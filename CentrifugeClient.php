@@ -42,19 +42,6 @@ class CentrifugeClient {
         return hash_final($ctx);
     }
 
-    public function sign(){
-        $data=[
-            "project"=>$this->projectKey,
-            "timestamp"=>(string) time(),
-            "url"=>$this->connectionHost,
-            "user"=>$this->user,
-        ];
-        $ctx=hash_init("md5",HASH_HMAC,$this->secret);
-        hash_update($ctx,$this->projectKey);
-        hash_update($ctx,$this->user);
-        hash_update($ctx,$data["timestamp"]);
-        $data["token"]=hash_final($ctx);
-        return $data;
-    }
+ 
 
 } 

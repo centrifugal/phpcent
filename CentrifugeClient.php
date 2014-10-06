@@ -5,7 +5,7 @@
  * Date: 03.10.14
  * Time: 16:11
  */
-namespace sl4mmer/cent-php
+namespace Sl4mmer\Phpcent;
 class CentrifugeClient {
     private $host;
     private $projectKey;

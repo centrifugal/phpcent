@@ -1,11 +1,5 @@
 <?php
-/**
- * Created by IntelliJ IDEA.
- * User: sl4mmer
- * Date: 03.10.14
- * Time: 16:11
- */
-namespace Sl4mmer\Phpcent;
+namespace phpcent;
 class CentrifugeClient {
     private $host;
     private $projectKey;
@@ -13,7 +7,7 @@ class CentrifugeClient {
 
 
     public function __construct($host="http://localhost:8000"){
-        $this->connectionHost=$host;
+        $this->host=$host;
 
     }
 
@@ -28,11 +22,15 @@ class CentrifugeClient {
 
     public function send($method,$params){
         $data=json_encode(["method"=>$method,"params"=>$params]);
-        $ch=curl_init( "$this->host/api/$this->projectKey");
+        $ch=curl_init( "$this->host/api/$this->projectId");
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
         curl_setopt($ch, CURLOPT_POST, 1);
         curl_setopt($ch, CURLOPT_POSTFIELDS,http_build_query(["data"=>$data,"sign"=>$this->buildSign($data)], '', '&'));
-        print_r(curl_exec($ch));
+        curl_exec($ch);
+        $headers=curl_getinfo($ch);
+        curl_close($ch);
+        return ((!empty($headers["http_code"]))&&($headers["http_code"]==200));
+
     }
 
     private function buildSign($data){

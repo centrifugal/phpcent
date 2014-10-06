@@ -1,14 +1,17 @@
 {
-    "name": "sl4mmer/phpcent",
-    "description":"Php library to communicate with Centrifuge",
-    "autoload": {
-        "psr-0" : {
-            "phpcent" : "sl4mmer/"
-        }
-
+    "name": "andre_487/php_rutils",
+    "description": "RUtils is a Russian-specific string utils (transliteration, numeral is words, russian dates, typography)",
+    "version": "1.1.1",
+    "type": "library",
+    "keywords": ["transliteration", "numeral is words", "russian dates", "typography"],
+    "homepage": "https://github.com/Andre-487/php_rutils",
+    "license": "MIT",
+    "require": {
+        "php":">=5.3.0"
     },
-    "require":{
-    	"php": ">=5.3.0",
-    	"ext-curl":"*"
+    "autoload":{
+        "psr-0":{
+            "phpcent": ".."
+        }
     }
 }

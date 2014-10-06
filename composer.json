@@ -3,7 +3,7 @@
     "description":"Php library to communicate with Centrifuge",
     "autoload": {
         "psr-0" : {
-            "Sl4mmer\\Phpcent" : "/"
+            "phpcent" : "sl4mmer/"
         }
 
     },

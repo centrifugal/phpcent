@@ -1,0 +1,12 @@
+{
+    "name": "sl4mmer/phpcent",
+    "autoload": {
+        "psr-0" : {
+            "Sl4mmer\\PhpCent" : "/"
+        }
+
+    },
+    "require":{
+    	"ext-curl":"*"
+    }
+}

@@ -1,23 +1,30 @@
-cent-php
+Phpcent
 ========
 
 Php library to communicate with Centrifuge
-		
-		Using with composer
-		add dependency at your composer.json
-		
-		"sl4mmer/phpcent":"dev-master",
 
-		
+Library is published on the Composer: https://packagist.org/packages/sl4mmer/phpcent
+
+Full Centrifuge documentation http://centrifuge.readthedocs.org/en/latest/		
+
+Basic Usage
 
 
-        $client = new \phpcent\CentrifugeClient("Your Host");
-        $client->setProject("Project Id","ProjectKey");
-        $client->send($method,$params)
-        //Publish method has a shortend
-        $client->publish($channelName,$data);
+```php
         
+        $client = new \phpcent\Client("http://localhost:8000");
+        $client->setProject("projectId","projectSecret");
+        $client->publish("basic:main_feed",["message"=>"Hello Everybody"]);
+        $history=$client->history("basic:main_feed")];
+        
+```
+All api methods for managing channels has shortends. You can call other methods trough phpcent/Client::send($mehtod,$params)
 
+You can use phpcent to create frontend token
+
+```php
+	$data['token']=$client->setProject($data["project"],$secret)->buildSign($data["user"].$data["timestamp"]);         
+```
 
         
 

@@ -27,13 +27,13 @@ Basic Usage
 ```
 All api methods for managing channels has shortends. You can call other methods trough send method 
 ```php
-phpcent/Client::send($mehtod,$params)
+$client->send($mehtod,$params)
 ```
 
 You can use phpcent to create frontend token
 
 ```php
-	$data['token']=$client->setProject($data["project"],$secret)->buildSign($data["user"].$data["timestamp"]);         
+	$data['token']=$client->buildSign($data["user"].$data["timestamp"]);         
 ```
 
         

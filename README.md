@@ -4,6 +4,13 @@ Phpcent
 Php library to communicate with Centrifuge
 
 Library is published on the Composer: https://packagist.org/packages/sl4mmer/phpcent
+```php
+{
+    "require": {
+        "sl4mmer/phpcent":"dev-master",
+    }
+}
+```
 
 Full Centrifuge documentation http://centrifuge.readthedocs.org/en/latest/		
 
@@ -18,7 +25,10 @@ Basic Usage
         $history=$client->history("basic:main_feed")];
         
 ```
-All api methods for managing channels has shortends. You can call other methods trough phpcent/Client::send($mehtod,$params)
+All api methods for managing channels has shortends. You can call other methods trough send method 
+```php
+phpcent/Client::send($mehtod,$params)
+```
 
 You can use phpcent to create frontend token
 

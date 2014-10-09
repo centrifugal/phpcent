@@ -18,7 +18,10 @@ Basic Usage
         $history=$client->history("basic:main_feed")];
         
 ```
-All api methods for managing channels has shortends. You can call other methods trough phpcent/Client::send($mehtod,$params)
+All api methods for managing channels has shortends. You can call other methods trough Client::send()
+```php
+$client->send("namespace_create",["name"=>"newnamespace"])
+```
 
 You can use phpcent to create frontend token
 
@@ -26,5 +29,7 @@ You can use phpcent to create frontend token
 	$data['token']=$client->setProject($data["project"],$secret)->buildSign($data["user"].$data["timestamp"]);         
 ```
 
+
+$client->send("namespace_create",["name"=>"second"])
         
 

@@ -4,6 +4,13 @@ Phpcent
 Php library to communicate with Centrifuge
 
 Library is published on the Composer: https://packagist.org/packages/sl4mmer/phpcent
+```php
+{
+    "require": {
+        "sl4mmer/phpcent":"dev-master",
+    }
+}
+```
 
 Full Centrifuge documentation http://centrifuge.readthedocs.org/en/latest/		
 
@@ -29,7 +36,5 @@ You can use phpcent to create frontend token
 	$data['token']=$client->setProject($data["project"],$secret)->buildSign($data["user"].$data["timestamp"]);         
 ```
 
-
-$client->send("namespace_create",["name"=>"second"])
         
 

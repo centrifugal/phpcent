@@ -8,22 +8,23 @@
 
 namespace phpcent;
 
-
-class Transport implements ITransport {
-
+class Transport implements ITransport
+{
 
     public function communicate($host, $projectId, $data)
     {
-        $ch=curl_init( "$host/api/$projectId");
+        $ch = curl_init("$host/api/$projectId");
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
         curl_setopt($ch, CURLOPT_POST, 1);
-        curl_setopt($ch, CURLOPT_POSTFIELDS,http_build_query($data, '', '&'));
-        $response=curl_exec($ch);
-        $headers=curl_getinfo($ch);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data, '', '&'));
+        $response = curl_exec($ch);
+        $headers = curl_getinfo($ch);
         curl_close($ch);
-        if (empty($headers["http_code"])||($headers["http_code"]!=200))
-            throw new \Exception("Response code: ".$headers["http_code"].PHP_EOL."Body: ".$response);
-        $answer= json_decode($response,true);
+        if (empty($headers["http_code"]) || ($headers["http_code"] != 200)) {
+            throw new \Exception("Response code: " . $headers["http_code"] . PHP_EOL . "Body: " . $response);
+        }
+        $answer = json_decode($response, true);
+
         return $answer;
     }
 }

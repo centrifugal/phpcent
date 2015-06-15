@@ -3,6 +3,7 @@
     "description":"Php library to communicate with Centrifuge",
     "keywords": ["centrifuge"],
     "homepage": "https://github.com/sl4mmer/phpcent",
+    "version": "0.6.0",
     "license": "MIT",
     "autoload": {
         "psr-0" : {

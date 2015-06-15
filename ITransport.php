@@ -8,15 +8,15 @@
 
 namespace phpcent;
 
-
-interface ITransport {
+interface ITransport
+{
 
     /**
      * @param $host
-     * @param $projectId
+     * @param $projectKey
      * @param $data
      * @return mixed
      */
-    public function communicate($host,$projectId,$data);
+    public function communicate($host, $projectKey, $data);
 
 } 

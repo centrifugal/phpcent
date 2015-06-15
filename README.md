@@ -20,7 +20,7 @@ Basic Usage
 ```php
         
         $client = new \phpcent\Client("http://localhost:8000");
-        $client->setProject("projectId","projectSecret");
+        $client->setProject("projectKey","projectSecret");
         $client->publish("basic:main_feed",["message"=>"Hello Everybody"]);
         $history=$client->history("basic:main_feed")];
         

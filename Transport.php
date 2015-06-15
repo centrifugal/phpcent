@@ -11,9 +11,9 @@ namespace phpcent;
 class Transport implements ITransport
 {
 
-    public function communicate($host, $projectId, $data)
+    public function communicate($host, $projectKey, $data)
     {
-        $ch = curl_init("$host/api/$projectId");
+        $ch = curl_init("$host/api/$projectKey");
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
         curl_setopt($ch, CURLOPT_POST, 1);
         curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data, '', '&'));

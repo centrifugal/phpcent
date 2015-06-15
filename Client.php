@@ -3,15 +3,9 @@ namespace phpcent;
 
 class Client
 {
-    private $host;
-    private $projectKey;
-    private $projectId;
-
-    /**
-     * @var string secret api key from configuration file. Required for superuser mode
-     */
-
-    private $apiSecret;
+    protected $projectSecret;
+    private   $host;
+    private   $projectKey;
     /**
      * @var ITransport $transport
      */
@@ -24,37 +18,15 @@ class Client
 
     }
 
-    /**
-     * Enables superuser mode for next request
-     * Don't use it. Will be available in next commit
-     *
-     * @todo Broken =)
-     * @return $this
-     */
-    public function su()
-    {
-        $this->_su = true;
-
-        return $this;
-    }
-
-    public function setApiSecret($secret)
-    {
-        $this->apiSecret = $secret;
-    }
-
     public function getHost()
     {
         return $this->host;
     }
 
-    public function setProject($id, $key, $apisecret = null)
+    public function setProject($projectKey, $projectSecret)
     {
-        if ($apisecret) {
-            $this->apiSecret = $apisecret;
-        }
-        $this->projectId = $id;
-        $this->projectKey = $key;
+        $this->projectSecret = $projectSecret;
+        $this->projectKey = $projectKey;
 
         return $this;
     }
@@ -127,20 +99,15 @@ class Client
         if (empty($params)) {
             $params = new \StdClass();
         }
-        if ($this->_su) {
-            $params["_project"] = $this->projectId;
-        }
         $data = json_encode(["method" => $method, "params" => $params]);
-        try {
-            $result = $this->getTransport()
-                           ->communicate($this->host, $this->projectId, ["data" => $data, "sign" => $this->buildSign($data)]);
-        } catch (\Exception $exception) {
-            $this->_su = false;
-            throw $exception;
-        }
-        $this->_su = false;
 
-        return $result;
+        return
+            $this->getTransport()
+                 ->communicate(
+                     $this->host,
+                     $this->projectKey,
+                     ["data" => $data, "sign" => $this->buildSign($data)]
+                 );
     }
 
     /**
@@ -150,17 +117,12 @@ class Client
      */
     public function buildSign($data)
     {
-        if ($this->projectKey == null) {
-            throw new \Exception("Project key should nod be empty");
+        if (empty($this->projectKey) || empty($this->projectSecret)) {
+            throw new \Exception("Project key and Project secret should nod be empty");
         }
-        if ($this->projectId == null) {
-            throw new \Exception("Project id should not be empty");
-        }
-        if ($this->_su && $this->apiSecret == null) {
-            throw new \Exception("Api secret is required for superuser mode");
-        }
-        $ctx = hash_init("sha256", HASH_HMAC, ($this->_su) ? $this->apiSecret : $this->projectKey);
-        hash_update($ctx, ($this->_su) ? "_" : $this->projectId);
+
+        $ctx = hash_init("sha256", HASH_HMAC, $this->projectSecret);
+        hash_update($ctx, ($this->_su) ? "_" : $this->projectKey);
         hash_update($ctx, $data);
 
         return hash_final($ctx);

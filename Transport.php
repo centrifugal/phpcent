@@ -14,6 +14,7 @@ class Transport implements ITransport
     public function communicate($host, $projectKey, $data)
     {
         $ch = curl_init("$host/api/$projectKey");
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
         curl_setopt($ch, CURLOPT_POST, 1);
         curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data, '', '&'));

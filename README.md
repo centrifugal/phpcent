@@ -40,4 +40,8 @@ You can use phpcent to create frontend token
 ```
 
         
+In case if your Centrifuge api has invalid SSL certificate, you can use 
 
+```php
+\phpcent\Transport::setSafety(\phpcent\Transport::UNSAFE);
+```

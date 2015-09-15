@@ -89,6 +89,16 @@ class Client
     }
 
     /**
+     * get channels information (list of currently active channels).
+     *
+     * @return mixed
+     */
+    public function channels()
+    {
+        return $this->send("channels", []);
+    }
+
+    /**
      * @param string $method
      * @param array  $params
      * @return mixed

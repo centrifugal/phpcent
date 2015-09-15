@@ -25,7 +25,7 @@ Basic Usage
         $client = new \phpcent\Client("http://localhost:8000");
         $client->setProject("projectKey", "projectSecret");
         $client->publish("basic:main_feed", ["message" => "Hello Everybody"]);
-        $history = $client->history("basic:main_feed")];
+        $history = $client->history("basic:main_feed");
         
 ```
 All api methods for managing channels has shortends. You can call other methods trough Client::send()

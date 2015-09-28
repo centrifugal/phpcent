@@ -3,9 +3,8 @@ namespace phpcent;
 
 class Client
 {
-    protected $projectSecret;
+    protected $secret;
     private   $host;
-    private   $projectKey;
     /**
      * @var ITransport $transport
      */
@@ -23,11 +22,9 @@ class Client
         return $this->host;
     }
 
-    public function setProject($projectKey, $projectSecret)
+    public function setSecret($secret)
     {
-        $this->projectSecret = $projectSecret;
-        $this->projectKey = $projectKey;
-
+        $this->secret = $secret;
         return $this;
     }
 
@@ -115,7 +112,6 @@ class Client
             $this->getTransport()
                  ->communicate(
                      $this->host,
-                     $this->projectKey,
                      ["data" => $data, "sign" => $this->buildSign($data)]
                  );
     }
@@ -127,12 +123,11 @@ class Client
      */
     public function buildSign($data)
     {
-        if (empty($this->projectKey) || empty($this->projectSecret)) {
-            throw new \Exception("Project key and Project secret should nod be empty");
+        if (empty($this->secret)) {
+            throw new \Exception("secret should nod be empty");
         }
 
-        $ctx = hash_init("sha256", HASH_HMAC, $this->projectSecret);
-        hash_update($ctx, ($this->_su) ? "_" : $this->projectKey);
+        $ctx = hash_init("sha256", HASH_HMAC, $this->secret);
         hash_update($ctx, $data);
 
         return hash_final($ctx);

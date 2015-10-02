@@ -96,6 +96,16 @@ class Client
     }
 
     /**
+     * get stats information about running server nodes.
+     *
+     * @return mixed
+     */
+    public function stats()
+    {
+        return $this->send("stats", []);
+    }
+
+    /**
      * @param string $method
      * @param array  $params
      * @return mixed

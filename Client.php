@@ -122,8 +122,18 @@ class Client
             $this->getTransport()
                  ->communicate(
                      $this->host,
-                     ["data" => $data, "sign" => $this->buildSign($data)]
+                     ["data" => $data, "sign" => $this->generateApiSign($data)]
                  );
+    }
+
+    /**
+     * Check that secret key set
+     * @throws \Exception
+     */
+    private function checkKey()
+    {
+        if ($this->secret == null)
+            throw new \Exception("Secret must be set");
     }
 
     /**
@@ -131,15 +141,45 @@ class Client
      * @return string $hash
      * @throws \Exception if required data not specified
      */
-    public function buildSign($data)
+    public function generateApiSign($data)
     {
-        if (empty($this->secret)) {
-            throw new \Exception("secret should nod be empty");
-        }
-
+        $this->checkKey();
         $ctx = hash_init("sha256", HASH_HMAC, $this->secret);
         hash_update($ctx, $data);
 
+        return hash_final($ctx);
+    }
+
+    /**
+     * Generate client connection token
+     *
+     * @param string $user
+     * @param string $timestamp
+     * @param string $info
+     * @return string
+     */
+    public function generateClientToken($user, $timestamp, $info = "")
+    {
+        $this->checkKey();
+        $ctx = hash_init("sha256", HASH_HMAC, $this->secret);
+        hash_update($ctx, $user);
+        hash_update($ctx, $timestamp);
+        hash_update($ctx, $info);
+        return hash_final($ctx);
+    }
+    /**
+     * @param string $client
+     * @param string $channel
+     * @param string $info
+     * @return string
+     */
+    public function generateChannelSign($client, $channel, $info = "")
+    {
+        $this->checkKey();
+        $ctx = hash_init("sha256", HASH_HMAC, $this->secret);
+        hash_update($ctx, $client);
+        hash_update($ctx, $channel);
+        hash_update($ctx, $info);
         return hash_final($ctx);
     }
 

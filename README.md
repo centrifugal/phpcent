@@ -28,13 +28,13 @@ Basic Usage:
 You can use `phpcent` to create frontend token:
 
 ```php
-	$token = $client->setSecret($pSecret)->genererateClientToken($user, $timestamp);
+	$token = $client->setSecret($pSecret)->generateClientToken($user, $timestamp);
 ```
 
 Or to create private channel sign:
 
 ```php
-	$sign = $client->setSecret($pSecret)->genererateChannelSign($client, $channel);
+	$sign = $client->setSecret($pSecret)->generateClientToken($client, $channel);
 ```
 
 In case if your Centrifugo server has invalid SSL certificate, you can use:

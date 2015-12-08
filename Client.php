@@ -85,7 +85,7 @@ class Client
      */
     public function history($channel)
     {
-        return $this->send("presence", ["channel" => $channel]);
+        return $this->send("history", ["channel" => $channel]);
     }
 
     /**

@@ -4,12 +4,11 @@ namespace phpcent;
 class Client
 {
     protected $secret;
-    private   $host;
+    private $host;
     /**
      * @var ITransport $transport
      */
     private $transport;
-    private $_su = false;
 
     public function __construct($host = "http://localhost:8000")
     {
@@ -107,7 +106,7 @@ class Client
 
     /**
      * @param string $method
-     * @param array  $params
+     * @param array $params
      * @return mixed
      * @throws \Exception
      */
@@ -120,10 +119,10 @@ class Client
 
         return
             $this->getTransport()
-                 ->communicate(
-                     $this->host,
-                     ["data" => $data, "sign" => $this->generateApiSign($data)]
-                 );
+                ->communicate(
+                    $this->host,
+                    ["data" => $data, "sign" => $this->generateApiSign($data)]
+                );
     }
 
     /**
@@ -165,8 +164,10 @@ class Client
         hash_update($ctx, $user);
         hash_update($ctx, $timestamp);
         hash_update($ctx, $info);
+
         return hash_final($ctx);
     }
+
     /**
      * @param string $client
      * @param string $channel
@@ -180,6 +181,7 @@ class Client
         hash_update($ctx, $client);
         hash_update($ctx, $channel);
         hash_update($ctx, $info);
+
         return hash_final($ctx);
     }
 

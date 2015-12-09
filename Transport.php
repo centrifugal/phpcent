@@ -26,7 +26,6 @@ class Transport implements ITransport
     public function communicate($host, $data)
     {
         $ch = curl_init("$host/api/");
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
         curl_setopt($ch, CURLOPT_POST, 1);
 
@@ -43,10 +42,10 @@ class Transport implements ITransport
 
         if (empty($headers["http_code"]) || ($headers["http_code"] != 200)) {
             throw new \Exception("Response code: "
-                                 . $headers["http_code"]
-                                 . PHP_EOL
-                                 . "Body: "
-                                 . $response
+                . $headers["http_code"]
+                . PHP_EOL
+                . "Body: "
+                . $response
             );
         }
 

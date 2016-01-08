@@ -1,7 +1,7 @@
 {
     "name": "sl4mmer/phpcent",
     "description":"Php library to communicate with Centrifugo/Centrifuge)",
-    "keywords": ["centrifuge",["centrifugo"]],
+    "keywords": "centrifugo",
     "homepage": "https://github.com/centrifugal/phpcent",
     "version": "1.0.2",
     "license": "MIT",

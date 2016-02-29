@@ -41,27 +41,17 @@ class Client
 
     /**
      * send message into multiple channels. data is an actual information you want to send into channel
-     * If you use outdated version of centrifugo - client use publish calls loop instead of native broadcast call
-     * @param       $channels
+     * @param array $channels
      * @param array $data
      * @return mixed.
      */
     public function broadcast($channels, $data)
     {
-        try {
-            return
-                $this->send(
-                    "broadcast",
-                    ["channels" => $channels, "data" => $data]
-                );
-        } catch (\Exception $e) {
-            foreach ($channels as $channel) {
-                $this->publish($channel, $data);
-            }
-
-            return true;
-        }
-
+        return
+            $this->send(
+                "broadcast",
+                ["channels" => $channels, "data" => $data]
+            );
     }
 
     /**

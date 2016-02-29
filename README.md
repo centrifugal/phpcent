@@ -43,7 +43,7 @@ In case if your Centrifugo server has invalid SSL certificate, you can use:
 \phpcent\Transport::setSafety(\phpcent\Transport::UNSAFE);
 ```
 
-Since 1.0.3  phpcent has broadcast implementation. It has legacy support, so you should not worry about centrifugo verssion
+Since 1.0.3  phpcent has broadcast implementation. 
 
 ```php
 $client->broadcast(['example:entities', 'example:moar'], ['user_id' => 2321321, 'state' => '1']);

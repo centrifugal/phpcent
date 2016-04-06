@@ -41,7 +41,7 @@ class Transport implements ITransport
         curl_close($ch);
 
         if (empty($headers["http_code"]) || ($headers["http_code"] != 200)) {
-            throw new \Exception("Response code: "
+            throw new TransportException ("Response code: "
                 . $headers["http_code"]
                 . PHP_EOL
                 . "Body: "

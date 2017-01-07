@@ -37,6 +37,7 @@ class Transport implements ITransport
         curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
 
         $response = curl_exec($ch);
+        $error = curl_error($ch);
         $headers = curl_getinfo($ch);
         curl_close($ch);
 
@@ -44,6 +45,7 @@ class Transport implements ITransport
             throw new TransportException ("Response code: "
                 . $headers["http_code"]
                 . PHP_EOL
+                . "cURL error: " . $error . PHP_EOL
                 . "Body: "
                 . $response
             );

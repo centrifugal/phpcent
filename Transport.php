@@ -16,6 +16,17 @@ class Transport implements ITransport
     protected static $safety = self::SAFE;
 
     /**
+     * @var string Certificate file name
+     * @since 1.0.5
+     */
+    private $cert;
+    /**
+     * @var string Directory containing CA certificates
+     * @since 1.0.5
+     */
+    private $caPath;
+
+    /**
      * @param mixed $safety
      */
     public static function setSafety($safety)
@@ -29,8 +40,19 @@ class Transport implements ITransport
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
         curl_setopt($ch, CURLOPT_POST, 1);
 
-        if (self::$safety === Transport::UNSAFE) {
+        if (self::$safety === self::UNSAFE) {
             curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+        } elseif (self::$safety === self::SAFE) {
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+
+            if (null !== $this->cert) {
+                curl_setopt($ch, CURLOPT_CAINFO, $this->cert);
+            }
+            if (null !== $this->caPath) {
+                curl_setopt($ch, CURLOPT_CAPATH, $this->caPath);
+            }
         }
 
         $postData = http_build_query($data, '', '&');
@@ -54,5 +76,41 @@ class Transport implements ITransport
         $answer = json_decode($response, true);
 
         return $answer;
+    }
+
+    /**
+     * @return string|null
+     * @since 1.0.5
+     */
+    public function getCert()
+    {
+        return $this->cert;
+    }
+
+    /**
+     * @param string|null $cert
+     * @since 1.0.5
+     */
+    public function setCert($cert)
+    {
+        $this->cert = $cert;
+    }
+
+    /**
+     * @return string|null
+     * @since 1.0.5
+     */
+    public function getCAPath()
+    {
+        return $this->caPath;
+    }
+
+    /**
+     * @param string|null $caPath
+     * @since 1.0.5
+     */
+    public function setCAPath($caPath)
+    {
+        $this->caPath = $caPath;
     }
 }

@@ -37,17 +37,31 @@ Or to create private channel sign:
 	$sign = $client->setSecret($pSecret)->generateClientToken($client, $channel);
 ```
 
+Since 1.0.3 phpcent has broadcast implementation.
+
+```php
+$client->broadcast(['example:entities', 'example:moar'], ['user_id' => 2321321, 'state' => '1']);
+```
+
+### SSL
+
 In case if your Centrifugo server has invalid SSL certificate, you can use:
 
 ```php
 \phpcent\Transport::setSafety(\phpcent\Transport::UNSAFE);
 ```
 
-Since 1.0.3  phpcent has broadcast implementation. 
+Since 1.0.5 you can use self signed certificate in safe manner:
 
 ```php
-$client->broadcast(['example:entities', 'example:moar'], ['user_id' => 2321321, 'state' => '1']);
+$client = new \phpcent\Client("https://localhost:8000");
+$client->setSecret("secret key from Centrifugo");
+$transport = new \phpcent\Transport();
+$transport->setCert("/path/to/certificate.pem");
+$client->setTransport($transport);
 ```
+
+*Note:* Certificate must match with host name in `Client` address (`localhost` in example above).
 
 Alternative clients
 ===================

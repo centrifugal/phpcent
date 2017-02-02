@@ -67,3 +67,5 @@ Alternative clients
 ===================
 
 * [php-centrifugo](https://github.com/oleh-ozimok/php-centrifugo) - allows to work with Redis Engine API queue.
+* [php_cent](https://github.com/skoniks/php_cent) by [skoniks](https://github.com/skoniks)
+

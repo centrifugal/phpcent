@@ -27,6 +27,16 @@ class Transport implements ITransport
     private $caPath;
 
     /**
+     * @var int|null
+     */
+    private $connectTimeoutOption;
+
+    /**
+     * @var int|null
+     */
+    private $timeoutOption;
+
+    /**
      * @param mixed $safety
      */
     public static function setSafety($safety)
@@ -34,11 +44,26 @@ class Transport implements ITransport
         self::$safety = $safety;
     }
 
+    /**
+     *
+     * @param string $host
+     * @param mixed $data
+     * @return mixed
+     * @throws TransportException
+     */
     public function communicate($host, $data)
     {
         $ch = curl_init("$host/api/");
+
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
         curl_setopt($ch, CURLOPT_POST, 1);
+
+        if ($this->connectTimeoutOption !== null) {
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $this->connectTimeoutOption);
+        }
+        if ($this->timeoutOption !== null) {
+            curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeoutOption);
+        }
 
         if (self::$safety === self::UNSAFE) {
             curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
@@ -73,9 +98,7 @@ class Transport implements ITransport
             );
         }
 
-        $answer = json_decode($response, true);
-
-        return $answer;
+        return json_decode($response, true);
     }
 
     /**
@@ -112,5 +135,43 @@ class Transport implements ITransport
     public function setCAPath($caPath)
     {
         $this->caPath = $caPath;
+    }
+
+    /**
+     * @return int|null
+     */
+    public function getConnectTimeoutOption()
+    {
+        return $this->connectTimeoutOption;
+    }
+
+    /**
+     * @return int|null
+     */
+    public function getTimeoutOption()
+    {
+        return $this->timeoutOption;
+    }
+
+    /**
+     * @param int|null $connectTimeoutOption
+     * @return Transport
+     */
+    public function setConnectTimeoutOption($connectTimeoutOption)
+    {
+        $this->connectTimeoutOption = $connectTimeoutOption;
+
+        return $this;
+    }
+
+    /**
+     * @param int|null $timeoutOption
+     * @return Transport
+     */
+    public function setTimeoutOption($timeoutOption)
+    {
+        $this->timeoutOption = $timeoutOption;
+
+        return $this;
     }
 }

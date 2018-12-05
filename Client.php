@@ -133,7 +133,7 @@ class Client
         return $this->send('info');
     }
 
-    public function generateToken(string $userId = '', int $exp = 0, array $info = [])
+    public function generateConnectionToken(string $userId = '', int $exp = 0, array $info = [])
     {
         $header = ['typ' => 'JWT', 'alg' => 'HS256'];
         $payload = ['sub' => $userId];
@@ -143,10 +143,23 @@ class Client
         $segments[] = $this->urlsafeB64Encode(json_encode($header));
         $segments[] = $this->urlsafeB64Encode(json_encode($payload));
         $signing_input = implode('.', $segments);
-
         $signature = $this->sign($signing_input, $this->secret);
         $segments[] = $this->urlsafeB64Encode($signature);
+        return implode('.', $segments);
+    }
 
+    public function generatePrivateChannelToken(string $client, string $channel, int $exp = 0, array $info = [])
+    {
+        $header = ['typ' => 'JWT', 'alg' => 'HS256'];
+        $payload = ['channel' => $channel, 'client' => $client];
+        if (!empty($info)) $payload['info'] = $info;
+        if ($exp) $payload['exp'] = $exp;
+        $segments = [];
+        $segments[] = $this->urlsafeB64Encode(json_encode($header));
+        $segments[] = $this->urlsafeB64Encode(json_encode($payload));
+        $signing_input = implode('.', $segments);
+        $signature = $this->sign($signing_input, $this->secret);
+        $segments[] = $this->urlsafeB64Encode($signature);
         return implode('.', $segments);
     }
 

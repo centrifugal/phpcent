@@ -15,22 +15,22 @@ class Client
 
     private static $safety = true;
 
-    public function __construct(string $url, string $secret = '', string $apikey = '')
+    public function __construct(string $url, string $apikey = '', string $secret = '')
     {
         $this->url = $url;
-        $this->secret = $secret;
         $this->apikey = $apikey;
-    }
-
-    public function setSecret(string $secret)
-    {
         $this->secret = $secret;
-        return $this;
     }
 
     public function setApiKey(string $key)
     {
         $this->apikey = $key;
+        return $this;
+    }
+
+    public function setSecret(string $secret)
+    {
+        $this->secret = $secret;
         return $this;
     }
 

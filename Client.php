@@ -3,221 +3,228 @@ namespace phpcent;
 
 class Client
 {
-    protected $secret;
-    private $host;
-    /**
-     * @var ITransport $transport
-     */
-    private $transport;
+    private $url;
+    private $apikey;
+    private $secret;
 
-    public function __construct($host = "http://localhost:8000")
+    private $cert;
+    private $caPath;
+
+    private $connectTimeoutOption;
+    private $timeoutOption;
+
+    private static $safety = true;
+
+    public function __construct(string $url, string $secret = '', string $apikey = '')
     {
-        $this->host = $host;
-
+        $this->url = $url;
+        $this->secret = $secret;
+        $this->apikey = $apikey;
     }
 
-    public function getHost()
-    {
-        return $this->host;
-    }
-
-    public function setSecret($secret)
+    public function setSecret(string $secret)
     {
         $this->secret = $secret;
         return $this;
     }
 
-    /**
-     * send message into channel of namespace. data is an actual information you want to send into channel
-     *
-     * @param       $channel
-     * @param array $data
-     * @return mixed
-     */
-    public function publish($channel, $data = [])
+    public function setApiKey(string $key)
     {
-        return $this->send("publish", ["channel" => $channel, "data" => $data]);
+        $this->apikey = $key;
+        return $this;
     }
 
-    /**
-     * send message into multiple channels. data is an actual information you want to send into channel
-     * @param array $channels
-     * @param array $data
-     * @return mixed.
-     */
+    public function setSafety($safety)
+    {
+        $this->safety = $safety;
+        return $this;
+    }
+
+    public function setCert($cert)
+    {
+        $this->cert = $cert;
+        return $this;
+    }
+
+    public function setCAPath($caPath)
+    {
+        $this->caPath = $caPath;
+        return $this;
+    }
+
+    public function setConnectTimeoutOption(int $connectTimeoutOption)
+    {
+        $this->connectTimeoutOption = $connectTimeoutOption;
+        return $this;
+    }
+
+    public function setTimeoutOption(int $timeoutOption)
+    {
+        $this->timeoutOption = $timeoutOption;
+        return $this;
+    }
+
+    public function publish($channel, $data)
+    {
+        return $this->send('publish', [
+            'channel' => $channel,
+            'data' => $data,
+        ]);
+    }
+
     public function broadcast($channels, $data)
     {
-        return
-            $this->send(
-                "broadcast",
-                ["channels" => $channels, "data" => $data]
-            );
+        return $this->send('broadcast', [
+            'channels' => $channels,
+            'data' => $data,
+        ]);
     }
 
-    /**
-     * unsubscribe user with certain ID from channel.
-     *
-     * @param $channel
-     * @param $userId
-     * @return mixed
-     */
-    public function unsubscribe($channel, $userId)
+    public function unsubscribe($channel, $user)
     {
-        return $this->send("unsubscribe", ["channel" => $channel, "user" => $userId]);
+        return $this->send('unsubscribe', [
+            'channel' => $channel,
+            'user' => $user,
+        ]);
     }
 
-    /**
-     * disconnect user by user ID.
-     *
-     * @param $userId
-     * @return mixed
-     */
-    public function disconnect($userId)
+    public function disconnect($user)
     {
-        return $this->send("disconnect", ["user" => $userId]);
+        return $this->send('disconnect', [
+            'user' => $user,
+        ]);
     }
 
-    /**
-     * get channel presence information (all clients currently subscribed on this channel).
-     *
-     * @param $channel
-     * @return mixed
-     */
     public function presence($channel)
     {
-        return $this->send("presence", ["channel" => $channel]);
+        return $this->send('presence', [
+            'channel' => $channel,
+        ]);
     }
 
-    /**
-     * get channel history information (list of last messages sent into channel).
-     *
-     * @param $channel
-     * @return mixed
-     */
+    public function presence_stats($channel)
+    {
+        return $this->send('presence_stats', [
+            'channel' => $channel,
+        ]);
+    }
+
     public function history($channel)
     {
-        return $this->send("history", ["channel" => $channel]);
+        return $this->send('history', [
+            'channel' => $channel,
+        ]);
     }
 
-    /**
-     * get channels information (list of currently active channels).
-     *
-     * @return mixed
-     */
+    public function history_remove($channel)
+    {
+        return $this->send('history_remove', [
+            'channel' => $channel,
+        ]);
+    }
+
     public function channels()
     {
-        return $this->send("channels", []);
+        return $this->send('channels');
     }
 
-    /**
-     * get stats information about running server nodes.
-     *
-     * @return mixed
-     */
-    public function stats()
+    public function info()
     {
-        return $this->send("stats", []);
+        return $this->send('info');
     }
 
-    /**
-     * @param string $method
-     * @param array $params
-     * @return mixed
-     * @throws \Exception
-     */
-    public function send($method, $params = [])
+    public function generateConnectionToken(string $userId = '', int $exp = 0, array $info = [])
     {
-        if (empty($params)) {
-            $params = new \StdClass();
+        $header = ['typ' => 'JWT', 'alg' => 'HS256'];
+        $payload = ['sub' => $userId];
+        if (!empty($info)) $payload['info'] = $info;
+        if ($exp) $payload['exp'] = $exp;
+        $segments = [];
+        $segments[] = $this->urlsafeB64Encode(json_encode($header));
+        $segments[] = $this->urlsafeB64Encode(json_encode($payload));
+        $signing_input = implode('.', $segments);
+        $signature = $this->sign($signing_input, $this->secret);
+        $segments[] = $this->urlsafeB64Encode($signature);
+        return implode('.', $segments);
+    }
+
+    public function generatePrivateChannelToken(string $client, string $channel, int $exp = 0, array $info = [])
+    {
+        $header = ['typ' => 'JWT', 'alg' => 'HS256'];
+        $payload = ['channel' => $channel, 'client' => $client];
+        if (!empty($info)) $payload['info'] = $info;
+        if ($exp) $payload['exp'] = $exp;
+        $segments = [];
+        $segments[] = $this->urlsafeB64Encode(json_encode($header));
+        $segments[] = $this->urlsafeB64Encode(json_encode($payload));
+        $signing_input = implode('.', $segments);
+        $signature = $this->sign($signing_input, $this->secret);
+        $segments[] = $this->urlsafeB64Encode($signature);
+        return implode('.', $segments);
+    }
+
+    private function send($method, $params = [])
+    {
+        $response = \json_decode($this->request($method, $params));
+        if (JSON_ERROR_NONE !== json_last_error()) {
+          throw new \Exception(
+            'json_decode error: ' . json_last_error_msg()
+          );
         }
-        $data = json_encode(["method" => $method, "params" => $params]);
-
-        return
-            $this->getTransport()
-                ->communicate(
-                    $this->host,
-                    ["data" => $data, "sign" => $this->generateApiSign($data)]
-                );
+        return $response;
     }
 
-    /**
-     * Check that secret key set
-     * @throws \Exception
-     */
-    private function checkKey()
+    private function urlsafeB64Encode($input)
     {
-        if ($this->secret == null)
-            throw new \Exception("Secret must be set");
+        return str_replace('=', '', strtr(base64_encode($input), '+/', '-_'));
     }
 
-    /**
-     * @param $data
-     * @return string $hash
-     * @throws \Exception if required data not specified
-     */
-    public function generateApiSign($data)
+    private function sign($msg, $key)
     {
-        $this->checkKey();
-        $ctx = hash_init("sha256", HASH_HMAC, $this->secret);
-        hash_update($ctx, $data);
-
-        return hash_final($ctx);
+        return hash_hmac('sha256', $msg, $key, true);
     }
 
-    /**
-     * Generate client connection token
-     *
-     * @param string $user
-     * @param string $timestamp
-     * @param string $info
-     * @return string
-     */
-    public function generateClientToken($user, $timestamp, $info = "")
+    private function request(string $method, array $params)
     {
-        $this->checkKey();
-        $ctx = hash_init("sha256", HASH_HMAC, $this->secret);
-        hash_update($ctx, $user);
-        hash_update($ctx, $timestamp);
-        hash_update($ctx, $info);
-
-        return hash_final($ctx);
-    }
-
-    /**
-     * @param string $client
-     * @param string $channel
-     * @param string $info
-     * @return string
-     */
-    public function generateChannelSign($client, $channel, $info = "")
-    {
-        $this->checkKey();
-        $ctx = hash_init("sha256", HASH_HMAC, $this->secret);
-        hash_update($ctx, $client);
-        hash_update($ctx, $channel);
-        hash_update($ctx, $info);
-
-        return hash_final($ctx);
-    }
-
-    /**
-     * @return ITransport
-     */
-    private function getTransport()
-    {
-        if ($this->transport == null) {
-            $this->setTransport(new Transport());
+        $ch = curl_init();
+        if ($this->connectTimeoutOption) curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $this->connectTimeoutOption);
+        if ($this->timeoutOption) curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeoutOption);
+        if (!self::$safety) {
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+        } elseif (self::$safety) {
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+            if ($this->cert) curl_setopt($ch, CURLOPT_CAINFO, $this->cert);
+            if ($this->caPath) curl_setopt($ch, CURLOPT_CAPATH, $this->caPath);
         }
-
-        return $this->transport;
+        curl_setopt($ch, CURLOPT_HEADER, 0);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(['method' => $method, 'params' => $params]));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getHeaders());
+        curl_setopt($ch, CURLOPT_URL, $this->url);
+        $data = curl_exec($ch);
+        $error = curl_error($ch);
+        $headers = curl_getinfo($ch);
+        curl_close($ch);
+        if (empty($headers["http_code"]) || ($headers["http_code"] != 200)) {
+            throw new \Exception("Response code: "
+                . $headers["http_code"]
+                . PHP_EOL
+                . "cURL error: " . $error . PHP_EOL
+                . "Body: "
+                . $response
+            );
+        }
+        return $data;
     }
 
-    /**
-     * @param ITransport $transport
-     */
-    public function setTransport(ITransport $transport)
+    private function getHeaders()
     {
-        $this->transport = $transport;
+        return [
+            'Content-Type: application/json',
+            'Authorization: apikey ' . $this->apikey
+        ];
     }
-
 }

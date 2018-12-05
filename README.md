@@ -1,9 +1,10 @@
-Phpcent
-========
+phpcent
+=======
 
-Php library to communicate with Centrifugo HTTP API.
+PHP library to communicate with Centrifugo v2 HTTP API.
 
 Library is published on the Composer: https://packagist.org/packages/sl4mmer/phpcent
+
 ```php
 {
     "require": {
@@ -12,35 +13,48 @@ Library is published on the Composer: https://packagist.org/packages/sl4mmer/php
 }
 ```
 
-Full [Centrifugo documentation](https://fzambia.gitbooks.io/centrifugal/content/)
+See [Centrifugo documentation](https://centrifugal.github.io/centrifugo/)
 
 Basic Usage:
 
 ```php
-        
-        $client = new \phpcent\Client("http://localhost:8000");
-        $client->setSecret("secret key from Centrifugo");
-        $client->publish("main_feed", ["message" => "Hello Everybody"]);
-        $history = $client->history("main_feed");
-        
+$client = new \phpcent\Client("http://localhost:8000/api");
+$client->setApiKey("api key from Centrifugo");
+$client->publish("channel", ["message" => "Hello Everybody"]);
 ```
 
-You can use `phpcent` to create frontend token:
+You can use `phpcent` to create connection token (JWT):
 
 ```php
-	$token = $client->setSecret($pSecret)->generateClientToken($user, $timestamp);
+$token = $client->setSecret("Centrifugo secret key")->generateConnectionToken($user);
 ```
 
-Or to create private channel sign:
+Or private channel subscription token:
 
 ```php
-	$sign = $client->setSecret($pSecret)->generateClientToken($client, $channel);
+$token = $client->setSecret("Centrifugo secret key")->generatePrivateChannelToken($client, $channel);
 ```
 
-Since 1.0.3 phpcent has broadcast implementation.
+Timeouts:
 
 ```php
-$client->broadcast(['example:entities', 'example:moar'], ['user_id' => 2321321, 'state' => '1']);
+$client->setConnectTimeoutOption(0); // Seconds | 0 = never
+$client->setTimeoutOption(2); // Seconds
+```
+
+All available API methods:
+
+```php
+$response = $client->publish($channel, $messageData);
+$response = $client->broadcast($channels, $messageData);
+$response = $client->unsubscribe($channel, $userId);
+$response = $client->disconnect($userId);
+$response = $client->presence($channel);
+$response = $client->presence_stats($channel);
+$response = $client->history($channel);
+$response = $client->history_remove($channel);
+$response = $client->channels();
+$response = $client->info();
 ```
 
 ### SSL
@@ -48,24 +62,21 @@ $client->broadcast(['example:entities', 'example:moar'], ['user_id' => 2321321, 
 In case if your Centrifugo server has invalid SSL certificate, you can use:
 
 ```php
-\phpcent\Transport::setSafety(\phpcent\Transport::UNSAFE);
+$client->setSafety(false);
 ```
 
-Since 1.0.5 you can use self signed certificate in safe manner:
+You can also use self signed certificate in safe manner:
 
 ```php
-$client = new \phpcent\Client("https://localhost:8000");
-$client->setSecret("secret key from Centrifugo");
-$transport = new \phpcent\Transport();
-$transport->setCert("/path/to/certificate.pem");
-$client->setTransport($transport);
+$client = new \phpcent\Client("https://localhost:8000/api");
+$client->setCert("/path/to/certificate.pem");
+$client->setCAPath("/ca/path"); // if you need.
 ```
 
 *Note:* Certificate must match with host name in `Client` address (`localhost` in example above).
 
-Alternative clients
-===================
+Authors
+=======
 
-* [php-centrifugo](https://github.com/oleh-ozimok/php-centrifugo) - allows to work with Redis Engine API queue.
-* [php_cent](https://github.com/skoniks/php_cent) by [skoniks](https://github.com/skoniks)
-
+* [Dmitriy Soldatenko](https://github.com/sl4mmer)
+* [Tomchanio](https://github.com/Tomchanskiy)

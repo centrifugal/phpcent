@@ -213,6 +213,8 @@ class Client
                 . $headers["http_code"]
                 . PHP_EOL
                 . "cURL error: " . $error . PHP_EOL
+                . "Body: "
+                . $response
             );
         }
         return $data;

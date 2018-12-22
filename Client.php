@@ -137,8 +137,12 @@ class Client
     {
         $header = ['typ' => 'JWT', 'alg' => 'HS256'];
         $payload = ['sub' => $userId];
-        if (!empty($info)) $payload['info'] = $info;
-        if ($exp) $payload['exp'] = $exp;
+        if (!empty($info)) {
+            $payload['info'] = $info;
+        }
+        if ($exp) {
+            $payload['exp'] = $exp;
+        }
         $segments = [];
         $segments[] = $this->urlsafeB64Encode(json_encode($header));
         $segments[] = $this->urlsafeB64Encode(json_encode($payload));
@@ -152,8 +156,12 @@ class Client
     {
         $header = ['typ' => 'JWT', 'alg' => 'HS256'];
         $payload = ['channel' => $channel, 'client' => $client];
-        if (!empty($info)) $payload['info'] = $info;
-        if ($exp) $payload['exp'] = $exp;
+        if (!empty($info)) {
+            $payload['info'] = $info;
+        }
+        if ($exp) {
+            $payload['exp'] = $exp;
+        }
         $segments = [];
         $segments[] = $this->urlsafeB64Encode(json_encode($header));
         $segments[] = $this->urlsafeB64Encode(json_encode($payload));
@@ -167,7 +175,7 @@ class Client
     {
         $response = \json_decode($this->request($method, $params));
         if (JSON_ERROR_NONE !== json_last_error()) {
-          throw new \Exception(
+            throw new \Exception(
             'json_decode error: ' . json_last_error_msg()
           );
         }
@@ -187,16 +195,24 @@ class Client
     private function request(string $method, array $params)
     {
         $ch = curl_init();
-        if ($this->connectTimeoutOption) curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $this->connectTimeoutOption);
-        if ($this->timeoutOption) curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeoutOption);
+        if ($this->connectTimeoutOption) {
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $this->connectTimeoutOption);
+        }
+        if ($this->timeoutOption) {
+            curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeoutOption);
+        }
         if (!self::$safety) {
             curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
             curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
         } elseif (self::$safety) {
             curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
             curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
-            if ($this->cert) curl_setopt($ch, CURLOPT_CAINFO, $this->cert);
-            if ($this->caPath) curl_setopt($ch, CURLOPT_CAPATH, $this->caPath);
+            if ($this->cert) {
+                curl_setopt($ch, CURLOPT_CAINFO, $this->cert);
+            }
+            if ($this->caPath) {
+                curl_setopt($ch, CURLOPT_CAPATH, $this->caPath);
+            }
         }
         curl_setopt($ch, CURLOPT_HEADER, 0);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
@@ -209,7 +225,8 @@ class Client
         $headers = curl_getinfo($ch);
         curl_close($ch);
         if (empty($headers["http_code"]) || ($headers["http_code"] != 200)) {
-            throw new \Exception("Response code: "
+            throw new \Exception(
+                "Response code: "
                 . $headers["http_code"]
                 . PHP_EOL
                 . "cURL error: " . $error . PHP_EOL

@@ -13,7 +13,7 @@ class Client
     private $connectTimeoutOption;
     private $timeoutOption;
 
-    private static $safety = true;
+    private $safety = true;
 
     public function __construct(string $url, string $apikey = '', string $secret = '')
     {
@@ -201,10 +201,10 @@ class Client
         if ($this->timeoutOption) {
             curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeoutOption);
         }
-        if (!self::$safety) {
+        if ($this->safety) {
             curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
             curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
-        } elseif (self::$safety) {
+        } elseif ($this->safety) {
             curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
             curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
             if ($this->cert) {
@@ -214,6 +214,7 @@ class Client
                 curl_setopt($ch, CURLOPT_CAPATH, $this->caPath);
             }
         }
+		curl_setopt($ch, CURLOPT_USERAGENT, 'curl/7.39.0');
         curl_setopt($ch, CURLOPT_HEADER, 0);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
         curl_setopt($ch, CURLOPT_POST, true);

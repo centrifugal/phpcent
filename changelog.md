@@ -1,3 +1,7 @@
+# v2.0.3
+
+* fix safety param check - see https://github.com/centrifugal/phpcent/pull/29
+
 # v2.0.2
 
 * fix setting safety and use set user agent on request - see https://github.com/centrifugal/phpcent/pull/28

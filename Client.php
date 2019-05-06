@@ -22,42 +22,70 @@ class Client
         $this->secret = $secret;
     }
 
+    /**
+     * @param string $key
+     * @return Client
+     */
     public function setApiKey($key)
     {
         $this->apikey = $key;
         return $this;
     }
 
+    /**
+     * @param string $secret
+     * @return Client
+     */
     public function setSecret($secret)
     {
         $this->secret = $secret;
         return $this;
     }
 
+    /**
+     * @param bool $caPath
+     * @return Client
+     */
     public function setSafety($safety)
     {
         $this->safety = $safety;
         return $this;
     }
 
+    /**
+     * @param string $cert
+     * @return Client
+     */
     public function setCert($cert)
     {
         $this->cert = $cert;
         return $this;
     }
 
+    /**
+     * @param string $caPath
+     * @return Client
+     */
     public function setCAPath($caPath)
     {
         $this->caPath = $caPath;
         return $this;
     }
 
+    /**
+     * @param int $connectTimeoutOption
+     * @return Client
+     */
     public function setConnectTimeoutOption($connectTimeoutOption)
     {
         $this->connectTimeoutOption = $connectTimeoutOption;
         return $this;
     }
 
+    /**
+     * @param int $timeoutOption
+     * @return Client
+     */
     public function setTimeoutOption($timeoutOption)
     {
         $this->timeoutOption = $timeoutOption;

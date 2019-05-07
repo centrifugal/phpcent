@@ -15,6 +15,14 @@ class Client
 
     private $safety = true;
 
+    /**
+     * Construct new Client instance.
+     *
+     * @param string $url Centrifugo API endpoint 
+     * @param string $apikey Centrifugo API key
+     * @param string $secret Centrifugo secret key.
+     *
+     */
     public function __construct($url, $apikey = '', $secret = '')
     {
         $this->url = $url;

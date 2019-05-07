@@ -1,3 +1,8 @@
+# v2.1.0
+
+* fix compatibility with older PHP versions
+* add `setUseAssoc` method to use `assoc` option while decoding JSON from server
+
 # v2.0.3
 
 * fix safety param check - see https://github.com/centrifugal/phpcent/pull/29

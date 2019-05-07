@@ -14,56 +14,110 @@ class Client
     private $timeoutOption;
 
     private $safety = true;
+    private $useAssoc = false;
 
-    public function __construct(string $url, string $apikey = '', string $secret = '')
+    /**
+     * Construct new Client instance.
+     *
+     * @param string $url Centrifugo API endpoint 
+     * @param string $apikey Centrifugo API key
+     * @param string $secret Centrifugo secret key.
+     *
+     */
+    public function __construct($url, $apikey = '', $secret = '')
     {
         $this->url = $url;
         $this->apikey = $apikey;
         $this->secret = $secret;
     }
 
-    public function setApiKey(string $key)
+    /**
+     * @param string $key
+     * @return Client
+     */
+    public function setApiKey($key)
     {
         $this->apikey = $key;
         return $this;
     }
 
-    public function setSecret(string $secret)
+    /**
+     * @param string $secret
+     * @return Client
+     */
+    public function setSecret($secret)
     {
         $this->secret = $secret;
         return $this;
     }
 
+    /**
+     * @param bool $caPath
+     * @return Client
+     */
     public function setSafety($safety)
     {
         $this->safety = $safety;
         return $this;
     }
 
+    /**
+     * @param bool $useAssoc
+     * @return Client
+     */
+    public function setUseAssoc($useAssoc)
+    {
+        $this->useAssoc = $useAssoc;
+        return $this;
+    }
+
+    /**
+     * @param string $cert
+     * @return Client
+     */
     public function setCert($cert)
     {
         $this->cert = $cert;
         return $this;
     }
 
+    /**
+     * @param string $caPath
+     * @return Client
+     */
     public function setCAPath($caPath)
     {
         $this->caPath = $caPath;
         return $this;
     }
 
-    public function setConnectTimeoutOption(int $connectTimeoutOption)
+    /**
+     * @param int $connectTimeoutOption
+     * @return Client
+     */
+    public function setConnectTimeoutOption($connectTimeoutOption)
     {
         $this->connectTimeoutOption = $connectTimeoutOption;
         return $this;
     }
 
-    public function setTimeoutOption(int $timeoutOption)
+    /**
+     * @param int $timeoutOption
+     * @return Client
+     */
+    public function setTimeoutOption($timeoutOption)
     {
         $this->timeoutOption = $timeoutOption;
         return $this;
     }
 
+    /**
+     * Publish data into channel.
+     *
+     * @param string $channel
+     * @param array $data
+     * @return mixed
+     */
     public function publish($channel, $data)
     {
         return $this->send('publish', [
@@ -72,6 +126,13 @@ class Client
         ]);
     }
 
+    /**
+     * Broadcast the same data into multiple channels.
+     *
+     * @param array $channels
+     * @param array $data
+     * @return mixed
+     */
     public function broadcast($channels, $data)
     {
         return $this->send('broadcast', [
@@ -80,6 +141,13 @@ class Client
         ]);
     }
 
+    /**
+     * Unsubscribe user from channel.
+     *
+     * @param string $channel
+     * @param string $user
+     * @return mixed
+     */
     public function unsubscribe($channel, $user)
     {
         return $this->send('unsubscribe', [
@@ -88,6 +156,12 @@ class Client
         ]);
     }
 
+    /**
+     * Disconnect user.
+     *
+     * @param string $user
+     * @return mixed
+     */
     public function disconnect($user)
     {
         return $this->send('disconnect', [
@@ -95,6 +169,12 @@ class Client
         ]);
     }
 
+    /**
+     * Get channel presence info.
+     *
+     * @param string $channel
+     * @return mixed
+     */
     public function presence($channel)
     {
         return $this->send('presence', [
@@ -102,13 +182,37 @@ class Client
         ]);
     }
 
+    /**
+     * Get channel presence stats.
+     * Deprecated: use presenceStats instead.
+     *
+     * @param string $channel
+     * @return mixed
+     */
     public function presence_stats($channel)
+    {
+        return $this->presenceStats($channel);
+    }
+
+    /**
+     * Get channel presence stats.
+     *
+     * @param string $channel
+     * @return mixed
+     */
+    public function presenceStats($channel)
     {
         return $this->send('presence_stats', [
             'channel' => $channel,
         ]);
     }
 
+    /**
+     * Get channel history.
+     *
+     * @param string $channel
+     * @return mixed
+     */
     public function history($channel)
     {
         return $this->send('history', [
@@ -116,24 +220,60 @@ class Client
         ]);
     }
 
+    /**
+     * Remove channel history.
+     * Deprecated: use historyRemove instead.
+     *
+     * @param string $channel
+     * @return mixed
+     */
     public function history_remove($channel)
+    {
+        return $this->historyRemove($channel);
+    }
+
+    /**
+     * Remove channel history.
+     *
+     * @param string $channel
+     * @return mixed
+     */
+    public function historyRemove($channel)
     {
         return $this->send('history_remove', [
             'channel' => $channel,
         ]);
     }
 
+    /**
+     * Get all active channels.
+     *
+     * @return mixed
+     */
     public function channels()
     {
         return $this->send('channels');
     }
 
+    /**
+     * Get server info.
+     *
+     * @return mixed
+     */
     public function info()
     {
         return $this->send('info');
     }
 
-    public function generateConnectionToken(string $userId = '', int $exp = 0, array $info = [])
+    /**
+     * Generate connection JWT.
+     *
+     * @param string $userId
+     * @param int $exp
+     * @param array $info
+     * @return string
+     */
+    public function generateConnectionToken($userId = '', $exp = 0, $info = [])
     {
         $header = ['typ' => 'JWT', 'alg' => 'HS256'];
         $payload = ['sub' => $userId];
@@ -152,7 +292,16 @@ class Client
         return implode('.', $segments);
     }
 
-    public function generatePrivateChannelToken(string $client, string $channel, int $exp = 0, array $info = [])
+    /**
+     * Generate private channel JWT.
+     *
+     * @param string $client
+     * @param string $channel
+     * @param int $exp
+     * @param array $info
+     * @return string
+     */
+    public function generatePrivateChannelToken($client, $channel, $exp = 0, $info = [])
     {
         $header = ['typ' => 'JWT', 'alg' => 'HS256'];
         $payload = ['channel' => $channel, 'client' => $client];
@@ -173,7 +322,7 @@ class Client
 
     private function send($method, $params = [])
     {
-        $response = \json_decode($this->request($method, $params));
+        $response = \json_decode($this->request($method, $params), $this->useAssoc);
         if (JSON_ERROR_NONE !== json_last_error()) {
             throw new \Exception(
             'json_decode error: ' . json_last_error_msg()
@@ -192,7 +341,7 @@ class Client
         return hash_hmac('sha256', $msg, $key, true);
     }
 
-    private function request(string $method, array $params)
+    private function request($method, $params)
     {
         $ch = curl_init();
         if ($this->connectTimeoutOption) {
@@ -214,7 +363,7 @@ class Client
                 curl_setopt($ch, CURLOPT_CAPATH, $this->caPath);
             }
         }
-	curl_setopt($ch, CURLOPT_USERAGENT, 'curl/7.39.0');
+        curl_setopt($ch, CURLOPT_USERAGENT, 'curl/7.39.0');
         curl_setopt($ch, CURLOPT_HEADER, 0);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
         curl_setopt($ch, CURLOPT_POST, true);

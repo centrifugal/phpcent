@@ -14,6 +14,7 @@ class Client
     private $timeoutOption;
 
     private $safety = true;
+    private $useAssoc = false;
 
     /**
      * Construct new Client instance.
@@ -57,6 +58,16 @@ class Client
     public function setSafety($safety)
     {
         $this->safety = $safety;
+        return $this;
+    }
+
+    /**
+     * @param bool $useAssoc
+     * @return Client
+     */
+    public function setUseAssoc($useAssoc)
+    {
+        $this->useAssoc = $useAssoc;
         return $this;
     }
 
@@ -173,11 +184,23 @@ class Client
 
     /**
      * Get channel presence stats.
+     * Deprecated: use presenceStats instead.
      *
      * @param string $channel
      * @return mixed
      */
     public function presence_stats($channel)
+    {
+        return $this->presenceStats($channel);
+    }
+
+    /**
+     * Get channel presence stats.
+     *
+     * @param string $channel
+     * @return mixed
+     */
+    public function presenceStats($channel)
     {
         return $this->send('presence_stats', [
             'channel' => $channel,
@@ -199,11 +222,23 @@ class Client
 
     /**
      * Remove channel history.
+     * Deprecated: use historyRemove instead.
      *
      * @param string $channel
      * @return mixed
      */
     public function history_remove($channel)
+    {
+        return $this->historyRemove($channel);
+    }
+
+    /**
+     * Remove channel history.
+     *
+     * @param string $channel
+     * @return mixed
+     */
+    public function historyRemove($channel)
     {
         return $this->send('history_remove', [
             'channel' => $channel,
@@ -287,7 +322,7 @@ class Client
 
     private function send($method, $params = [])
     {
-        $response = \json_decode($this->request($method, $params));
+        $response = \json_decode($this->request($method, $params), $this->useAssoc);
         if (JSON_ERROR_NONE !== json_last_error()) {
             throw new \Exception(
             'json_decode error: ' . json_last_error_msg()

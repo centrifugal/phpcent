@@ -57,16 +57,22 @@ $client->setTimeoutOption(2); // Seconds
 All available API methods:
 
 ```php
-$response = $client->publish($channel, $messageData);
-$response = $client->broadcast($channels, $messageData);
+$response = $client->publish($channel, $data);
+$response = $client->broadcast($channels, $data);
 $response = $client->unsubscribe($channel, $userId);
 $response = $client->disconnect($userId);
 $response = $client->presence($channel);
-$response = $client->presence_stats($channel);
+$response = $client->presenceStats($channel);
 $response = $client->history($channel);
-$response = $client->history_remove($channel);
+$response = $client->historyRemove($channel);
 $response = $client->channels();
 $response = $client->info();
+```
+
+To use `assoc` option while decoding JSON:
+
+```php
+$client->setUseAssoc(true);
 ```
 
 ### SSL

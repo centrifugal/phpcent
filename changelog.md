@@ -1,3 +1,7 @@
+# v2.2.0
+
+* no changes here – just to sync actual version with Packagist.
+
 # v2.1.0
 
 * fix compatibility with older PHP versions

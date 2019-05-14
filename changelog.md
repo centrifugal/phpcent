@@ -1,3 +1,7 @@
+# v3.0.0
+
+* library is now distributed under new name – `centrifugal/phpcent`.
+
 # v2.2.0
 
 * no changes here – just to sync actual version with Packagist.

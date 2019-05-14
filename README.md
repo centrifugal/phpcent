@@ -3,12 +3,12 @@ phpcent
 
 PHP library to communicate with Centrifugo v2 HTTP API.
 
-Library is published on the Composer: https://packagist.org/packages/sl4mmer/phpcent
+Library is published on the Composer: https://packagist.org/packages/centrifugal/phpcent
 
 ```php
 {
     "require": {
-        "sl4mmer/phpcent":"dev-master",
+        "centrifugal/phpcent":"dev-master",
     }
 }
 ```

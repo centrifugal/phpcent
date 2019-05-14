@@ -1,5 +1,5 @@
 {
-    "name": "sl4mmer/phpcent",
+    "name": "centrifugal/phpcent",
     "description":"PHP library to communicate with Centrifugo HTTP API",
     "keywords": ["centrifugo"],
     "homepage": "https://github.com/centrifugal/phpcent",

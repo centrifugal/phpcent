@@ -1,6 +1,12 @@
-<?php
-namespace phpcent;
+<?php namespace phpcent;
 
+/**
+ * Centrifugo API Client
+ *
+ * @package    phpcent
+ * @copyright  Copyright (c) 2019 Centrifugal
+ * @license    The MIT License (MIT)
+ */
 class Client
 {
     private $url;
@@ -19,7 +25,7 @@ class Client
     /**
      * Construct new Client instance.
      *
-     * @param string $url Centrifugo API endpoint 
+     * @param string $url Centrifugo API endpoint
      * @param string $apikey Centrifugo API key
      * @param string $secret Centrifugo secret key.
      *
@@ -325,8 +331,8 @@ class Client
         $response = \json_decode($this->request($method, $params), $this->useAssoc);
         if (JSON_ERROR_NONE !== json_last_error()) {
             throw new \Exception(
-            'json_decode error: ' . json_last_error_msg()
-          );
+                'json_decode error: ' . json_last_error_msg()
+            );
         }
         return $response;
     }
@@ -389,7 +395,7 @@ class Client
     {
         return [
             'Content-Type: application/json',
-            'Authorization: apikey ' . $this->apikey
+            'Authorization: apikey ' . $this->apikey,
         ];
     }
 }

@@ -1,16 +1,15 @@
 phpcent
 =======
 
+[![Build Status](https://img.shields.io/travis/centrifugal/phpcent.svg?style=flat-square)](https://travis-ci.org/centrifugal/phpcent)
+[![Latest Version](https://img.shields.io/github/release/centrifugal/phpcent.svg?style=flat-square)](https://github.com/centrifugal/phpcent/releases)
+
 PHP library to communicate with Centrifugo v2 HTTP API.
 
 Library is published on the Composer: https://packagist.org/packages/centrifugal/phpcent
 
-```php
-{
-    "require": {
-        "centrifugal/phpcent":"dev-master",
-    }
-}
+```bash
+composer require centrifugal/phpcent:~3.0
 ```
 
 See [Centrifugo documentation](https://centrifugal.github.io/centrifugo/)
@@ -19,8 +18,8 @@ Basic Usage:
 
 ```php
 $client = new \phpcent\Client("http://localhost:8000/api");
-$client->setApiKey("Centrifugo api key");
-$client->publish("channel", ["message" => "Hello Everybody"]);
+$client->setApiKey("Centrifugo API key");
+$client->publish("channel", ["message" => "Hello World"]);
 ```
 
 You can use `phpcent` to create connection token (JWT):
@@ -44,7 +43,7 @@ $token = $client->setSecret("Centrifugo secret key")->generatePrivateChannelToke
 Also API key and secret can be set in constructor:
 
 ```php
-$client = new \phpcent\Client("http://localhost:8000/api", "Centrifugo api key", "Centrifugo secret key");
+$client = new \phpcent\Client("http://localhost:8000/api", "Centrifugo API key", "Centrifugo secret key");
 ```
 
 Timeouts:
@@ -69,7 +68,7 @@ $response = $client->channels();
 $response = $client->info();
 ```
 
-To use `assoc` option while decoding JSON:
+To use `assoc` option while decoding JSON in response:
 
 ```php
 $client->setUseAssoc(true);

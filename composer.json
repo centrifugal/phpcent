@@ -1,19 +1,19 @@
 {
     "name": "centrifugal/phpcent",
     "description":"PHP library to communicate with Centrifugo HTTP API",
-    "keywords": ["centrifugo"],
+    "keywords": ["centrifugo", "websocket", "realtime", "messaging"],
     "homepage": "https://github.com/centrifugal/phpcent",
     "version": "3.0.1",
     "license": "MIT",
-    "autoload": {
-        "psr-0" : {
-            "phpcent" : ".."
-        }
-
-    },
     "require":{
         "php": ">=5.3.0",
         "ext-json":"*",
         "ext-curl":"*"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "5.*"
+    },
+    "autoload": {
+        "psr-4": { "phpcent\\": "src" }
     }
 }

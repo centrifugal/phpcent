@@ -47,3 +47,6 @@ crashlytics.properties
 crashlytics-build.properties
 
 # Created by .ignore support plugin (hsz.mobi)
+composer.lock
+vendor/
+.phpunit.result.cache

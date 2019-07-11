@@ -3,7 +3,7 @@
     "description":"PHP library to communicate with Centrifugo HTTP API",
     "keywords": ["centrifugo"],
     "homepage": "https://github.com/centrifugal/phpcent",
-    "version": "3.0.0",
+    "version": "3.0.1",
     "license": "MIT",
     "autoload": {
         "psr-0" : {

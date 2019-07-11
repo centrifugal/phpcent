@@ -1,3 +1,7 @@
+# v3.0.1
+
+* cast user to string when generating connection token - fixes possible regression after updating to v3.0.0
+
 # v3.0.0
 
 * library is now distributed under new name – `centrifugal/phpcent`.

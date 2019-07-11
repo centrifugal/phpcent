@@ -276,7 +276,7 @@ class Client
     public function generateConnectionToken($userId = '', $exp = 0, $info = [])
     {
         $header = ['typ' => 'JWT', 'alg' => 'HS256'];
-        $payload = ['sub' => $userId];
+        $payload = ['sub' => (string) $userId];
         if (!empty($info)) {
             $payload['info'] = $info;
         }

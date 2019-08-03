@@ -310,7 +310,7 @@ class Client
     public function generatePrivateChannelToken($client, $channel, $exp = 0, $info = [])
     {
         $header = ['typ' => 'JWT', 'alg' => 'HS256'];
-        $payload = ['channel' => $channel, 'client' => $client];
+        $payload = ['channel' => (string)$channel, 'client' => (string)$client];
         if (!empty($info)) {
             $payload['info'] = $info;
         }

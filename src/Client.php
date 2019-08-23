@@ -330,7 +330,10 @@ class Client
  * Function added for backward compatibility with PHP version < 5.5
  */
     
-    private function json_last_error_msg() {
+    public function _json_last_error_msg() {
+      if (function_exists('json_last_error_msg')) {
+        return json_last_error_msg(json_last_error());
+      }
       static $ERRORS = array(
         JSON_ERROR_NONE => 'No error',
         JSON_ERROR_DEPTH => 'Maximum stack depth exceeded',
@@ -342,14 +345,14 @@ class Client
 
       $error = json_last_error();
       return isset($ERRORS[$error]) ? $ERRORS[$error] : 'Unknown error';
-    }
+  }
 
   private function send($method, $params = array())
     {
         $response = \json_decode($this->request($method, $params), $this->useAssoc);
         if (JSON_ERROR_NONE !== json_last_error()) {
             throw new \Exception(
-                'json_decode error: ' . json_last_error_msg()
+                'json_decode error: ' . _json_last_error_msg()
             );
         }
         return $response;

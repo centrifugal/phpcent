@@ -332,7 +332,7 @@ class Client
     
     public function _json_last_error_msg() {
       if (function_exists('json_last_error_msg')) {
-        return json_last_error_msg(json_last_error());
+        return json_last_error_msg();
       }
       static $ERRORS = array(
         JSON_ERROR_NONE => 'No error',

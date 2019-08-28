@@ -126,10 +126,10 @@ class Client
      */
     public function publish($channel, $data)
     {
-        return $this->send('publish', [
+        return $this->send('publish', array(
             'channel' => $channel,
             'data' => $data,
-        ]);
+        ));
     }
 
     /**
@@ -141,10 +141,10 @@ class Client
      */
     public function broadcast($channels, $data)
     {
-        return $this->send('broadcast', [
+        return $this->send('broadcast', array(
             'channels' => $channels,
             'data' => $data,
-        ]);
+        ));
     }
 
     /**
@@ -156,10 +156,10 @@ class Client
      */
     public function unsubscribe($channel, $user)
     {
-        return $this->send('unsubscribe', [
+        return $this->send('unsubscribe', array(
             'channel' => $channel,
             'user' => $user,
-        ]);
+        ));
     }
 
     /**
@@ -170,9 +170,9 @@ class Client
      */
     public function disconnect($user)
     {
-        return $this->send('disconnect', [
+        return $this->send('disconnect', array(
             'user' => $user,
-        ]);
+        ));
     }
 
     /**
@@ -183,9 +183,9 @@ class Client
      */
     public function presence($channel)
     {
-        return $this->send('presence', [
+        return $this->send('presence', array(
             'channel' => $channel,
-        ]);
+        ));
     }
 
     /**
@@ -208,9 +208,9 @@ class Client
      */
     public function presenceStats($channel)
     {
-        return $this->send('presence_stats', [
+        return $this->send('presence_stats', array(
             'channel' => $channel,
-        ]);
+        ));
     }
 
     /**
@@ -221,9 +221,9 @@ class Client
      */
     public function history($channel)
     {
-        return $this->send('history', [
+        return $this->send('history', array(
             'channel' => $channel,
-        ]);
+        ));
     }
 
     /**
@@ -246,9 +246,9 @@ class Client
      */
     public function historyRemove($channel)
     {
-        return $this->send('history_remove', [
+        return $this->send('history_remove', array(
             'channel' => $channel,
-        ]);
+        ));
     }
 
     /**
@@ -279,17 +279,17 @@ class Client
      * @param array $info
      * @return string
      */
-    public function generateConnectionToken($userId = '', $exp = 0, $info = [])
+    public function generateConnectionToken($userId = '', $exp = 0, $info = array())
     {
-        $header = ['typ' => 'JWT', 'alg' => 'HS256'];
-        $payload = ['sub' => (string) $userId];
+        $header = array('typ' => 'JWT', 'alg' => 'HS256');
+        $payload = array('sub' => (string) $userId);
         if (!empty($info)) {
             $payload['info'] = $info;
         }
         if ($exp) {
             $payload['exp'] = $exp;
         }
-        $segments = [];
+        $segments = array();
         $segments[] = $this->urlsafeB64Encode(json_encode($header));
         $segments[] = $this->urlsafeB64Encode(json_encode($payload));
         $signing_input = implode('.', $segments);
@@ -307,17 +307,17 @@ class Client
      * @param array $info
      * @return string
      */
-    public function generatePrivateChannelToken($client, $channel, $exp = 0, $info = [])
+    public function generatePrivateChannelToken($client, $channel, $exp = 0, $info = array())
     {
-        $header = ['typ' => 'JWT', 'alg' => 'HS256'];
-        $payload = ['channel' => (string)$channel, 'client' => (string)$client];
+        $header = array('typ' => 'JWT', 'alg' => 'HS256');
+        $payload = array('channel' => (string)$channel, 'client' => (string)$client);
         if (!empty($info)) {
             $payload['info'] = $info;
         }
         if ($exp) {
             $payload['exp'] = $exp;
         }
-        $segments = [];
+        $segments = array();
         $segments[] = $this->urlsafeB64Encode(json_encode($header));
         $segments[] = $this->urlsafeB64Encode(json_encode($payload));
         $signing_input = implode('.', $segments);
@@ -326,12 +326,33 @@ class Client
         return implode('.', $segments);
     }
 
-    private function send($method, $params = [])
+/*
+ * Function added for backward compatibility with PHP version < 5.5
+ */
+    
+    public function _json_last_error_msg() {
+      if (function_exists('json_last_error_msg')) {
+        return json_last_error_msg();
+      }
+      static $ERRORS = array(
+        JSON_ERROR_NONE => 'No error',
+        JSON_ERROR_DEPTH => 'Maximum stack depth exceeded',
+        JSON_ERROR_STATE_MISMATCH => 'State mismatch (invalid or malformed JSON)',
+        JSON_ERROR_CTRL_CHAR => 'Control character error, possibly incorrectly encoded',
+        JSON_ERROR_SYNTAX => 'Syntax error',
+        JSON_ERROR_UTF8 => 'Malformed UTF-8 characters, possibly incorrectly encoded'
+      );
+
+      $error = json_last_error();
+      return isset($ERRORS[$error]) ? $ERRORS[$error] : 'Unknown error';
+  }
+
+  private function send($method, $params = array())
     {
         $response = \json_decode($this->request($method, $params), $this->useAssoc);
         if (JSON_ERROR_NONE !== json_last_error()) {
             throw new \Exception(
-                'json_decode error: ' . json_last_error_msg()
+                'json_decode error: ' . _json_last_error_msg()
             );
         }
         return $response;
@@ -373,7 +394,7 @@ class Client
         curl_setopt($ch, CURLOPT_HEADER, 0);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
         curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(['method' => $method, 'params' => $params]));
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(array('method' => $method, 'params' => $params)));
         curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getHeaders());
         curl_setopt($ch, CURLOPT_URL, $this->url);
         $data = curl_exec($ch);
@@ -393,9 +414,9 @@ class Client
 
     private function getHeaders()
     {
-        return [
+        return array(
             'Content-Type: application/json',
             'Authorization: apikey ' . $this->apikey,
-        ];
+        );
     }
 }

@@ -1,3 +1,7 @@
+# v3.0.2
+
+* fix `Call to undefined function phpcent\_json_last_error_msg()`
+
 # v3.0.1
 
 * cast user to string when generating connection token - fixes possible regression after updating to v3.0.0

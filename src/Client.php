@@ -352,7 +352,7 @@ class Client
         $response = \json_decode($this->request($method, $params), $this->useAssoc);
         if (JSON_ERROR_NONE !== json_last_error()) {
             throw new \Exception(
-                'json_decode error: ' . _json_last_error_msg()
+                'json_decode error: ' . $this->_json_last_error_msg()
             );
         }
         return $response;

@@ -92,6 +92,31 @@ $client->setCAPath("/ca/path"); // if you need.
 
 *Note:* Certificate must match with host name in `Client` address (`localhost` in example above).
 
+### Testing
+
+Requirements:
+
+* git
+* A supported version of PHP
+* [composer](http://getcomposer.org/download)
+* [Docker](https://www.docker.com/products/docker-desktop)
+
+The provided PHPUnit tests assume that a local [Centrifugo](https://github.com/centrifugal/centrifugo) server is running and available at port 8000. This can be accomplished using Docker and the [official Centrifugo image](https://hub.docker.com/r/centrifugo/centrifugo/).
+
+```shell
+# Install package dependencies.
+$ composer install
+
+# The following command starts a Centrifugo server running in a background Docker container.
+$ docker run -d -p 8000:8000 --name centrifugo centrifugo/centrifugo centrifugo --api_insecure
+
+# Run the test suite.
+$ vendor/bin/phpunit
+
+# Shut down the Centrifugo container.
+$ docker stop centrifugo
+```
+
 Authors
 =======
 

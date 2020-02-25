@@ -16,4 +16,4 @@ before_script:
   - docker run -d -p 8000:8000 centrifugo/centrifugo centrifugo --api_insecure
 
 script:
-  - phpunit
+  - vendor/bin/phpunit

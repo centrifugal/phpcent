@@ -279,12 +279,15 @@ class Client
      * @param array $info
      * @return string
      */
-    public function generateConnectionToken($userId = '', $exp = 0, $info = array())
+    public function generateConnectionToken($userId = '', $exp = 0, $info = array(), $channels = array())
     {
         $header = array('typ' => 'JWT', 'alg' => 'HS256');
         $payload = array('sub' => (string) $userId);
         if (!empty($info)) {
             $payload['info'] = $info;
+        }
+        if (!empty($channels)) {
+            $payload['channels'] = $channels;
         }
         if ($exp) {
             $payload['exp'] = $exp;
@@ -329,7 +332,7 @@ class Client
 /*
  * Function added for backward compatibility with PHP version < 5.5
  */
-    
+
     public function _json_last_error_msg() {
       if (function_exists('json_last_error_msg')) {
         return json_last_error_msg();

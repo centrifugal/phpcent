@@ -1,3 +1,7 @@
+# v3.1.0
+
+* support `channels` JWT claim in `generateConnectionToken` function - which is an array of server-side channels to subscribe (see [docs](https://centrifugal.github.io/centrifugo/server/server_subs/)). Thanks, [Julius TM](https://github.com/juliustm)
+
 # v3.0.2
 
 * fix `Call to undefined function phpcent\_json_last_error_msg()`

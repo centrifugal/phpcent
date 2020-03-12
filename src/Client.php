@@ -277,6 +277,7 @@ class Client
      * @param string $userId
      * @param int $exp
      * @param array $info
+     * @param array $channels
      * @return string
      */
     public function generateConnectionToken($userId = '', $exp = 0, $info = array(), $channels = array())

@@ -92,6 +92,20 @@ $client->setCAPath("/ca/path"); // if you need.
 
 *Note:* Certificate must match with host name in `Client` address (`localhost` in example above).
 
+### DNS Resolution
+
+This error may indicate your system is having trouble resolving IPv6 addresses:
+
+```
+cURL error: Resolving timed out after [value] milliseconds
+```
+
+By default, both IPv4 and IPv6 addresses will attempt to be resolved. You can force it to only resolve IPv4 addresses with:
+
+```php
+$client->forceIpResolveV4();
+```
+
 ### Testing
 
 Requirements:

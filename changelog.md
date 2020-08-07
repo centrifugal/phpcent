@@ -1,3 +1,11 @@
+# v3.1.1
+
+* option to force IPv4 addresses when resolving hostnames, see [#44](https://github.com/centrifugal/phpcent/issues/44) and [#45](https://github.com/centrifugal/phpcent/pull/45). Thanks [Steve Therrien](https://github.com/SteveTherrien)!
+
+```php
+$client->forceIpResolveV4();
+```
+
 # v3.1.0
 
 * support `channels` JWT claim in `generateConnectionToken` function - which is an array of server-side channels to subscribe (see [docs](https://centrifugal.github.io/centrifugo/server/server_subs/)). Thanks, [Julius TM](https://github.com/juliustm)

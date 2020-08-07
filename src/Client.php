@@ -18,6 +18,7 @@ class Client
 
     private $connectTimeoutOption;
     private $timeoutOption;
+    private $forceIpResolveV4;
 
     private $safety = true;
     private $useAssoc = false;
@@ -114,6 +115,17 @@ class Client
     public function setTimeoutOption($timeoutOption)
     {
         $this->timeoutOption = $timeoutOption;
+        return $this;
+    }
+
+    /**
+     * Forces DNS to only resolve IPv4 addresses.
+     *
+     * @return Client
+     */
+    public function forceIpResolveV4()
+    {
+        $this->forceIpResolveV4 = true;
         return $this;
     }
 
@@ -380,6 +392,9 @@ class Client
         }
         if ($this->timeoutOption) {
             curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeoutOption);
+        }
+        if ($this->forceIpResolveV4) {
+            curl_setopt($ch, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
         }
         if (!$this->safety) {
             curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);

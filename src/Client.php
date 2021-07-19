@@ -134,14 +134,15 @@ class Client
      *
      * @param string $channel
      * @param array $data
+     * @param boolean $skipHistory (optional)
      * @return mixed
      */
-    public function publish($channel, $data, $skip_history = false)
+    public function publish($channel, $data, $skipHistory = false)
     {
         return $this->send('publish', array(
             'channel' => $channel,
             'data' => $data,
-            'skip_history' => $skip_history,
+            'skip_history' => $skipHistory,
         ));
     }
 
@@ -150,14 +151,15 @@ class Client
      *
      * @param array $channels
      * @param array $data
+     * @param boolean $skipHistory (optional)
      * @return mixed
      */
-    public function broadcast($channels, $data, $skip_history = false)
+    public function broadcast($channels, $data, $skipHistory = false)
     {
         return $this->send('broadcast', array(
             'channels' => $channels,
             'data' => $data,
-            'skip_history' => $skip_history,
+            'skip_history' => $skipHistory,
         ));
     }
 
@@ -166,6 +168,7 @@ class Client
      *
      * @param string $channel
      * @param string $user
+     * @param string $client (optional)
      * @return mixed
      */
     public function subscribe($channel, $user, $client = '')
@@ -182,6 +185,7 @@ class Client
      *
      * @param string $channel
      * @param string $user
+     * @param string $client (optional)
      * @return mixed
      */
     public function unsubscribe($channel, $user, $client = '')
@@ -197,6 +201,7 @@ class Client
      * Disconnect user.
      *
      * @param string $user
+     * @param string $client (optional)
      * @return mixed
      */
     public function disconnect($user, $client = '')
@@ -237,6 +242,9 @@ class Client
      * Get channel history.
      *
      * @param string $channel
+     * @param int $limit (optional)
+     * @param array $since (optional)
+     * @param boolean $reverse (optional)
      * @return mixed
      */
     public function history($channel, $limit = 0, $since = array(), $reverse = false)
@@ -276,7 +284,9 @@ class Client
 
     /**
      * Get all active channels.
-     *
+     * 
+     * @param string $client (optional)
+     * @param string $pattern (optional)
      * @return mixed
      */
     public function channels($pattern = '')

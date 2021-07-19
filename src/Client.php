@@ -136,11 +136,12 @@ class Client
      * @param array $data
      * @return mixed
      */
-    public function publish($channel, $data)
+    public function publish($channel, $data, $skip_history = false)
     {
         return $this->send('publish', array(
             'channel' => $channel,
             'data' => $data,
+            'skip_history' => $skip_history,
         ));
     }
 
@@ -151,11 +152,28 @@ class Client
      * @param array $data
      * @return mixed
      */
-    public function broadcast($channels, $data)
+    public function broadcast($channels, $data, $skip_history = false)
     {
         return $this->send('broadcast', array(
             'channels' => $channels,
             'data' => $data,
+            'skip_history' => $skip_history,
+        ));
+    }
+
+    /**
+     * Subscribe user to channel.
+     *
+     * @param string $channel
+     * @param string $user
+     * @return mixed
+     */
+    public function subscribe($channel, $user, $client = '')
+    {
+        return $this->send('subscribe', array(
+            'channel' => $channel,
+            'user' => $user,
+            'client' => $client,
         ));
     }
 
@@ -166,11 +184,12 @@ class Client
      * @param string $user
      * @return mixed
      */
-    public function unsubscribe($channel, $user)
+    public function unsubscribe($channel, $user, $client = '')
     {
         return $this->send('unsubscribe', array(
             'channel' => $channel,
             'user' => $user,
+            'client' => $client,
         ));
     }
 
@@ -180,10 +199,11 @@ class Client
      * @param string $user
      * @return mixed
      */
-    public function disconnect($user)
+    public function disconnect($user, $client = '')
     {
         return $this->send('disconnect', array(
             'user' => $user,
+            'client' => $client,
         ));
     }
 
@@ -198,18 +218,6 @@ class Client
         return $this->send('presence', array(
             'channel' => $channel,
         ));
-    }
-
-    /**
-     * Get channel presence stats.
-     * Deprecated: use presenceStats instead.
-     *
-     * @param string $channel
-     * @return mixed
-     */
-    public function presence_stats($channel)
-    {
-        return $this->presenceStats($channel);
     }
 
     /**
@@ -231,23 +239,13 @@ class Client
      * @param string $channel
      * @return mixed
      */
-    public function history($channel)
+    public function history($channel, $limit = 0, $since = array(), $reverse = false)
     {
-        return $this->send('history', array(
-            'channel' => $channel,
-        ));
-    }
-
-    /**
-     * Remove channel history.
-     * Deprecated: use historyRemove instead.
-     *
-     * @param string $channel
-     * @return mixed
-     */
-    public function history_remove($channel)
-    {
-        return $this->historyRemove($channel);
+        $params = array('channel' => $channel, 'limit' => $limit, 'reverse' => $reverse);
+        if (!empty($since)) {
+            $params['since'] = $since;
+        }
+        return $this->send('history', $params);
     }
 
     /**
@@ -264,13 +262,26 @@ class Client
     }
 
     /**
+     * Send rpc.
+     *
+     * @return mixed
+     */
+    public function rpc($method, $params)
+    {
+        return $this->send('rpc', array(
+            'method' => $method,
+            'params' => $params,
+        ));
+    }
+
+    /**
      * Get all active channels.
      *
      * @return mixed
      */
-    public function channels()
+    public function channels($pattern = '')
     {
-        return $this->send('channels');
+        return $this->rpc("getChannels", array('pattern' => $pattern));
     }
 
     /**
@@ -342,10 +353,9 @@ class Client
         return implode('.', $segments);
     }
 
-/*
- * Function added for backward compatibility with PHP version < 5.5
- */
-
+    /*
+    * Function added for backward compatibility with PHP version < 5.5
+    */
     public function _json_last_error_msg() {
       if (function_exists('json_last_error_msg')) {
         return json_last_error_msg();

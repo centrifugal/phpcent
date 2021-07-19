@@ -1,3 +1,10 @@
+# v4.0.0
+
+Adapt to work with Centrifugo v3.
+
+* Deprecated `history_remove` removed (in favour of `historyRemove`)
+* Deprecated `presence_stats` removed (in favour of `presenceStats`)
+
 # v3.1.1
 
 * option to force IPv4 addresses when resolving hostnames, see [#44](https://github.com/centrifugal/phpcent/issues/44) and [#45](https://github.com/centrifugal/phpcent/pull/45). Thanks [Steve Therrien](https://github.com/SteveTherrien)!

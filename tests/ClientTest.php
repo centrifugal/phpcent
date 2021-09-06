@@ -1,8 +1,8 @@
 <?php
-class ClientTest extends PHPUnit_Framework_TestCase
+class ClientTest extends PHPUnit\Framework\TestCase
 {
     protected $client;
-    public function setUp()
+    public function setUp(): void
     {
         $this->client = new \phpcent\Client("http://localhost:8000/api");
     }
@@ -22,14 +22,14 @@ class ClientTest extends PHPUnit_Framework_TestCase
         $this->client->setUseAssoc(true);
         $res = $this->client->publish('channel', ["message" => "Hello World"]);
         $this->assertNotNull($res);
-        $this->assertEquals([], $res);
+        $this->assertEquals(["result" => array()], $res);
     }
     public function testPublishCentrifugoError()
     {
         $this->client->setUseAssoc(true);
         $res = $this->client->publish('namespace:channel', ["message" => "Hello World"]);
         $this->assertNotNull($res);
-        $this->assertEquals(["error" => ["code" => 102, "message" => "namespace not found"]], $res);
+        $this->assertEquals(["error" => ["code" => 102, "message" => "unknown channel"]], $res);
     }
     public function testPublishNetworkError()
     {

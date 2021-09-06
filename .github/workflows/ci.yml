@@ -1,0 +1,28 @@
+
+name: "test"
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    name: "test"
+    # Prevent duplicate builds on internal PRs.
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
+    strategy:
+      matrix:
+        php-version: ["8.0"]
+    steps:
+      - uses: "actions/checkout@v2"
+
+      - uses: "shivammathur/setup-php@v2"
+        with:
+          php-version: "${{ matrix.php-version }}"
+
+      - name: Composer install
+        uses: "ramsey/composer-install@v1"
+
+      - name: Start Centrifugo
+        run: docker run -d -p 8000:8000 centrifugo/centrifugo:latest centrifugo --api_insecure
+
+      - name: Run tests
+        run: vendor/bin/phpunit

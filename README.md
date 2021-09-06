@@ -12,6 +12,8 @@ Library is published on the Composer: https://packagist.org/packages/centrifugal
 composer require centrifugal/phpcent:~4.0
 ```
 
+See [Centrifugo server API documentation](https://centrifugal.dev/docs/server/server_api).
+
 Basic Usage:
 
 ```php

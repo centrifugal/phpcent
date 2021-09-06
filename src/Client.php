@@ -1,4 +1,6 @@
-<?php namespace phpcent;
+<?php
+
+namespace phpcent;
 
 /**
  * Centrifugo API Client
@@ -134,13 +136,15 @@ class Client
      *
      * @param string $channel
      * @param array $data
+     * @param boolean $skipHistory (optional)
      * @return mixed
      */
-    public function publish($channel, $data)
+    public function publish($channel, $data, $skipHistory = false)
     {
         return $this->send('publish', array(
             'channel' => $channel,
             'data' => $data,
+            'skip_history' => $skipHistory,
         ));
     }
 
@@ -149,13 +153,32 @@ class Client
      *
      * @param array $channels
      * @param array $data
+     * @param boolean $skipHistory (optional)
      * @return mixed
      */
-    public function broadcast($channels, $data)
+    public function broadcast($channels, $data, $skipHistory = false)
     {
         return $this->send('broadcast', array(
             'channels' => $channels,
             'data' => $data,
+            'skip_history' => $skipHistory,
+        ));
+    }
+
+    /**
+     * Subscribe user to channel.
+     *
+     * @param string $channel
+     * @param string $user
+     * @param string $client (optional)
+     * @return mixed
+     */
+    public function subscribe($channel, $user, $client = '')
+    {
+        return $this->send('subscribe', array(
+            'channel' => $channel,
+            'user' => $user,
+            'client' => $client,
         ));
     }
 
@@ -164,13 +187,15 @@ class Client
      *
      * @param string $channel
      * @param string $user
+     * @param string $client (optional)
      * @return mixed
      */
-    public function unsubscribe($channel, $user)
+    public function unsubscribe($channel, $user, $client = '')
     {
         return $this->send('unsubscribe', array(
             'channel' => $channel,
             'user' => $user,
+            'client' => $client,
         ));
     }
 
@@ -178,12 +203,14 @@ class Client
      * Disconnect user.
      *
      * @param string $user
+     * @param string $client (optional)
      * @return mixed
      */
-    public function disconnect($user)
+    public function disconnect($user, $client = '')
     {
         return $this->send('disconnect', array(
             'user' => $user,
+            'client' => $client,
         ));
     }
 
@@ -198,18 +225,6 @@ class Client
         return $this->send('presence', array(
             'channel' => $channel,
         ));
-    }
-
-    /**
-     * Get channel presence stats.
-     * Deprecated: use presenceStats instead.
-     *
-     * @param string $channel
-     * @return mixed
-     */
-    public function presence_stats($channel)
-    {
-        return $this->presenceStats($channel);
     }
 
     /**
@@ -229,25 +244,18 @@ class Client
      * Get channel history.
      *
      * @param string $channel
+     * @param int $limit (optional)
+     * @param array $since (optional)
+     * @param boolean $reverse (optional)
      * @return mixed
      */
-    public function history($channel)
+    public function history($channel, $limit = 0, $since = array(), $reverse = false)
     {
-        return $this->send('history', array(
-            'channel' => $channel,
-        ));
-    }
-
-    /**
-     * Remove channel history.
-     * Deprecated: use historyRemove instead.
-     *
-     * @param string $channel
-     * @return mixed
-     */
-    public function history_remove($channel)
-    {
-        return $this->historyRemove($channel);
+        $params = array('channel' => $channel, 'limit' => $limit, 'reverse' => $reverse);
+        if (!empty($since)) {
+            $params['since'] = $since;
+        }
+        return $this->send('history', $params);
     }
 
     /**
@@ -265,12 +273,15 @@ class Client
 
     /**
      * Get all active channels.
-     *
+     * 
+     * @param string $pattern (optional)
      * @return mixed
      */
-    public function channels()
+    public function channels($pattern = '')
     {
-        return $this->send('channels');
+        return $this->send("channels", array(
+            'pattern' => $pattern,
+        ));
     }
 
     /**
@@ -342,28 +353,28 @@ class Client
         return implode('.', $segments);
     }
 
-/*
- * Function added for backward compatibility with PHP version < 5.5
- */
+    /*
+    * Function added for backward compatibility with PHP version < 5.5
+    */
+    public function _json_last_error_msg()
+    {
+        if (function_exists('json_last_error_msg')) {
+            return json_last_error_msg();
+        }
+        static $ERRORS = array(
+            JSON_ERROR_NONE => 'No error',
+            JSON_ERROR_DEPTH => 'Maximum stack depth exceeded',
+            JSON_ERROR_STATE_MISMATCH => 'State mismatch (invalid or malformed JSON)',
+            JSON_ERROR_CTRL_CHAR => 'Control character error, possibly incorrectly encoded',
+            JSON_ERROR_SYNTAX => 'Syntax error',
+            JSON_ERROR_UTF8 => 'Malformed UTF-8 characters, possibly incorrectly encoded'
+        );
 
-    public function _json_last_error_msg() {
-      if (function_exists('json_last_error_msg')) {
-        return json_last_error_msg();
-      }
-      static $ERRORS = array(
-        JSON_ERROR_NONE => 'No error',
-        JSON_ERROR_DEPTH => 'Maximum stack depth exceeded',
-        JSON_ERROR_STATE_MISMATCH => 'State mismatch (invalid or malformed JSON)',
-        JSON_ERROR_CTRL_CHAR => 'Control character error, possibly incorrectly encoded',
-        JSON_ERROR_SYNTAX => 'Syntax error',
-        JSON_ERROR_UTF8 => 'Malformed UTF-8 characters, possibly incorrectly encoded'
-      );
+        $error = json_last_error();
+        return isset($ERRORS[$error]) ? $ERRORS[$error] : 'Unknown error';
+    }
 
-      $error = json_last_error();
-      return isset($ERRORS[$error]) ? $ERRORS[$error] : 'Unknown error';
-  }
-
-  private function send($method, $params = array())
+    private function send($method, $params = array())
     {
         $response = \json_decode($this->request($method, $params), $this->useAssoc);
         if (JSON_ERROR_NONE !== json_last_error()) {
@@ -423,9 +434,9 @@ class Client
         if (empty($headers["http_code"]) || ($headers["http_code"] != 200)) {
             throw new \Exception(
                 "Response code: "
-                . $headers["http_code"]
-                . PHP_EOL
-                . "cURL error: " . $error . PHP_EOL
+                    . $headers["http_code"]
+                    . PHP_EOL
+                    . "cURL error: " . $error . PHP_EOL
             );
         }
         return $data;

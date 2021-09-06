@@ -1,18 +1,18 @@
 phpcent
 =======
 
-[![Build Status](https://img.shields.io/travis/centrifugal/phpcent.svg?style=flat-square)](https://travis-ci.org/centrifugal/phpcent)
+[![Build Status](https://github.com/centrifugal/phpcent/workflows/build/badge.svg?branch=master)](https://github.com/centrifugal/phpcent/actions)
 [![Latest Version](https://img.shields.io/github/release/centrifugal/phpcent.svg?style=flat-square)](https://github.com/centrifugal/phpcent/releases)
 
-PHP library to communicate with Centrifugo v2 HTTP API.
+PHP library to communicate with Centrifugo v3 HTTP API.
 
 Library is published on the Composer: https://packagist.org/packages/centrifugal/phpcent
 
 ```bash
-composer require centrifugal/phpcent:~3.0
+composer require centrifugal/phpcent:~4.0
 ```
 
-See [Centrifugo documentation](https://centrifugal.github.io/centrifugo/)
+See [Centrifugo server API documentation](https://centrifugal.dev/docs/server/server_api).
 
 Basic Usage:
 
@@ -43,7 +43,7 @@ $token = $client->setSecret("Centrifugo secret key")->generatePrivateChannelToke
 Also API key and secret can be set in constructor:
 
 ```php
-$client = new \phpcent\Client("http://localhost:8000/api", "Centrifugo API key", "Centrifugo secret key");
+$client = new \phpcent\Client("http://localhost:8000/api", "<API key>", "<secret key>");
 ```
 
 Timeouts:

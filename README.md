@@ -1,7 +1,7 @@
 phpcent
 =======
 
-[![Build Status](https://github.com/centrifugal/phpcent/workflows/build/badge.svg?branch=master)](https://github.com/centrifugal/phpcent/actions)
+[![Build Status](https://github.com/centrifugal/phpcent/workflows/test/badge.svg?branch=master)](https://github.com/centrifugal/phpcent/actions)
 [![Latest Version](https://img.shields.io/github/release/centrifugal/phpcent.svg?style=flat-square)](https://github.com/centrifugal/phpcent/releases)
 
 PHP library to communicate with Centrifugo v3 HTTP API.

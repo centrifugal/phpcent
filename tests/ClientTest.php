@@ -1,5 +1,5 @@
 <?php
-class ClientTest extends PHPUnit_Framework_TestCase
+class ClientTest extends PHPUnit\Framework\TestCase
 {
     protected $client;
     public function setUp()

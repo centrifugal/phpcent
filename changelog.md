@@ -4,6 +4,7 @@ Adapt to work with Centrifugo v3.
 
 * Deprecated `history_remove` removed (in favour of `historyRemove`)
 * Deprecated `presence_stats` removed (in favour of `presenceStats`)
+* Drop support for PHP < 7.0.0
 
 # v3.1.1
 

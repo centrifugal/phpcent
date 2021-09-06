@@ -5,7 +5,8 @@ on: [push, pull_request]
 
 jobs:
   test:
-    name: "test"
+    name: Test with PHP ${{ matrix.php-version }}
+    runs-on: ubuntu-latest
     # Prevent duplicate builds on internal PRs.
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     strategy:

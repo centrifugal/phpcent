@@ -2,7 +2,7 @@
 class ClientTest extends PHPUnit\Framework\TestCase
 {
     protected $client;
-    public function setUp()
+    public function setUp(): void
     {
         $this->client = new \phpcent\Client("http://localhost:8000/api");
     }

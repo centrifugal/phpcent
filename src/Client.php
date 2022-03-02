@@ -11,6 +11,8 @@ namespace phpcent;
  */
 class Client
 {
+    /** @var \CurlHandle */
+    private $ch;
     private $url;
     private $apikey;
     private $secret;
@@ -38,6 +40,7 @@ class Client
         $this->url = $url;
         $this->apikey = $apikey;
         $this->secret = $secret;
+        $this->initCurl();
     }
 
     /**
@@ -397,40 +400,10 @@ class Client
 
     private function request($method, $params)
     {
-        $ch = curl_init();
-        if ($this->connectTimeoutOption) {
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $this->connectTimeoutOption);
-        }
-        if ($this->timeoutOption) {
-            curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeoutOption);
-        }
-        if ($this->forceIpResolveV4) {
-            curl_setopt($ch, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
-        }
-        if (!$this->safety) {
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
-        } elseif ($this->safety) {
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
-            if ($this->cert) {
-                curl_setopt($ch, CURLOPT_CAINFO, $this->cert);
-            }
-            if ($this->caPath) {
-                curl_setopt($ch, CURLOPT_CAPATH, $this->caPath);
-            }
-        }
-        curl_setopt($ch, CURLOPT_USERAGENT, 'curl/7.39.0');
-        curl_setopt($ch, CURLOPT_HEADER, 0);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(array('method' => $method, 'params' => $params)));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getHeaders());
-        curl_setopt($ch, CURLOPT_URL, $this->url);
-        $data = curl_exec($ch);
-        $error = curl_error($ch);
-        $headers = curl_getinfo($ch);
-        curl_close($ch);
+        curl_setopt($this->ch, CURLOPT_POSTFIELDS, json_encode(array('method' => $method, 'params' => $params)));
+        $data = curl_exec($this->ch);
+        $error = curl_error($this->ch);
+        $headers = curl_getinfo($this->ch);
         if (empty($headers["http_code"]) || ($headers["http_code"] != 200)) {
             throw new \Exception(
                 "Response code: "
@@ -448,5 +421,46 @@ class Client
             'Content-Type: application/json',
             'Authorization: apikey ' . $this->apikey,
         );
+    }
+
+    /**
+     * Init curl handle
+     */
+    private function initCurl(): void
+    {
+        $this->ch = curl_init();
+        if ($this->connectTimeoutOption) {
+            curl_setopt($this->ch, CURLOPT_CONNECTTIMEOUT, $this->connectTimeoutOption);
+        }
+        if ($this->timeoutOption) {
+            curl_setopt($this->ch, CURLOPT_TIMEOUT, $this->timeoutOption);
+        }
+        if ($this->forceIpResolveV4) {
+            curl_setopt($this->ch, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
+        }
+        if (!$this->safety) {
+            curl_setopt($this->ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($this->ch, CURLOPT_SSL_VERIFYHOST, 0);
+        } elseif ($this->safety) {
+            curl_setopt($this->ch, CURLOPT_SSL_VERIFYPEER, true);
+            curl_setopt($this->ch, CURLOPT_SSL_VERIFYHOST, 2);
+            if ($this->cert) {
+                curl_setopt($this->ch, CURLOPT_CAINFO, $this->cert);
+            }
+            if ($this->caPath) {
+                curl_setopt($this->ch, CURLOPT_CAPATH, $this->caPath);
+            }
+        }
+        curl_setopt($this->ch, CURLOPT_USERAGENT, 'curl/7.39.0');
+        curl_setopt($this->ch, CURLOPT_HEADER, 0);
+        curl_setopt($this->ch, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($this->ch, CURLOPT_POST, true);
+        curl_setopt($this->ch, CURLOPT_HTTPHEADER, $this->getHeaders());
+        curl_setopt($this->ch, CURLOPT_URL, $this->url);
+    }
+
+    private function __destruct()
+    {
+        curl_close($this->ch);
     }
 }

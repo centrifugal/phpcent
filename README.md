@@ -40,6 +40,12 @@ It's also possible to generate channel subscription token:
 $token = $client->setSecret("Centrifugo secret key")->generateSubscriptionToken($userId, $channel);
 ```
 
+It's also possible to generate channel subscription token with expiration time, for example token for 30 mins:
+
+```php
+$token = $client->setSecret("Centrifugo secret key")->generateSubscriptionToken($userId, $channel, time() + 30*60);
+```
+
 Also API key and secret can be set in constructor:
 
 ```php

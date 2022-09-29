@@ -1,3 +1,10 @@
+# v5.0.0
+
+In this release we adapt phpcent for Centrifugo v4:
+
+* `generatePrivateChannelToken` renamed to `generateSubscriptionToken` and now supports providing `sub` (user ID) claim - according to [channel auth docs](https://centrifugal.dev/docs/server/channel_token_auth) and [v4 subscription token migration docs](https://centrifugal.dev/docs/getting-started/migration_v4#subscription-token-migration).
+* In `generateConnectionToken` method `$userId` argument is not optional anymore – it should be explicitly provided. You can still pass empty string explicitly for anonymous users.
+
 # v4.0.0
 
 Adapt to work with Centrifugo v3.

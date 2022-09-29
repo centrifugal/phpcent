@@ -295,15 +295,17 @@ class Client
     }
 
     /**
-     * Generate connection JWT.
+     * Generate connection JWT. See https://centrifugal.dev/docs/server/authentication.
+     * Keep in mind that this method does not support all claims of Centrifugo JWT connection
+     * token at this point. You can use any JWT library to generate Centrifugo tokens.
      *
-     * @param string $userId
-     * @param int $exp
+     * @param string $userId - current user ID as string.
+     * @param int $exp - time in the future as unix seconds for token expiration.
      * @param array $info
      * @param array $channels
      * @return string
      */
-    public function generateConnectionToken($userId = '', $exp = 0, $info = array(), $channels = array())
+    public function generateConnectionToken($userId, $exp = 0, $info = array(), $channels = array())
     {
         $header = array('typ' => 'JWT', 'alg' => 'HS256');
         $payload = array('sub' => (string) $userId);
@@ -326,18 +328,20 @@ class Client
     }
 
     /**
-     * Generate private channel JWT.
+     * Generate subscription JWT. See https://centrifugal.dev/docs/server/channel_token_auth.
+     * Keep in mind that this method does not support all claims of Centrifugo JWT subscription
+     * token at this point. You can use any JWT library to generate Centrifugo tokens.
      *
-     * @param string $client
-     * @param string $channel
-     * @param int $exp
+     * @param string $userId - current user ID as string.
+     * @param string $channel - channel token generated for.
+     * @param int $exp - time in the future as unix seconds for token expiration.
      * @param array $info
      * @return string
      */
-    public function generatePrivateChannelToken($client, $channel, $exp = 0, $info = array())
+    public function generateSubscriptionToken($userId, $channel, $exp = 0, $info = array())
     {
         $header = array('typ' => 'JWT', 'alg' => 'HS256');
-        $payload = array('channel' => (string)$channel, 'client' => (string)$client);
+        $payload = array('channel' => (string)$channel, 'sub' => (string)$userId);
         if (!empty($info)) {
             $payload['info'] = $info;
         }

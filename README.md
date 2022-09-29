@@ -34,10 +34,10 @@ Connection token that will be valid for 5 minutes:
 $token = $client->setSecret("Centrifugo secret key")->generateConnectionToken($userId, time() + 5*60);
 ```
 
-It's also possible to generate private channel subscription token:
+It's also possible to generate channel subscription token:
 
 ```php
-$token = $client->setSecret("Centrifugo secret key")->generatePrivateChannelToken($client, $channel);
+$token = $client->setSecret("Centrifugo secret key")->generateSubscriptionToken($userId, $channel);
 ```
 
 Also API key and secret can be set in constructor:

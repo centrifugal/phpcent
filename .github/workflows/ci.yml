@@ -25,5 +25,8 @@ jobs:
       - name: Start Centrifugo
         run: docker run -d -p 8000:8000 centrifugo/centrifugo:latest centrifugo --api_insecure
 
+      - name: Check container status
+        run: docker ps
+
       - name: Run tests
         run: vendor/bin/phpunit

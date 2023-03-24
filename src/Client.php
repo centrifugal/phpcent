@@ -303,14 +303,18 @@ class Client
      * @param int $exp - time in the future as unix seconds for token expiration.
      * @param array $info
      * @param array $channels
+     * @param array $meta
      * @return string
      */
-    public function generateConnectionToken($userId, $exp = 0, $info = array(), $channels = array())
+    public function generateConnectionToken($userId, $exp = 0, $info = array(), $channels = array(), $meta = array())
     {
         $header = array('typ' => 'JWT', 'alg' => 'HS256');
         $payload = array('sub' => (string) $userId);
         if (!empty($info)) {
             $payload['info'] = $info;
+        }
+        if (!empty($meta)) {
+            $payload['meta'] = $meta;
         }
         if (!empty($channels)) {
             $payload['channels'] = $channels;

@@ -1,3 +1,7 @@
+# v5.1.0
+
+* Add meta data support in jwt token [#56](https://github.com/centrifugal/phpcent/pull/56)
+
 # v5.0.0
 
 In this release we adapt phpcent for Centrifugo v4:

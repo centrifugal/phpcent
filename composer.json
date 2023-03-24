@@ -8,7 +8,7 @@
         "messaging"
     ],
     "homepage": "https://github.com/centrifugal/phpcent",
-    "version": "5.0.0",
+    "version": "5.1.0",
     "license": "MIT",
     "require": {
         "php": ">=7.0.0",

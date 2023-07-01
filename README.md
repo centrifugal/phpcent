@@ -4,7 +4,7 @@ phpcent
 [![Build Status](https://github.com/centrifugal/phpcent/workflows/test/badge.svg?branch=master)](https://github.com/centrifugal/phpcent/actions)
 [![Latest Version](https://img.shields.io/github/release/centrifugal/phpcent.svg?style=flat-square)](https://github.com/centrifugal/phpcent/releases)
 
-PHP library to communicate with Centrifugo v4 HTTP API (for Centrifugo v3 use phpcent v4.x).
+PHP library to communicate with Centrifugo v5 and v4 HTTP API (for Centrifugo v3 use phpcent v4.x).
 
 Library is published on the Composer: https://packagist.org/packages/centrifugal/phpcent
 

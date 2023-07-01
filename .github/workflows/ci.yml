@@ -30,7 +30,7 @@ jobs:
 
       - uses: iFaxity/wait-on-action@v1
         with:
-          resource: http://localhost:8000
+          resource: tcp://localhost:8000
           timeout: 10000
 
       - name: Run tests

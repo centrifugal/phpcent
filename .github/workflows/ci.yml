@@ -28,10 +28,13 @@ jobs:
       - name: Check container status
         run: docker ps
 
-      - uses: iFaxity/wait-on-action@v1
-        with:
-          resource: tcp://localhost:8000
-          timeout: 10000
+      - name: Wait for server to be ready
+        run: |
+          while ! curl -s http://localhost:8000 > /dev/null; do
+            echo "Waiting for server..."
+            sleep 1
+          done
+        shell: bash
 
       - name: Run tests
         run: vendor/bin/phpunit

@@ -28,5 +28,13 @@ jobs:
       - name: Check container status
         run: docker ps
 
+      - name: Wait for server to be ready
+        run: |
+          while ! curl -s http://localhost:8000 > /dev/null; do
+            echo "Waiting for server..."
+            sleep 1
+          done
+        shell: bash
+
       - name: Run tests
         run: vendor/bin/phpunit

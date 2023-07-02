@@ -25,6 +25,8 @@ class Client
     private $safety = true;
     private $useAssoc = false;
 
+    private $curlHandle = null;
+
     /**
      * Construct new Client instance.
      *
@@ -405,40 +407,41 @@ class Client
 
     private function request($method, $params)
     {
-        $ch = curl_init();
+        if(!$this->curlHandle){
+            $this->curlHandle = curl_init();
+        }
         if ($this->connectTimeoutOption) {
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $this->connectTimeoutOption);
+            curl_setopt($this->curlHandle, CURLOPT_CONNECTTIMEOUT, $this->connectTimeoutOption);
         }
         if ($this->timeoutOption) {
-            curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeoutOption);
+            curl_setopt($this->curlHandle, CURLOPT_TIMEOUT, $this->timeoutOption);
         }
         if ($this->forceIpResolveV4) {
-            curl_setopt($ch, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
+            curl_setopt($this->curlHandle, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
         }
         if (!$this->safety) {
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+            curl_setopt($this->curlHandle, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($this->curlHandle, CURLOPT_SSL_VERIFYHOST, 0);
         } elseif ($this->safety) {
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+            curl_setopt($this->curlHandle, CURLOPT_SSL_VERIFYPEER, true);
+            curl_setopt($this->curlHandle, CURLOPT_SSL_VERIFYHOST, 2);
             if ($this->cert) {
-                curl_setopt($ch, CURLOPT_CAINFO, $this->cert);
+                curl_setopt($this->curlHandle, CURLOPT_CAINFO, $this->cert);
             }
             if ($this->caPath) {
-                curl_setopt($ch, CURLOPT_CAPATH, $this->caPath);
+                curl_setopt($this->curlHandle, CURLOPT_CAPATH, $this->caPath);
             }
         }
-        curl_setopt($ch, CURLOPT_USERAGENT, 'curl/7.39.0');
-        curl_setopt($ch, CURLOPT_HEADER, 0);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(array('method' => $method, 'params' => $params)));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getHeaders());
-        curl_setopt($ch, CURLOPT_URL, $this->url);
-        $data = curl_exec($ch);
-        $error = curl_error($ch);
-        $headers = curl_getinfo($ch);
-        curl_close($ch);
+        curl_setopt($this->curlHandle, CURLOPT_USERAGENT, 'curl/7.39.0');
+        curl_setopt($this->curlHandle, CURLOPT_HEADER, 0);
+        curl_setopt($this->curlHandle, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($this->curlHandle, CURLOPT_POST, true);
+        curl_setopt($this->curlHandle, CURLOPT_POSTFIELDS, json_encode(array('method' => $method, 'params' => $params)));
+        curl_setopt($this->curlHandle, CURLOPT_HTTPHEADER, $this->getHeaders());
+        curl_setopt($this->curlHandle, CURLOPT_URL, $this->url);
+        $data = curl_exec($this->curlHandle);
+        $error = curl_error($this->curlHandle);
+        $headers = curl_getinfo($this->curlHandle);
         if (empty($headers["http_code"]) || ($headers["http_code"] != 200)) {
             throw new \Exception(
                 "Response code: "
@@ -456,5 +459,12 @@ class Client
             'Content-Type: application/json',
             'Authorization: apikey ' . $this->apikey,
         );
+    }
+
+    public function closeConnection()
+    {
+        if($this->curlHandle){
+            curl_close($this->curlHandle);
+        }
     }
 }

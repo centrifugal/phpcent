@@ -16,6 +16,20 @@ class ClientTest extends PHPUnit\Framework\TestCase
         $this->assertNotNull($this->client->setCAPath(""));
         $this->assertNotNull($this->client->setConnectTimeoutOption(1));
         $this->assertNotNull($this->client->setTimeoutOption(1));
+        $this->assertNotNull($this->client->setCompatibility(false));
+    }
+    public function testGetUrl(){
+        $client = new \ReflectionClass($this->client);
+
+        $method = $client->getMethod('getUrl');
+
+        $this->client->setCompatibility(true);
+
+        $this->assertEquals("http://localhost:8000/api", $method->invokeArgs($this->client,['publish']));
+
+        $this->client->setCompatibility(false);
+
+        $this->assertEquals("http://localhost:8000/api/publish", $method->invokeArgs($this->client,['publish']));
     }
     public function testPublish()
     {

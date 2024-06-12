@@ -24,7 +24,6 @@ class Client
 
     private $safety = true;
     private $useAssoc = false;
-    private $compatibility = false;
 
     /**
      * Construct new Client instance.
@@ -433,14 +432,8 @@ class Client
         curl_setopt($ch, CURLOPT_HEADER, 0);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
         curl_setopt($ch, CURLOPT_POST, true);
-
-        ($this->compatibility) 
-        ? curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(array('method' => $method, 'params' => $params)))
-        : curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($params))
-        ;
-
+        curl_setopt($ch, CURLOPT_POSTFIELDS, \json_encode($params));
         curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getHeaders());
-        $a = $this->getUrl($method);
         curl_setopt($ch, CURLOPT_URL, $this->getUrl($method));
         $data = curl_exec($ch);
         $error = curl_error($ch);
@@ -457,26 +450,17 @@ class Client
         return $data;
     }
 
-    public function setCompatibility($value)
-    {
-        $this->compatibility = $value;
-
-        return $this;
-    }
-
     private function getUrl($method)
     {
-       return ($this->compatibility) ? $this->url : $this->url.'/'.$method;
+       return $this->url.'/'.$method;
     }
 
     private function getHeaders()
     {
-        $headers = ['Content-Type: application/json'];
-
-        $headers[] = ($this->compatibility) 
-        ? 'Authorization: apikey ' . $this->apikey
-        : 'X-API-Key: '.$this->apikey
-        ; 
+        $headers = [
+            'Content-Type: application/json',
+            'X-API-Key: '.$this->apikey
+        ];
 
         return $headers;
     }

@@ -29,7 +29,6 @@
 ## File-based project format:
 *.ipr
 *.iws
-
 ## Plugin-specific files:
 
 # IntelliJ
@@ -50,3 +49,4 @@ crashlytics-build.properties
 composer.lock
 vendor/
 .phpunit.result.cache
+.php-cs-fixer.cache

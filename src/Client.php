@@ -432,9 +432,9 @@ class Client
         curl_setopt($ch, CURLOPT_HEADER, 0);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
         curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(array('method' => $method, 'params' => $params)));
+        curl_setopt($ch, CURLOPT_POSTFIELDS, \json_encode($params));
         curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getHeaders());
-        curl_setopt($ch, CURLOPT_URL, $this->url);
+        curl_setopt($ch, CURLOPT_URL, $this->getUrl($method));
         $data = curl_exec($ch);
         $error = curl_error($ch);
         $headers = curl_getinfo($ch);
@@ -450,11 +450,18 @@ class Client
         return $data;
     }
 
+    private function getUrl($method)
+    {
+       return $this->url.'/'.$method;
+    }
+
     private function getHeaders()
     {
-        return array(
+        $headers = [
             'Content-Type: application/json',
-            'Authorization: apikey ' . $this->apikey,
-        );
+            'X-API-Key: '.$this->apikey
+        ];
+
+        return $headers;
     }
 }

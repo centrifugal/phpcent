@@ -17,6 +17,39 @@ class ClientTest extends PHPUnit\Framework\TestCase
         $this->assertNotNull($this->client->setConnectTimeoutOption(1));
         $this->assertNotNull($this->client->setTimeoutOption(1));
     }
+
+    public function testGetUrl(){
+        $client = new \ReflectionClass($this->client);
+
+        $method = $client->getMethod('getUrl');
+
+        $method->setAccessible(true);
+
+        $this->assertEquals("http://localhost:8000/api/publish", $method->invokeArgs($this->client,['publish']));
+    }
+   
+    public function testGetHeaders(){
+
+        $phpcent = new \phpcent\Client("http://localhost:8000/api");
+
+        $apiKey = '12w5ec80-1bd0-4c0x-a2e9-2c96501d2123';
+        
+        $phpcent->setApiKey($apiKey);
+
+        $client = new \ReflectionClass($phpcent);
+
+        $method = $client->getMethod('getHeaders');
+
+        $method->setAccessible(true);
+
+        $this->assertEquals(
+        [
+            'Content-Type: application/json',
+            'X-API-Key: '.$apiKey
+        ]
+        , $method->invoke($phpcent));
+    }
+
     public function testPublish()
     {
         $this->client->setUseAssoc(true);

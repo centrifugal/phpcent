@@ -1,3 +1,9 @@
+# v6.0.0
+
+Since phpcent v6.0.0 we do not maintain CHANGELOG.md file.
+
+All changes may be found on [releases page](https://github.com/centrifugal/phpcent/releases) on Github.
+
 # v5.1.0
 
 * Add meta data support in jwt token [#56](https://github.com/centrifugal/phpcent/pull/56)

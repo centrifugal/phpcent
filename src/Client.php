@@ -432,7 +432,7 @@ class Client
         curl_setopt($ch, CURLOPT_HEADER, 0);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
         curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, \json_encode($params));
+        curl_setopt($ch, CURLOPT_POSTFIELDS, \json_encode((object)$params));
         curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getHeaders());
         curl_setopt($ch, CURLOPT_URL, $this->getUrl($method));
         $data = curl_exec($ch);

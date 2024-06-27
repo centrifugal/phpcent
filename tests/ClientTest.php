@@ -70,4 +70,11 @@ class ClientTest extends PHPUnit\Framework\TestCase
         $client = new \phpcent\Client("http://localhost:9000/api");
         $res = $client->publish('channel', ["message" => "Hello World"]);
     }
+
+    public function testInfo()
+    {
+        $res = $this->client->info();
+        $this->assertNotNull($res);
+        $this->assertTrue(is_array($res->result->nodes));
+    }
 }

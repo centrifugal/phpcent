@@ -382,7 +382,7 @@ class Client
         return isset($ERRORS[$error]) ? $ERRORS[$error] : 'Unknown error';
     }
 
-    private function send($method, $params = array())
+    protected function send($method, $params = array())
     {
         $response = \json_decode($this->request($method, $params), $this->useAssoc);
         if (JSON_ERROR_NONE !== json_last_error()) {

@@ -68,7 +68,11 @@ class ClientTest extends PHPUnit\Framework\TestCase
     {
         $this->expectException(Exception::class);
         $client = new \phpcent\Client("http://localhost:9000/api");
-        $res = $client->publish('channel', ["message" => "Hello World"]);
+
+        $client->setConnectTimeoutOption(5);
+        $client->setTimeoutOption(15);
+
+        $client->publish('channel', ["message" => "Hello World"]);
     }
 
     public function testInfo()
@@ -76,5 +80,27 @@ class ClientTest extends PHPUnit\Framework\TestCase
         $res = $this->client->info();
         $this->assertNotNull($res);
         $this->assertTrue(is_array($res->result->nodes));
+    }
+
+    public function testBatch()
+    {
+        $data = [
+            "commands" => [
+                [
+                    "presence_stats" => [
+                        "channel" => "test1"
+                    ]
+                ],
+                [
+                    "publish" => [
+                        "channel" => "x:test2",
+                        "data" => []
+                    ]
+                ]
+            ]
+        ];
+
+        $res = $this->client->batch($data);
+        $this->assertIsArray($res->replies);
     }
 }

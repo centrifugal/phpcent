@@ -295,6 +295,17 @@ class Client
     }
 
     /**
+     * Sending many commands in one request
+     *
+     * @param array $data
+     * @return mixed
+     */
+    public function batch(array $data)
+    {
+        return $this->send('batch', $data);
+    }
+
+    /**
      * Generate connection JWT. See https://centrifugal.dev/docs/server/authentication.
      * Keep in mind that this method does not support all claims of Centrifugo JWT connection
      * token at this point. You can use any JWT library to generate Centrifugo tokens.

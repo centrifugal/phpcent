@@ -64,6 +64,7 @@ All available API methods:
 ```php
 $response = $client->publish($channel, $data);
 $response = $client->broadcast($channels, $data);
+$response = $client->subscribe($channel, $userId);
 $response = $client->unsubscribe($channel, $userId);
 $response = $client->disconnect($userId);
 $response = $client->presence($channel);
@@ -72,6 +73,7 @@ $response = $client->history($channel);
 $response = $client->historyRemove($channel);
 $response = $client->channels();
 $response = $client->info();
+$response = $client->batch($data);
 ```
 
 To use `assoc` option while decoding JSON in response:

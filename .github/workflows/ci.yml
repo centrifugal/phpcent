@@ -23,7 +23,7 @@ jobs:
         uses: "ramsey/composer-install@v1"
 
       - name: Start Centrifugo
-        run: docker run -d -p 8000:8000 centrifugo/centrifugo:latest centrifugo --api_insecure
+        run: docker run -d -p 8000:8000 centrifugo/centrifugo:latest centrifugo --http_api.insecure
 
       - name: Check container status
         run: docker ps

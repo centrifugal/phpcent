@@ -449,7 +449,9 @@ class Client
         $data = curl_exec($ch);
         $error = curl_error($ch);
         $headers = curl_getinfo($ch);
-        curl_close($ch);
+        if (PHP_VERSION_ID < 80000) {
+            curl_close($ch);
+        }
         if (empty($headers["http_code"]) || ($headers["http_code"] != 200)) {
             throw new \Exception(
                 "Response code: "

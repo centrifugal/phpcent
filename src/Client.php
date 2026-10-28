@@ -11,12 +11,14 @@ use Centrifugal\Phpcent\Exception\ClosedException;
 use Centrifugal\Phpcent\Exception\InvalidConfigException;
 use Centrifugal\Phpcent\Exception\InvalidRequestException;
 use Centrifugal\Phpcent\Exception\TimeoutException;
+use Centrifugal\Phpcent\Internal\BroadcastRequest;
 use Centrifugal\Phpcent\Internal\CurlTransport;
 use Centrifugal\Phpcent\Internal\Headers;
 use Centrifugal\Phpcent\Internal\Limits;
 use Centrifugal\Phpcent\Internal\Methods;
 use Centrifugal\Phpcent\Internal\Psr18Transport;
 use Centrifugal\Phpcent\Internal\Reply;
+use Centrifugal\Phpcent\Internal\Request;
 use Centrifugal\Phpcent\Internal\Transport;
 use Centrifugal\Phpcent\Internal\Validate;
 use Psr\Http\Client\ClientInterface;
@@ -27,11 +29,13 @@ use Psr\Http\Message\StreamFactoryInterface;
  * Calls Centrifugo's HTTP server API. Create it once and reuse it:
  *
  *     $client = new Client('http://localhost:8000/api', apiKey: getenv('CENTRIFUGO_API_KEY'));
- *     $client->publish(new PublishRequest(channel: 'news', data: ['text' => 'hello']));
+ *     $client->publish(channel: 'news', data: ['text' => 'hello']);
  *
- * Every API method takes its request and returns its result, throwing unless
- * Centrifugo did everything asked. Each takes $timeout, in seconds; without
- * one, requestTimeout bounds the call.
+ * There is a method per API method, taking the fields of its request as named
+ * arguments - pass them by name: their order follows api.proto and is not part
+ * of the API. Each returns its result, throwing unless Centrifugo did
+ * everything asked, and takes $timeout, in seconds; without one,
+ * requestTimeout bounds the call.
  */
 final class Client
 {
@@ -185,35 +189,10 @@ final class Client
         }
     }
 
-    // Broadcast.
+    // Broadcast: the public methods are generated, with the fields of
+    // BroadcastRequest as their arguments.
 
-    /**
-     * Publishes the same data into many channels in one request.
-     *
-     * Channels succeed or fail on their own. It returns when every channel got
-     * the publication. When Centrifugo carried the broadcast out and one or
-     * more channels failed - up to all of them - it throws
-     * BroadcastFailedChannelsException, whose $result holds every channel's
-     * outcome. Any other exception means it failed as a whole: no channel got
-     * a reply. After a timeout or a network error Centrifugo may still have
-     * published it.
-     *
-     * To go on despite some failed channels:
-     *
-     *     try {
-     *         $client->broadcast($request);
-     *     } catch (BroadcastFailedChannelsException $e) {
-     *         $logger->warning('broadcast failed in some channels', ['failed' => $e->result->failed()]);
-     *     }
-     *
-     * Retry it with broadcastWithRetry, which sends again only the channels
-     * which may still succeed, with one idempotencyKey.
-     *
-     * @param ?float $timeout seconds bounding the call: requestTimeout when null
-     *
-     * @throws CentException
-     */
-    public function broadcast(BroadcastRequest $request, ?float $timeout = null): BroadcastResult
+    private function sendBroadcast(BroadcastRequest $request, ?float $timeout): BroadcastResult
     {
         $channels = array_values($request->channels);
         $result = $this->result($request, $timeout);
@@ -221,47 +200,13 @@ final class Client
         return BroadcastResult::fromWire($result, 'broadcast result', $channels, $request->idempotencyKey)->check();
     }
 
-    /**
-     * Broadcasts as broadcast does, and retries the channels which failed for a
-     * temporary reason - see Retry::retryable - up to $maxAttempts (2 by
-     * default: one retry).
-     *
-     * - Only the channels which may still succeed are sent again; when only
-     *   channels which failed for good are left, it stops.
-     * - Every attempt carries the same idempotencyKey - made for the call when
-     *   the request has none - so that a channel which got the publication in
-     *   an earlier attempt does not get it again. The memory, Redis and
-     *   PostgreSQL brokers keep keys; the NATS broker ignores them, and a retry
-     *   may publish again.
-     * - The result holds every channel's last outcome, and the key: retrying
-     *   later with it publishes only into the channels which did not get it.
-     *
-     * $timeout, when set, bounds the whole call, waits included;
-     * $attemptTimeout - requestTimeout by default - bounds each attempt.
-     * Waits block the calling request: in a web request, set a short
-     * $timeout, and retry for longer from a job queue, with the request's
-     * own idempotencyKey.
-     *
-     * $onAttemptError is called after an attempt which failed in a way a retry
-     * may fix, except the last, with a BroadcastAttempt. It returns the seconds
-     * to wait before the next attempt, or null for the default wait -
-     * Retry::exponentialBackoff(0.1, 5.0) of the attempt - and may log or count
-     * meanwhile. To stop, it throws: its exception propagates as it is - the
-     * BroadcastAttempt it was given holds the attempt's error and every
-     * channel's outcome so far. The wait never outlasts the call's timeout.
-     *
-     * It throws as broadcast does.
-     *
-     * @param ?callable(BroadcastAttempt): ?float $onAttemptError
-     *
-     * @throws CentException
-     */
-    public function broadcastWithRetry(
+    /** @param ?callable(BroadcastAttempt): ?float $onAttemptError */
+    private function retryBroadcast(
         BroadcastRequest $request,
-        int $maxAttempts = Limits::MAX_ATTEMPTS,
-        ?float $attemptTimeout = null,
-        ?callable $onAttemptError = null,
-        ?float $timeout = null,
+        int $maxAttempts,
+        ?float $attemptTimeout,
+        ?callable $onAttemptError,
+        ?float $timeout,
     ): BroadcastResult {
         if ($maxAttempts < 1) {
             throw new InvalidRequestException('invalid broadcast request: maxAttempts must be 1 or more');
@@ -298,7 +243,7 @@ final class Client
             $attemptReq->channels = array_map(static fn(int $p): string => $channels[$p], $pending);
             $attemptReq->idempotencyKey = $key;
             try {
-                $res = $this->broadcast($attemptReq, min($left, $perAttempt));
+                $res = $this->sendBroadcast($attemptReq, min($left, $perAttempt));
                 $err = null;
             } catch (InvalidRequestException $e) {
                 throw $e;

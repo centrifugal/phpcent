@@ -8,10 +8,11 @@ two packages.
 
 What changes:
 
-- **Every API method** takes its request object and returns a typed result:
-  `$client->publish(new PublishRequest(channel: 'news', data: $data))` instead
-  of positional arguments, `$res->offset` instead of `$res->result->offset`.
-  Every method of Centrifugo v6's API is there, the PRO ones included.
+- **Every API method** takes its request's fields as named arguments and
+  returns a typed result: `$client->publish(channel: 'news', data: $data)`,
+  `$res->offset` instead of `$res->result->offset`. Pass them by name: phpcent
+  6's positional order is not kept. Every method of Centrifugo v6's API is
+  there, the PRO ones included.
 - **Errors are exceptions.** phpcent 6 returned Centrifugo's errors in the
   response, for you to check; phpcent 7 throws them - `ApiException`, with a
   subclass per known code - and throws `BroadcastFailedChannelsException` or
@@ -52,7 +53,7 @@ Decide, for each broadcast and batch, which you want:
 
 ```php
 try {
-    $client->broadcast(new BroadcastRequest(channels: $channels, data: $data));
+    $client->broadcast(channels: $channels, data: $data);
 } catch (BroadcastFailedChannelsException $e) {
     foreach ($e->result->failed() as $ch) {
         $logger->warning("broadcast to {$ch->channel} failed: {$ch->error->getMessage()}");
@@ -119,20 +120,18 @@ require __DIR__ . '/vendor/autoload.php';
 
 use Centrifugal\Phpcent\Client;
 use Centrifugal\Phpcent\Exception\ApiException;
-use Centrifugal\Phpcent\HistoryRequest;
-use Centrifugal\Phpcent\PublishRequest;
 
 $client = new Client('http://localhost:8000/api', apiKey: 'api_key', requestTimeout: 5.0);
 
-$res = $client->publish(new PublishRequest(channel: 'news', data: ['text' => 'hello']));
+$res = $client->publish(channel: 'news', data: ['text' => 'hello']);
 echo "published at offset {$res->offset}\n";
 
-$res = $client->history(new HistoryRequest(channel: 'news', limit: 1, reverse: true));
+$res = $client->history(channel: 'news', limit: 1, reverse: true);
 echo "last: {$res->publications[0]->data->text}\n";
 
 // Centrifugo's errors are thrown.
 try {
-    $client->publish(new PublishRequest(channel: 'unknown:news', data: ['text' => 'hello']));
+    $client->publish(channel: 'unknown:news', data: ['text' => 'hello']);
 } catch (ApiException $e) {
     echo "error {$e->getCode()}: {$e->serverMessage}\n";
 }
@@ -170,14 +169,13 @@ phpcent 7:
 
 require __DIR__ . '/vendor/autoload.php';
 
-use Centrifugal\Phpcent\BroadcastRequest;
 use Centrifugal\Phpcent\Client;
 use Centrifugal\Phpcent\Exception\BroadcastFailedChannelsException;
 
 $client = new Client('http://localhost:8000/api', apiKey: 'api_key');
 
 try {
-    $res = $client->broadcast(new BroadcastRequest(channels: ['news', 'unknown:alerts', 'sport'], data: ['text' => 'hello']));
+    $res = $client->broadcast(channels: ['news', 'unknown:alerts', 'sport'], data: ['text' => 'hello']);
 } catch (BroadcastFailedChannelsException $e) {
     // Some channels failed; the others got the publication.
     $res = $e->result;
@@ -193,7 +191,7 @@ foreach ($res->channels as $ch) {
 
 ### Batch
 
-Commands are request objects added to a batch, each with its own result.
+A batch has the client's methods, each adding a command with its own result.
 
 phpcent 6:
 
@@ -221,14 +219,12 @@ phpcent 7:
 require __DIR__ . '/vendor/autoload.php';
 
 use Centrifugal\Phpcent\Client;
-use Centrifugal\Phpcent\PresenceStatsRequest;
-use Centrifugal\Phpcent\PublishRequest;
 
 $client = new Client('http://localhost:8000/api', apiKey: 'api_key');
 
 $batch = $client->newBatch();
-$pub = $batch->add(new PublishRequest(channel: 'news', data: ['text' => 'hi']));
-$stats = $batch->add(new PresenceStatsRequest(channel: 'news'));
+$pub = $batch->publish(channel: 'news', data: ['text' => 'hi']);
+$stats = $batch->presenceStats(channel: 'news');
 $batch->send();
 echo "published at offset {$pub->result()->offset}\n";
 echo "clients: {$stats->result()->numClients}\n";
@@ -309,11 +305,11 @@ foreach ([$conn, $sub] as $token) {
 | `setCert($path)`, `setCAPath($dir)` | `curlOptions: [CURLOPT_CAINFO => $path, CURLOPT_CAPATH => $dir]` |
 | `forceIpResolveV4()` | `curlOptions: [CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4]` |
 | `setUseAssoc(true)` | gone: results are typed objects, payloads `stdClass`; `Payload::toArray($payload)` for arrays |
-| `publish($channel, $data, $skipHistory, $tags, $idempotencyKey, $delta, $version, $versionEpoch)` | `publish(new PublishRequest(channel: ..., data: ..., skipHistory: ..., tags: ..., idempotencyKey: ..., delta: ..., version: ..., versionEpoch: ...))` |
-| `broadcast($channels, $data, ...)` | `broadcast(new BroadcastRequest(channels: ..., data: ...))`, or `broadcastWithRetry` |
-| `subscribe($channel, $user, $client, ...)` | `subscribe(new SubscribeRequest(channel: ..., user: ..., client: ...))` |
-| `unsubscribe`, `disconnect`, `presence`, `presenceStats`, `history`, `historyRemove`, `channels`, `info` | the same names, each taking its request: `UnsubscribeRequest`, `DisconnectRequest`, ... `info()` takes none |
-| `batch(['commands' => [...]])` | `$batch = $client->newBatch(); $p = $batch->add($request); $batch->send(); $p->result()` |
+| `publish($channel, $data, $skipHistory, $tags, $idempotencyKey, $delta, $version, $versionEpoch)` | `publish(channel: ..., data: ..., skipHistory: ..., tags: ..., idempotencyKey: ..., delta: ..., version: ..., versionEpoch: ...)` |
+| `broadcast($channels, $data, ...)` | `broadcast(channels: ..., data: ...)`, or `broadcastWithRetry` |
+| `subscribe($channel, $user, $client, ...)` | `subscribe(channel: ..., user: ..., client: ...)` |
+| `unsubscribe`, `disconnect`, `presence`, `presenceStats`, `history`, `historyRemove`, `channels`, `info` | the same names, each taking its request's fields by name: `history(channel: ..., limit: ...)`; `info()` takes none |
+| `batch(['commands' => [...]])` | `$batch = $client->newBatch(); $p = $batch->publish(channel: ..., data: ...); $batch->send(); $p->result()` |
 | `generateConnectionToken($user, $exp, $info, $channels, $meta)` | `Token::connection($key, new ConnectionClaims(expiresAt: ..., user: ..., info: ..., channels: ..., meta: ...))` |
 | `generateSubscriptionToken($user, $channel, $exp, $info)` | `Token::subscription($key, new SubscriptionClaims(channel: ..., expiresAt: ..., user: ..., info: ...))` |
 | a token without `$exp`, which never expired | `expiresAt: Expiry::Never`, chosen explicitly |

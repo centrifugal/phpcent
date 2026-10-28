@@ -5,9 +5,7 @@ declare(strict_types=1);
 namespace Centrifugal\Phpcent\Tests;
 
 use Centrifugal\Phpcent\Exception\InvalidRequestException;
-use Centrifugal\Phpcent\HistoryRequest;
 use Centrifugal\Phpcent\Payload;
-use Centrifugal\Phpcent\PublishRequest;
 use Centrifugal\Phpcent\RawJson;
 use Centrifugal\Phpcent\Tests\Support\FakeCentrifugo;
 use Nyholm\Psr7\Response;
@@ -20,7 +18,7 @@ final class PayloadTest extends TestCase
     private static function sent(mixed $data): string
     {
         $fake = new FakeCentrifugo();
-        FakeCentrifugo::client($fake)->publish(new PublishRequest(channel: 'c', data: $data));
+        FakeCentrifugo::client($fake)->publish(channel: 'c', data: $data);
         $body = $fake->last()['body'];
         \assert(str_starts_with($body, '{"channel":"c","data":') && str_ends_with($body, '}'));
 
@@ -95,7 +93,7 @@ final class PayloadTest extends TestCase
     {
         $fake = new FakeCentrifugo();
         try {
-            FakeCentrifugo::client($fake)->publish(new PublishRequest(channel: 'c', data: $value));
+            FakeCentrifugo::client($fake)->publish(channel: 'c', data: $value);
             self::fail('sent');
         } catch (InvalidRequestException $e) {
             self::assertStringStartsWith('invalid publish request: data', $e->getMessage());
@@ -143,15 +141,15 @@ final class PayloadTest extends TestCase
             ? '{"result":{"publications":[{"data":' . $json . ',"offset":1}]}}'
             : '{"result":{}}'));
         $c = FakeCentrifugo::client($fake);
-        $pub = $c->history(new HistoryRequest(channel: 'c'))->publications[0];
-        $c->publish(new PublishRequest(channel: 'c', data: $pub->data));
+        $pub = $c->history(channel: 'c')->publications[0];
+        $c->publish(channel: 'c', data: $pub->data);
         self::assertSame('{"channel":"c","data":' . $json . '}', $fake->last()['body']);
     }
 
     public function testReplyPayloadIsTheDecodedValue(): void
     {
         $fake = new FakeCentrifugo(static fn(): Response => FakeCentrifugo::json(200, '{"result":{"publications":[{"data":{"text":"hi","n":[1,2]}}]}}'));
-        $data = FakeCentrifugo::client($fake)->history(new HistoryRequest(channel: 'c'))->publications[0]->data;
+        $data = FakeCentrifugo::client($fake)->history(channel: 'c')->publications[0]->data;
         self::assertInstanceOf(\stdClass::class, $data);
         self::assertSame('hi', $data->text);
         self::assertSame([1, 2], $data->n);
@@ -178,10 +176,10 @@ final class PayloadTest extends TestCase
         $fake = new FakeCentrifugo();
         $c = FakeCentrifugo::client($fake);
         // Numeric map keys stay object keys.
-        $c->publish(new PublishRequest(channel: 'c', data: 1, tags: ['0' => 'a', '1' => 'b']));
+        $c->publish(channel: 'c', data: 1, tags: ['0' => 'a', '1' => 'b']);
         self::assertStringContainsString('"tags":{"0":"a","1":"b"}', $fake->last()['body']);
         try {
-            $c->publish(new PublishRequest(channel: 'c', data: 1, tags: ['k' => 1]));
+            $c->publish(channel: 'c', data: 1, tags: ['k' => 1]);
             self::fail('sent');
         } catch (InvalidRequestException $e) {
             self::assertStringContainsString('tags[k] must be a string', $e->getMessage());

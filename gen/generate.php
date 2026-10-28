@@ -344,9 +344,23 @@ function methodDoc(Command $c): array
 function emitMessage(ProtoMessage $m, string $namespace, string $proto, string $protocol, ?Command $command): string
 {
     $out = \sprintf(HEADER, $proto, $namespace) . "\n";
-    $uses = ['Centrifugal\\Phpcent\\Internal\\Decode', 'Centrifugal\\Phpcent\\Internal\\Encode'];
+    $uses = [];
+    if ($namespace !== 'Centrifugal\\Phpcent\\Internal') {
+        $uses = ['Centrifugal\\Phpcent\\Internal\\Decode', 'Centrifugal\\Phpcent\\Internal\\Encode'];
+    }
     if ($namespace !== 'Centrifugal\\Phpcent') {
         $uses[] = 'Centrifugal\\Phpcent\\Message';
+    }
+    if ($command !== null) {
+        // A request is internal: the types of its fields and its result are
+        // the root namespace's - php-cs-fixer drops the imports left unused.
+        $uses[] = 'Centrifugal\\Phpcent\\' . ($command->method === 'broadcast' ? 'BroadcastResult' : $command->result);
+        foreach ($m->fields as $f) {
+            if (!isset(PHP_TYPES[$f->type]) && !isset(WRAPPERS[$f->type]) && $f->type !== 'bytes') {
+                $uses[] = 'Centrifugal\\Phpcent\\' . $f->type;
+            }
+        }
+        $uses = array_values(array_unique($uses));
     }
     sort($uses);
     foreach ($uses as $u) {
@@ -359,6 +373,8 @@ function emitMessage(ProtoMessage $m, string $namespace, string $proto, string $
     if ($command !== null) {
         $doc[] = '';
         $doc[] = "@implements Request<{$result}>";
+        $doc[] = '';
+        $doc[] = '@internal the client, Batch and Command build it from their named arguments';
     }
     $out .= docblock($doc, '');
     $out .= 'final class ' . $m->name . ' implements Message' . ($command !== null ? ', Request' : '') . "\n{\n";
@@ -435,30 +451,209 @@ function emitMessage(ProtoMessage $m, string $namespace, string $proto, string $
     return $out . "    }\n}\n";
 }
 
-function emitClientMethods(array $cmds): string
+// Parameter names the methods take besides a request's fields.
+const OWN_PARAMS = ['timeout', 'maxAttempts', 'attemptTimeout', 'onAttemptError'];
+
+const BROADCAST_DOC = <<<'DOC'
+    Channels succeed or fail on their own. It returns when every channel got
+    the publication. When Centrifugo carried the broadcast out and one or more
+    channels failed - up to all of them - it throws
+    BroadcastFailedChannelsException, whose $result holds every channel's
+    outcome. Any other exception means it failed as a whole: no channel got a
+    reply. After a timeout or a network error Centrifugo may still have
+    published it.
+
+    To go on despite some failed channels:
+
+        try {
+            $client->broadcast(channels: $channels, data: $data);
+        } catch (BroadcastFailedChannelsException $e) {
+            $logger->warning('broadcast failed in some channels', ['failed' => $e->result->failed()]);
+        }
+
+    Retry it with broadcastWithRetry, which sends again only the channels which
+    may still succeed, with one $idempotencyKey.
+    DOC;
+
+const BROADCAST_RETRY_DOC = <<<'DOC'
+    Broadcasts as broadcast does, and retries the channels which failed for a
+    temporary reason - see Retry::retryable - up to $maxAttempts (2 by default:
+    one retry).
+
+    - Only the channels which may still succeed are sent again; when only
+      channels which failed for good are left, it stops.
+    - Every attempt carries the same $idempotencyKey - made for the call when
+      none is given - so that a channel which got the publication in an
+      earlier attempt does not get it again. The memory, Redis and PostgreSQL
+      brokers keep keys; the NATS broker ignores them, and a retry may publish
+      again.
+    - The result holds every channel's last outcome, and the key: retrying
+      later with it publishes only into the channels which did not get it.
+
+    $timeout, when set, bounds the whole call, waits included; $attemptTimeout
+    - requestTimeout by default - bounds each attempt. Waits block the calling
+    request: in a web request, set a short $timeout, and retry for longer from
+    a job queue, with an $idempotencyKey of its own.
+
+    $onAttemptError is called after an attempt which failed in a way a retry
+    may fix, except the last, with a BroadcastAttempt. It returns the seconds
+    to wait before the next attempt, or null for the default wait -
+    Retry::exponentialBackoff(0.1, 5.0) of the attempt - and may log or count
+    meanwhile. To stop, it throws: its exception propagates as it is - the
+    BroadcastAttempt it was given holds the attempt's error and every channel's
+    outcome so far. The wait never outlasts the call's timeout.
+
+    It throws as broadcast does.
+    DOC;
+
+/** Lines of a heredoc constant, its indentation gone. */
+function lines(string $text): array
+{
+    return explode("\n", $text);
+}
+
+/**
+ * The parameters of a request's method, a field each, and the expression
+ * building the request from them.
+ *
+ * @return array{list<string>, list<string>, string} @param lines, the parameters, the request
+ */
+function fieldParams(Command $c): array
+{
+    $docs = [];
+    $params = [];
+    $args = [];
+    foreach ($c->request->fields as $f) {
+        $name = camel($f->name);
+        if (\in_array($name, OWN_PARAMS, true) || $name === 'this') {
+            throw new \RuntimeException("api.proto: {$c->request->name}.{$f->name} would be the method's own \${$name} parameter");
+        }
+        [$type, $docType, $default] = fieldType($f);
+        $text = docText(fieldDoc($c->request, $f));
+        $docs[] = "@param {$docType} \${$name}" . ($text !== [] ? ' ' . array_shift($text) : '');
+        foreach ($text as $t) {
+            $docs[] = '    ' . $t;
+        }
+        $params[] = "{$type} \${$name} = {$default}";
+        $args[] = "{$name}: \${$name}";
+    }
+
+    // One argument a line when they don't fit one: the body is indented by 8.
+    $request = \count($args) <= 2
+        ? "new {$c->request->name}(" . implode(', ', $args) . ')'
+        : "new {$c->request->name}(\n            " . implode(",\n            ", $args) . ",\n        )";
+
+    return [$docs, $params, $request];
+}
+
+function method(array $doc, string $signature, array $params, string $returns, string $body): string
+{
+    $out = "\n" . docblock($doc, '    ');
+    if ($params === []) {
+        return $out . "    {$signature}(): {$returns}\n    {\n        {$body}\n    }\n";
+    }
+    $out .= "    {$signature}(\n";
+    foreach ($params as $p) {
+        $out .= "        {$p},\n";
+    }
+
+    return $out . "    ): {$returns} {\n        {$body}\n    }\n";
+}
+
+/** The imports of a trait of methods: the request classes and the result types. */
+function methodsHeader(array $cmds, array $uses): string
 {
     $out = \sprintf(HEADER, 'api.proto', 'Centrifugal\\Phpcent') . "\n";
-    $out .= "use Centrifugal\\Phpcent\\Exception\\CentException;\n\n";
+    foreach ($cmds as $c) {
+        $uses[] = 'Centrifugal\\Phpcent\\Internal\\' . $c->request->name;
+    }
+    $uses = array_unique($uses);
+    sort($uses);
+    foreach ($uses as $u) {
+        $out .= "use {$u};\n";
+    }
+
+    return $out . "\n";
+}
+
+function emitClientMethods(array $cmds): string
+{
+    $out = methodsHeader($cmds, ['Centrifugal\\Phpcent\\Exception\\CentException', 'Centrifugal\\Phpcent\\Internal\\Limits', 'Centrifugal\\Phpcent\\Internal\\Request']);
     $out .= "/**\n * The server API methods of Client, one per method of api.proto.\n *\n * @internal\n */\n";
     $out .= "trait ClientMethods\n{\n";
     $out .= "    /**\n     * @template T\n     *\n     * @param Request<T> \$request\n     *\n     * @return T\n     */\n";
-    $out .= "    abstract private function invoke(Request \$request, ?float \$timeout): mixed;\n";
+    $out .= "    abstract private function invoke(Request \$request, ?float \$timeout): mixed;\n\n";
+    $out .= "    abstract private function sendBroadcast(BroadcastRequest \$request, ?float \$timeout): BroadcastResult;\n\n";
+    $out .= "    /** @param ?callable(BroadcastAttempt): ?float \$onAttemptError */\n";
+    $out .= "    abstract private function retryBroadcast(BroadcastRequest \$request, int \$maxAttempts, ?float \$attemptTimeout, ?callable \$onAttemptError, ?float \$timeout): BroadcastResult;\n";
+    $timeoutDoc = '@param ?float $timeout Seconds bounding the call: requestTimeout when null.';
     foreach ($cmds as $c) {
+        [$fieldDocs, $params, $request] = fieldParams($c);
+        $name = camel($c->method);
+        $doc = methodDoc($c);
         if ($c->method === 'broadcast') {
-            continue; // written by hand: its result is a result per channel
+            $doc = [...$doc, '', ...lines(BROADCAST_DOC)];
         }
-        $req = $c->request->name;
-        $empty = $c->request->fields === [];
-        $arg = $empty ? "?{$req} \$request = null" : "{$req} \$request";
-        $value = $empty ? "\$request ?? new {$req}()" : '$request';
+        $doc = [...$doc, '', ...$fieldDocs, $timeoutDoc, '', '@throws CentException'];
+        $returns = $c->method === 'broadcast' ? 'BroadcastResult' : $c->result;
+        $call = $c->method === 'broadcast' ? "\$this->sendBroadcast({$request}, \$timeout)" : "\$this->invoke({$request}, \$timeout)";
+        $out .= method($doc, "public function {$name}", [...$params, '?float $timeout = null'], $returns, "return {$call};");
+        if ($c->method === 'broadcast') {
+            $doc = [...lines(BROADCAST_RETRY_DOC), '', ...$fieldDocs,
+                '@param int $maxAttempts Attempts at most, the first included.',
+                '@param ?float $attemptTimeout Seconds bounding each attempt: requestTimeout when null.',
+                '@param ?callable(BroadcastAttempt): ?float $onAttemptError Called after an attempt',
+                '    which failed in a way a retry may fix, except the last; returns the',
+                '    seconds to wait before the next attempt, or null for the default wait.',
+                '@param ?float $timeout Seconds bounding the whole call, waits included: no',
+                '    bound but each attempt\'s when null.',
+                '', '@throws CentException'];
+            $own = ['int $maxAttempts = Limits::MAX_ATTEMPTS', '?float $attemptTimeout = null', '?callable $onAttemptError = null', '?float $timeout = null'];
+            $out .= method($doc, 'public function broadcastWithRetry', [...$params, ...$own], 'BroadcastResult', "return \$this->retryBroadcast({$request}, \$maxAttempts, \$attemptTimeout, \$onAttemptError, \$timeout);");
+        }
+    }
+
+    return $out . "}\n";
+}
+
+function emitBatchMethods(array $cmds): string
+{
+    $out = methodsHeader($cmds, ['Centrifugal\\Phpcent\\Internal\\Request']);
+    $out .= "/**\n * The commands a Batch takes, one per method of api.proto.\n *\n * @internal\n */\n";
+    $out .= "trait BatchMethods\n{\n";
+    $out .= "    /**\n     * @template T\n     *\n     * @param Request<T> \$request\n     *\n     * @return Pending<T>\n     */\n";
+    $out .= "    abstract private function add(Request \$request): Pending;\n";
+    foreach ($cmds as $c) {
+        [$fieldDocs, $params, $request] = fieldParams($c);
+        $result = $c->method === 'broadcast' ? 'BroadcastResult' : $c->result;
         $doc = methodDoc($c);
         $doc[] = '';
-        $doc[] = '@param ?float $timeout Seconds bounding the call: requestTimeout when null.';
+        $doc[] = 'Adds the command to the batch: its Pending holds the result once the';
+        $doc[] = 'batch is sent' . ($c->method === 'broadcast' ? ', and throws BroadcastFailedChannelsException' : '.');
+        if ($c->method === 'broadcast') {
+            $doc[] = 'when any channel failed.';
+        }
+        $doc = [...$doc, '', ...$fieldDocs, '', "@return Pending<{$result}>"];
+        $out .= method($doc, 'public function ' . camel($c->method), $params, 'Pending', "return \$this->add({$request});");
+    }
+
+    return $out . "}\n";
+}
+
+function emitCommandMethods(array $cmds): string
+{
+    $out = methodsHeader($cmds, ['Centrifugal\\Phpcent\\Exception\\InvalidRequestException', 'Centrifugal\\Phpcent\\Internal\\Request']);
+    $out .= "/**\n * The commands of Command, one per method of api.proto.\n *\n * @internal\n */\n";
+    $out .= "trait CommandMethods\n{\n";
+    $out .= "    /** @param Request<mixed> \$request */\n";
+    $out .= "    abstract private static function of(Request \$request): self;\n";
+    foreach ($cmds as $c) {
+        [$fieldDocs, $params, $request] = fieldParams($c);
+        $doc = methodDoc($c);
         $doc[] = '';
-        $doc[] = '@throws CentException';
-        $out .= "\n" . docblock($doc, '    ');
-        $out .= '    public function ' . camel($c->method) . "({$arg}, ?float \$timeout = null): {$c->result}\n    {\n";
-        $out .= "        return \$this->invoke({$value}, \$timeout);\n    }\n";
+        $doc[] = 'The command making the call, checked as a Client checks it.';
+        $doc = [...$doc, '', ...$fieldDocs, '', '@throws InvalidRequestException'];
+        $out .= method($doc, 'public static function ' . camel($c->method), $params, 'self', "return self::of({$request});");
     }
 
     return $out . "}\n";
@@ -522,10 +717,13 @@ function generate(): array
     }
     foreach ($api->messages as $m) {
         if (!isset($skip[$m->name])) {
-            $files["{$m->name}.php"] = emitMessage($m, 'Centrifugal\\Phpcent', 'api.proto', 'server API', $byRequest[$m->name] ?? null);
+            $command = $byRequest[$m->name] ?? null;
+            $files[($command !== null ? 'Internal/' : '') . "{$m->name}.php"] = emitMessage($m, 'Centrifugal\\Phpcent' . ($command !== null ? '\\Internal' : ''), 'api.proto', 'server API', $command);
         }
     }
     $files['ClientMethods.php'] = emitClientMethods($cmds);
+    $files['BatchMethods.php'] = emitBatchMethods($cmds);
+    $files['CommandMethods.php'] = emitCommandMethods($cmds);
     $files['Internal/Methods.php'] = emitMethods($cmds);
 
     $proxy = $schema = Proto::parse((string) file_get_contents(ROOT . '/proto/proxy.proto'), 'proxy.proto');

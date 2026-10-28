@@ -12,7 +12,7 @@ use Centrifugal\Phpcent\Internal\Encode;
  * queue, a cache - or encoded with rules of your own. It is checked to be
  * valid JSON when created, and sent unchanged, number text kept.
  *
- *     new PublishRequest(channel: 'news', data: new RawJson('{"text":"hi"}'));
+ *     $client->publish(channel: 'news', data: new RawJson('{"text":"hi"}'));
  *
  * It may also stand for a part of a payload - ['user' => 42, 'doc' => $raw] -
  * which is then sent as its text too. A string, by contrast, is always a JSON

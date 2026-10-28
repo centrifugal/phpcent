@@ -12,7 +12,7 @@ misuse. Read this before changing code.
 |---|---|
 | `proto/api.proto`, `proto/proxy.proto` | Copies of Centrifugo's protos, from a released tag (`CENTRIFUGO_REF=v6.10.2 composer sync-proto`) |
 | `gen/` | The generator: `Proto.php` parses the protos, `generate.php` writes `generated/`, `api_docs.php` writes `API.md` |
-| `generated/` | Generated - never edited: the request and result types, `ClientMethods`, `Proxy/` types |
+| `generated/` | Generated - never edited: the result and nested message types; `ClientMethods`, `BatchMethods`, `CommandMethods`, the methods taking each request's fields as named arguments; `Internal/` the request classes they build; `Proxy/` types |
 | `API.md` | The API reference, generated from the docblocks by `composer docs` - never edited |
 | `src/Client.php` | The client: configuration, sending, broadcast, `broadcastWithRetry` |
 | `src/Internal/` | Encoding requests (`Encode`), decoding replies (`Decode`, `Reply`), validation, the curl and PSR-18 transports |
@@ -96,9 +96,12 @@ release. `composer.json` has no `version`: the tag is the version.
 
 ## Things that look wrong but are deliberate
 
-- **Request objects, not named arguments on the methods**, as gocent's and
-  pycent's: one argument per method, the same objects for `Batch::add` and
-  `Command::from`.
+- **Named arguments, not request objects**: spec 0.2's "unified meaning,
+  idiomatic spelling" - `$client->publish(channel: ..., data: ...)`,
+  `$batch->publish(...)`, `Command::publish(...)`, generated with the same
+  parameters. The request classes are internal. PHP cannot make arguments
+  named-only: the docs say their order is not part of the API, and a field
+  added to a proto may shift it - before `$timeout`, too.
 - **Payloads in replies are `stdClass`.** Arrays would turn `{}` into `[]`
   when sent on: spec 3.4's PHP row.
 - **curl by default, PSR-18 optional.** curl enforces the one deadline and

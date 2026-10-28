@@ -4,43 +4,22 @@ declare(strict_types=1);
 
 namespace Centrifugal\Phpcent\Tests\Integration;
 
-use Centrifugal\Phpcent\BlockUserRequest;
-use Centrifugal\Phpcent\CancelPushRequest;
 use Centrifugal\Phpcent\Client;
 use Centrifugal\Phpcent\Command;
-use Centrifugal\Phpcent\ConnectionsRequest;
-use Centrifugal\Phpcent\DeleteUserStatusRequest;
 use Centrifugal\Phpcent\DeviceFilter;
-use Centrifugal\Phpcent\DeviceListRequest;
 use Centrifugal\Phpcent\DeviceMetaUpdate;
-use Centrifugal\Phpcent\DeviceRegisterRequest;
-use Centrifugal\Phpcent\DeviceRemoveRequest;
 use Centrifugal\Phpcent\DeviceTopicFilter;
-use Centrifugal\Phpcent\DeviceTopicListRequest;
-use Centrifugal\Phpcent\DeviceTopicUpdateRequest;
-use Centrifugal\Phpcent\DeviceUpdateRequest;
 use Centrifugal\Phpcent\Exception\NotAvailableException;
 use Centrifugal\Phpcent\Exception\UnauthorizedException;
-use Centrifugal\Phpcent\GetUserStatusRequest;
-use Centrifugal\Phpcent\HistoryRequest;
-use Centrifugal\Phpcent\InvalidateUserTokensRequest;
-use Centrifugal\Phpcent\PublishRequest;
 use Centrifugal\Phpcent\PushNotification;
 use Centrifugal\Phpcent\PushRecipient;
-use Centrifugal\Phpcent\RevokeTokenRequest;
-use Centrifugal\Phpcent\SendPushNotificationRequest;
 use Centrifugal\Phpcent\Tests\Support\TestServer;
 use Centrifugal\Phpcent\Token\ApiClaims;
 use Centrifugal\Phpcent\Token\ApiTokens;
 use Centrifugal\Phpcent\Token\ConnectionClaims;
 use Centrifugal\Phpcent\Token\Key;
 use Centrifugal\Phpcent\Token\Token;
-use Centrifugal\Phpcent\UnblockUserRequest;
-use Centrifugal\Phpcent\UpdatePushStatusRequest;
-use Centrifugal\Phpcent\UpdateUserStatusRequest;
 use Centrifugal\Phpcent\UserTopicFilter;
-use Centrifugal\Phpcent\UserTopicListRequest;
-use Centrifugal\Phpcent\UserTopicUpdateRequest;
 use Centrifugal\Phpcent\WebPushPushNotification;
 
 /**
@@ -76,12 +55,12 @@ final class ProTest extends IntegrationTestCase
     {
         $pro = $this->pro();
         $user = $this->unique();
-        $pro->updateUserStatus(new UpdateUserStatusRequest(users: [$user], state: 'away'));
-        $st = $pro->getUserStatus(new GetUserStatusRequest(users: [$user]))->statuses[0];
+        $pro->updateUserStatus(users: [$user], state: 'away');
+        $st = $pro->getUserStatus(users: [$user])->statuses[0];
         self::assertSame([$user, 'away'], [$st->user, $st->state]);
         self::assertGreaterThan(0, $st->active);
-        $pro->deleteUserStatus(new DeleteUserStatusRequest(users: [$user]));
-        self::assertSame(0, $pro->getUserStatus(new GetUserStatusRequest(users: [$user]))->statuses[0]->active);
+        $pro->deleteUserStatus(users: [$user]);
+        self::assertSame(0, $pro->getUserStatus(users: [$user])->statuses[0]->active);
     }
 
     public function testUserAndTokenControl(): void
@@ -89,10 +68,10 @@ final class ProTest extends IntegrationTestCase
         $pro = $this->pro();
         $user = $this->unique();
         $expire = time() + 60;
-        $pro->blockUser(new BlockUserRequest(expireAt: $expire, user: $user));
-        $pro->unblockUser(new UnblockUserRequest(user: $user));
-        $pro->revokeToken(new RevokeTokenRequest(expireAt: $expire, uid: "{$user}-jti"));
-        $pro->invalidateUserTokens(new InvalidateUserTokensRequest(expireAt: $expire, user: $user, issuedBefore: time()));
+        $pro->blockUser(expireAt: $expire, user: $user);
+        $pro->unblockUser(user: $user);
+        $pro->revokeToken(expireAt: $expire, uid: "{$user}-jti");
+        $pro->invalidateUserTokens(expireAt: $expire, user: $user, issuedBefore: time());
         self::assertTrue(true);
     }
 
@@ -100,37 +79,37 @@ final class ProTest extends IntegrationTestCase
     {
         $pro = $this->pro();
         $user = $this->unique();
-        $reg = $pro->deviceRegister(new DeviceRegisterRequest(provider: 'webpush', token: self::webpushToken(), platform: 'web', user: $user, meta: ['app' => 'phpcent'], topics: ['news']));
+        $reg = $pro->deviceRegister(provider: 'webpush', token: self::webpushToken(), platform: 'web', user: $user, meta: ['app' => 'phpcent'], topics: ['news']);
         self::assertNotSame('', $reg->id);
         $byUser = new DeviceFilter(users: [$user]);
-        $list = $pro->deviceList(new DeviceListRequest(filter: $byUser, includeTotalCount: true, includeMeta: true, includeTopics: true));
+        $list = $pro->deviceList(filter: $byUser, includeTotalCount: true, includeMeta: true, includeTopics: true);
         self::assertSame(1, $list->totalCount);
         self::assertSame($reg->id, $list->items[0]->id);
         self::assertSame(['app' => 'phpcent'], $list->items[0]->meta);
         self::assertContains('news', $list->items[0]->topics);
-        $pro->deviceTopicUpdate(new DeviceTopicUpdateRequest(deviceId: $reg->id, op: 'add', topics: ['sport']));
-        $topics = $pro->deviceTopicList(new DeviceTopicListRequest(filter: new DeviceTopicFilter(deviceIds: [$reg->id]), includeTotalCount: true));
+        $pro->deviceTopicUpdate(deviceId: $reg->id, op: 'add', topics: ['sport']);
+        $topics = $pro->deviceTopicList(filter: new DeviceTopicFilter(deviceIds: [$reg->id]), includeTotalCount: true);
         self::assertSame(2, $topics->totalCount);
-        $pro->deviceUpdate(new DeviceUpdateRequest(ids: [$reg->id], metaUpdate: new DeviceMetaUpdate(meta: ['app' => 'updated'])));
-        self::assertSame(['app' => 'updated'], $pro->deviceList(new DeviceListRequest(filter: $byUser, includeMeta: true))->items[0]->meta);
-        $pro->userTopicUpdate(new UserTopicUpdateRequest(user: $user, op: 'add', topics: ['alerts']));
-        $ut = $pro->userTopicList(new UserTopicListRequest(filter: new UserTopicFilter(users: [$user])));
+        $pro->deviceUpdate(ids: [$reg->id], metaUpdate: new DeviceMetaUpdate(meta: ['app' => 'updated']));
+        self::assertSame(['app' => 'updated'], $pro->deviceList(filter: $byUser, includeMeta: true)->items[0]->meta);
+        $pro->userTopicUpdate(user: $user, op: 'add', topics: ['alerts']);
+        $ut = $pro->userTopicList(filter: new UserTopicFilter(users: [$user]));
         self::assertSame(['alerts'], array_map(static fn($i) => $i->topic, $ut->items));
-        $push = $pro->sendPushNotification(new SendPushNotificationRequest(
+        $push = $pro->sendPushNotification(
             recipient: new PushRecipient(filter: $byUser),
             notification: new PushNotification(webpush: new WebPushPushNotification(payload: ['title' => 'hi'])),
             sendAt: time() + 3600,
-        ));
+        );
         self::assertNotSame('', $push->uid);
-        $pro->cancelPush(new CancelPushRequest(uid: $push->uid));
+        $pro->cancelPush(uid: $push->uid);
         // Push status needs push analytics in ClickHouse; without it, the
         // method is not available.
         try {
-            $pro->updatePushStatus(new UpdatePushStatusRequest(analyticsUid: $push->uid, status: 'delivered', deviceId: $reg->id));
+            $pro->updatePushStatus(analyticsUid: $push->uid, status: 'delivered', deviceId: $reg->id);
         } catch (NotAvailableException) {
         }
-        $pro->deviceRemove(new DeviceRemoveRequest(ids: [$reg->id]));
-        self::assertSame([], $pro->deviceList(new DeviceListRequest(filter: $byUser))->items);
+        $pro->deviceRemove(ids: [$reg->id]);
+        self::assertSame([], $pro->deviceList(filter: $byUser)->items);
     }
 
     public function testProBatch(): void
@@ -138,15 +117,15 @@ final class ProTest extends IntegrationTestCase
         $pro = $this->pro();
         $user = $this->unique();
         $b = $pro->newBatch();
-        $b->add(new UpdateUserStatusRequest(users: [$user], state: 'busy'));
-        $status = $b->add(new GetUserStatusRequest(users: [$user]));
-        $reg = $b->add(new DeviceRegisterRequest(provider: 'webpush', token: self::webpushToken(), platform: 'web', user: $user));
-        $conns = $b->add(new ConnectionsRequest(user: $user));
+        $b->updateUserStatus(users: [$user], state: 'busy');
+        $status = $b->getUserStatus(users: [$user]);
+        $reg = $b->deviceRegister(provider: 'webpush', token: self::webpushToken(), platform: 'web', user: $user);
+        $conns = $b->connections(user: $user);
         $b->send();
         self::assertSame('busy', $status->result()->statuses[0]->state);
         self::assertNotSame('', $reg->result()->id);
         self::assertSame([], $conns->result()->connections);
-        $pro->deviceRemove(new DeviceRemoveRequest(ids: [$reg->result()->id]));
+        $pro->deviceRemove(ids: [$reg->result()->id]);
     }
 
     public function testApiTokens(): void
@@ -161,7 +140,7 @@ final class ProTest extends IntegrationTestCase
         try {
             $key = Key::ed25519(str_repeat("\1", 32))->withKeyId('gocent-api-test');
             $publish = function (callable $token): void {
-                (new Client(self::addr(), bearerTokenFunc: $token))->publish(new PublishRequest(channel: $this->unique(), data: new \stdClass()));
+                (new Client(self::addr(), bearerTokenFunc: $token))->publish(channel: $this->unique(), data: new \stdClass());
             };
             $tokens = new ApiTokens(claims: new ApiClaims(audience: 'centrifugo-api', scope: ['centrifugo:api']), key: $key);
             $publish($tokens->token(...));
@@ -194,13 +173,13 @@ final class ProTest extends IntegrationTestCase
         // Centrifugo's async consumer: apart, as method and payload, and whole.
         $pro = $this->pro();
         $ch = $this->unique();
-        $apart = Command::from(new PublishRequest(channel: $ch, data: ['n' => 1]));
+        $apart = Command::publish(channel: $ch, data: ['n' => 1]);
         self::redisXadd('phpcent_commands', 'method', $apart->method, 'payload', $apart->payload);
-        $whole = Command::from(new PublishRequest(channel: $ch, data: ['n' => 2]));
+        $whole = Command::publish(channel: $ch, data: ['n' => 2]);
         self::redisXadd('phpcent_commands', 'payload', $whole->toJson());
         $deadline = microtime(true) + 15;
         while (true) {
-            $pubs = $pro->history(new HistoryRequest(channel: $ch, limit: 10))->publications;
+            $pubs = $pro->history(channel: $ch, limit: 10)->publications;
             if (\count($pubs) === 2) {
                 self::assertSame(['{"n":1}', '{"n":2}'], array_map(static fn($p) => json_encode($p->data), $pubs));
 

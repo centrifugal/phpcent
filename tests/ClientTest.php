@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace Centrifugal\Phpcent\Tests;
 
+use Centrifugal\Phpcent\Batch;
 use Centrifugal\Phpcent\BroadcastAttempt;
-use Centrifugal\Phpcent\BroadcastRequest;
 use Centrifugal\Phpcent\Client;
 use Centrifugal\Phpcent\Command;
-use Centrifugal\Phpcent\ConnectionsRequest;
 use Centrifugal\Phpcent\Exception\ApiException;
 use Centrifugal\Phpcent\Exception\BadRequestException;
 use Centrifugal\Phpcent\Exception\BatchFailedCommandsException;
@@ -27,11 +26,8 @@ use Centrifugal\Phpcent\Exception\TimeoutException;
 use Centrifugal\Phpcent\Exception\TooManyRequestsException;
 use Centrifugal\Phpcent\Exception\UnauthorizedException;
 use Centrifugal\Phpcent\Exception\UnknownChannelException;
-use Centrifugal\Phpcent\HistoryRequest;
-use Centrifugal\Phpcent\InfoRequest;
-use Centrifugal\Phpcent\PresenceStatsRequest;
-use Centrifugal\Phpcent\PublishRequest;
-use Centrifugal\Phpcent\Request;
+use Centrifugal\Phpcent\Internal\PresenceStatsRequest;
+use Centrifugal\Phpcent\Internal\Request;
 use Centrifugal\Phpcent\RequestInfo;
 use Centrifugal\Phpcent\Retry;
 use Centrifugal\Phpcent\Tests\Support\FakeCentrifugo;
@@ -150,53 +146,92 @@ final class ClientTest extends TestCase
 
     // Every method.
 
-    /** @return iterable<string, array{string, class-string<Request<mixed>>}> */
+    /** @return iterable<string, array{string, class-string<Request<mixed>>, array<string, mixed>}> */
     public static function methods(): iterable
     {
         $trait = new \ReflectionClass(\Centrifugal\Phpcent\ClientMethods::class);
         foreach ($trait->getMethods(\ReflectionMethod::IS_PUBLIC) as $m) {
-            $type = $m->getParameters()[0]->getType();
-            \assert($type instanceof \ReflectionNamedType);
+            $name = $m->getName();
+            if ($name === 'broadcast' || $name === 'broadcastWithRetry') {
+                continue; // a result per channel: tested on their own
+            }
             /** @var class-string<Request<mixed>> $class */
-            $class = $type->getName();
-            yield $m->getName() => [$m->getName(), $class];
+            $class = 'Centrifugal\\Phpcent\\Internal\\' . ucfirst($name) . 'Request';
+            $args = $name === 'publish' ? ['channel' => 'ch', 'data' => 1] : [];
+            yield $name => [$name, $class, $args];
         }
     }
 
-    /** @param class-string<Request<mixed>> $class */
-    private static function request(string $class): Request
-    {
-        return match ($class) {
-            PublishRequest::class => new PublishRequest(channel: 'ch', data: 1),
-            default => new $class(),
-        };
-    }
-
-    /** @param class-string<Request<mixed>> $class */
+    /**
+     * @param class-string<Request<mixed>> $class
+     * @param array<string, mixed> $args
+     */
     #[DataProvider('methods')]
-    public function testEveryMethodReachesItsEndpoint(string $name, string $class): void
+    public function testEveryMethodReachesItsEndpoint(string $name, string $class, array $args): void
     {
         $fake = new FakeCentrifugo();
         $c = FakeCentrifugo::client($fake);
-        $request = self::request($class);
-        $result = $c->{$name}($request);
+        $result = $c->{$name}(...$args);
         self::assertSame('/api/' . $class::apiMethod(), $fake->last()['path']);
-        self::assertSame($request->toJson(), $fake->last()['body']);
+        self::assertSame((new $class(...$args))->toJson(), $fake->last()['body']);
         self::assertSame($class::decodeResult(new \stdClass(), 'x')::class, $result::class);
     }
 
-    /** @param class-string<Request<mixed>> $class */
+    /**
+     * @param class-string<Request<mixed>> $class
+     * @param array<string, mixed> $args
+     */
     #[DataProvider('methods')]
-    public function testEveryMethodInABatch(string $name, string $class): void
+    public function testEveryMethodInABatch(string $name, string $class, array $args): void
     {
         $fake = new FakeCentrifugo(static fn(string $method, mixed $json): Response => FakeCentrifugo::json(200, ['replies' => [[$class::apiMethod() => new \stdClass()]]]));
         $b = FakeCentrifugo::client($fake)->newBatch();
-        $request = self::request($class);
-        $p = $b->add($request);
+        $p = $b->{$name}(...$args);
         $b->send();
         self::assertSame('/api/batch', $fake->last()['path']);
-        self::assertSame('{"commands":[{"' . $class::apiMethod() . '":' . $request->toJson() . '}]}', $fake->last()['body']);
+        self::assertSame('{"commands":[{"' . $class::apiMethod() . '":' . (new $class(...$args))->toJson() . '}]}', $fake->last()['body']);
         self::assertSame($class::decodeResult(new \stdClass(), 'x')::class, $p->result()::class);
+    }
+
+    /**
+     * @param class-string<Request<mixed>> $class
+     * @param array<string, mixed> $args
+     */
+    #[DataProvider('methods')]
+    public function testEveryMethodAsACommand(string $name, string $class, array $args): void
+    {
+        $cmd = Command::{$name}(...$args);
+        self::assertSame($class::apiMethod(), $cmd->method);
+        self::assertSame((new $class(...$args))->toJson(), $cmd->payload);
+    }
+
+    public function testClientBatchAndCommandTakeTheSameArguments(): void
+    {
+        $params = static fn(\ReflectionMethod $m): array => array_map(
+            static fn(\ReflectionParameter $p): string => $p->getType() . ' $' . $p->getName() . ' = ' . var_export($p->getDefaultValue(), true),
+            $m->getParameters(),
+        );
+        $client = new \ReflectionClass(Client::class);
+        $batch = new \ReflectionClass(Batch::class);
+        $command = new \ReflectionClass(Command::class);
+        $n = 0;
+        foreach ((new \ReflectionClass(\Centrifugal\Phpcent\ClientMethods::class))->getMethods(\ReflectionMethod::IS_PUBLIC) as $m) {
+            if ($m->getName() === 'broadcastWithRetry') {
+                continue;
+            }
+            $fields = $params($m);
+            self::assertSame('?float $timeout = NULL', array_pop($fields), $m->getName());
+            self::assertSame($fields, $params($batch->getMethod($m->getName())), $m->getName());
+            self::assertSame($fields, $params($command->getMethod($m->getName())), $m->getName());
+            self::assertTrue($client->getMethod($m->getName())->isPublic());
+            $n++;
+        }
+        self::assertGreaterThan(30, $n);
+        // broadcastWithRetry takes broadcast's fields, then its own.
+        $retry = $params($client->getMethod('broadcastWithRetry'));
+        $broadcast = $params($client->getMethod('broadcast'));
+        array_pop($broadcast);
+        self::assertSame($broadcast, \array_slice($retry, 0, \count($broadcast)));
     }
 
     public function testRequestNamesItsMethod(): void
@@ -210,7 +245,7 @@ final class ClientTest extends TestCase
         $fake = new FakeCentrifugo();
         FakeCentrifugo::client($fake)->info();
         self::assertSame('{}', $fake->last()['body']);
-        FakeCentrifugo::client($fake)->info(new InfoRequest());
+        FakeCentrifugo::client($fake)->info();
         self::assertSame('{}', $fake->last()['body']);
     }
 
@@ -291,7 +326,7 @@ final class ClientTest extends TestCase
             self::assertStringContainsString('is apiEndpoint the API base URL', $e->getMessage());
         }
         try {
-            $c->connections(new ConnectionsRequest());
+            $c->connections();
             self::fail('no error');
         } catch (HttpException $e) {
             self::assertStringContainsString('connections is a Centrifugo PRO method', $e->getMessage());
@@ -317,8 +352,8 @@ final class ClientTest extends TestCase
     {
         $fake = new FakeCentrifugo(static fn(): Response => FakeCentrifugo::json(200, ['replies' => [['error' => ['code' => 104, 'message' => 'not found']], ['error' => ['code' => 104, 'message' => 'not found']]]]));
         $b = FakeCentrifugo::client($fake)->newBatch();
-        $conns = $b->add(new ConnectionsRequest());
-        $hist = $b->add(new HistoryRequest(channel: 'x'));
+        $conns = $b->connections();
+        $hist = $b->history(channel: 'x');
         try {
             $b->send();
         } catch (BatchFailedCommandsException) {
@@ -391,16 +426,16 @@ final class ClientTest extends TestCase
         $fake = new FakeCentrifugo();
         $c = FakeCentrifugo::client($fake);
         foreach ([
-            [new PublishRequest(data: 1), 'invalid publish request: channel is required'],
-            [new PublishRequest(channel: 'a'), 'invalid publish request: data or b64data is required'],
-            [new BroadcastRequest(data: 1), 'invalid broadcast request: channels is required'],
-            [new BroadcastRequest(channels: ['a']), 'data or b64data is required'],
-            [new BroadcastRequest(channels: ['a', ''], data: 1), 'channels[1] is empty'],
-            [new PublishRequest(channel: 'a', data: \INF), 'invalid publish request: data cannot be encoded'],
-            [new PublishRequest(channel: "\xff", data: 1), 'channel is not valid UTF-8'],
-        ] as [$req, $message]) {
+            ['publish', ['data' => 1], 'invalid publish request: channel is required'],
+            ['publish', ['channel' => 'a'], 'invalid publish request: data or b64data is required'],
+            ['broadcast', ['data' => 1], 'invalid broadcast request: channels is required'],
+            ['broadcast', ['channels' => ['a']], 'data or b64data is required'],
+            ['broadcast', ['channels' => ['a', ''], 'data' => 1], 'channels[1] is empty'],
+            ['publish', ['channel' => 'a', 'data' => \INF], 'invalid publish request: data cannot be encoded'],
+            ['publish', ['channel' => "\xff", 'data' => 1], 'channel is not valid UTF-8'],
+        ] as [$method, $args, $message]) {
             try {
-                $req instanceof BroadcastRequest ? $c->broadcast($req) : $c->publish($req);
+                $c->{$method}(...$args);
                 self::fail("sent: {$message}");
             } catch (InvalidRequestException $e) {
                 self::assertStringContainsString($message, $e->getMessage());
@@ -409,7 +444,7 @@ final class ClientTest extends TestCase
         }
         self::assertSame([], $fake->requests);
         // Only those rules: a publication with b64data alone is Centrifugo's to judge.
-        $c->publish(new PublishRequest(channel: 'a', b64data: 'AA=='));
+        $c->publish(channel: 'a', b64data: 'AA==');
         self::assertCount(1, $fake->requests);
     }
 
@@ -424,7 +459,7 @@ final class ClientTest extends TestCase
     public function testBroadcastSucceeds(): void
     {
         $fake = self::broadcastReply([['result' => ['offset' => 1]], ['result' => ['offset' => 2]]]);
-        $res = FakeCentrifugo::client($fake)->broadcast(new BroadcastRequest(channels: ['a', 'b'], data: 1, idempotencyKey: 'k'));
+        $res = FakeCentrifugo::client($fake)->broadcast(channels: ['a', 'b'], data: 1, idempotencyKey: 'k');
         self::assertTrue($res->replied);
         self::assertSame([], $res->failed());
         self::assertSame(['a', 'b'], array_map(static fn($c) => $c->channel, $res->channels));
@@ -437,7 +472,7 @@ final class ClientTest extends TestCase
     {
         $fake = self::broadcastReply([['result' => ['offset' => 1]], ['error' => ['code' => 102, 'message' => 'unknown channel']], ['error' => ['code' => 100, 'message' => 'internal']]]);
         try {
-            FakeCentrifugo::client($fake)->broadcast(new BroadcastRequest(channels: ['a', 'b', 'c'], data: 1));
+            FakeCentrifugo::client($fake)->broadcast(channels: ['a', 'b', 'c'], data: 1);
             self::fail('no error');
         } catch (BroadcastFailedChannelsException $e) {
             self::assertNotInstanceOf(ApiException::class, $e);
@@ -456,7 +491,7 @@ final class ClientTest extends TestCase
     {
         $fake = self::broadcastReply([['error' => ['code' => 102, 'message' => 'unknown channel']]]);
         try {
-            FakeCentrifugo::client($fake)->broadcast(new BroadcastRequest(channels: ['a'], data: 1));
+            FakeCentrifugo::client($fake)->broadcast(channels: ['a'], data: 1);
             self::fail('no error');
         } catch (BroadcastFailedChannelsException $e) {
             self::assertSame('broadcast: 1 of 1 channels failed: a: unknown channel (code 102)', $e->getMessage());
@@ -468,7 +503,7 @@ final class ClientTest extends TestCase
     {
         $fake = self::broadcastReply([['result' => ['offset' => 1]]]);
         $this->expectException(DecodeException::class);
-        FakeCentrifugo::client($fake)->broadcast(new BroadcastRequest(channels: ['a', 'b'], data: 1));
+        FakeCentrifugo::client($fake)->broadcast(channels: ['a', 'b'], data: 1);
     }
 
     public function testBroadcastWithRetry(): void
@@ -487,7 +522,8 @@ final class ClientTest extends TestCase
         $attempts = [];
         try {
             FakeCentrifugo::client($fake)->broadcastWithRetry(
-                new BroadcastRequest(channels: ['a', 'b', 'c'], data: 1),
+                channels: ['a', 'b', 'c'],
+                data: 1,
                 onAttemptError: static function (BroadcastAttempt $a) use (&$attempts): float {
                     $attempts[] = $a;
 
@@ -516,7 +552,7 @@ final class ClientTest extends TestCase
         $c = FakeCentrifugo::client($fake);
         // The callback stops the retries by throwing.
         try {
-            $c->broadcastWithRetry(new BroadcastRequest(channels: ['a'], data: 1), maxAttempts: 5, onAttemptError: static fn(): never => throw new \DomainException('stop'));
+            $c->broadcastWithRetry(channels: ['a'], data: 1, maxAttempts: 5, onAttemptError: static fn(): never => throw new \DomainException('stop'));
             self::fail('no error');
         } catch (\DomainException $e) {
             self::assertSame('stop', $e->getMessage());
@@ -525,7 +561,7 @@ final class ClientTest extends TestCase
         // A failure no retry fixes stops it at once.
         $fake = new FakeCentrifugo(static fn(): Response => FakeCentrifugo::json(401, ''));
         try {
-            FakeCentrifugo::client($fake)->broadcastWithRetry(new BroadcastRequest(channels: ['a'], data: 1), maxAttempts: 5);
+            FakeCentrifugo::client($fake)->broadcastWithRetry(channels: ['a'], data: 1, maxAttempts: 5);
             self::fail('no error');
         } catch (UnauthorizedException) {
         }
@@ -533,7 +569,7 @@ final class ClientTest extends TestCase
         // maxAttempts is a bound.
         $fake = new FakeCentrifugo(static fn(): Response => FakeCentrifugo::json(503, ''));
         try {
-            FakeCentrifugo::client($fake)->broadcastWithRetry(new BroadcastRequest(channels: ['a'], data: 1), maxAttempts: 3, onAttemptError: static fn(): float => 0.0);
+            FakeCentrifugo::client($fake)->broadcastWithRetry(channels: ['a'], data: 1, maxAttempts: 3, onAttemptError: static fn(): float => 0.0);
             self::fail('no error');
         } catch (HttpException) {
         }
@@ -546,7 +582,7 @@ final class ClientTest extends TestCase
         $c = FakeCentrifugo::client($fake);
         foreach ([['maxAttempts' => 0], ['maxAttempts' => -1], ['attemptTimeout' => -1.0], ['attemptTimeout' => 0.0]] as $opts) {
             try {
-                $c->broadcastWithRetry(new BroadcastRequest(channels: ['a'], data: 1), ...$opts);
+                $c->broadcastWithRetry(...['channels' => ['a'], 'data' => 1, ...$opts]);
                 self::fail('accepted ' . json_encode($opts));
             } catch (InvalidRequestException) {
             }
@@ -559,7 +595,7 @@ final class ClientTest extends TestCase
         $fake = new FakeCentrifugo(static fn(): Response => FakeCentrifugo::json(503, ''));
         $start = microtime(true);
         try {
-            FakeCentrifugo::client($fake)->broadcastWithRetry(new BroadcastRequest(channels: ['a'], data: 1), maxAttempts: 10, onAttemptError: static fn(): float => 60.0, timeout: 0.3);
+            FakeCentrifugo::client($fake)->broadcastWithRetry(channels: ['a'], data: 1, maxAttempts: 10, onAttemptError: static fn(): float => 60.0, timeout: 0.3);
             self::fail('no error');
         } catch (HttpException|TimeoutException) {
         }
@@ -576,9 +612,9 @@ final class ClientTest extends TestCase
             ['broadcast' => ['responses' => [['result' => ['offset' => 1]], ['error' => ['code' => 102, 'message' => 'u']]]]],
         ]]));
         $b = FakeCentrifugo::client($fake)->newBatch(parallel: true);
-        $pub = $b->add(new PublishRequest(channel: 'a', data: 1));
-        $hist = $b->add(new HistoryRequest(channel: 'x'));
-        $bc = $b->add(new BroadcastRequest(channels: ['a', 'b'], data: 1));
+        $pub = $b->publish(channel: 'a', data: 1);
+        $hist = $b->history(channel: 'x');
+        $bc = $b->broadcast(channels: ['a', 'b'], data: 1);
         self::assertCount(3, $b);
         try {
             $pub->result();
@@ -611,7 +647,7 @@ final class ClientTest extends TestCase
     {
         $fake = new FakeCentrifugo(static fn(): Response => FakeCentrifugo::json(200, ['replies' => [['info' => new \stdClass()]]]));
         $b = FakeCentrifugo::client($fake)->newBatch();
-        $b->add(new InfoRequest());
+        $b->info();
         $b->send();
         try {
             $b->send();
@@ -619,14 +655,14 @@ final class ClientTest extends TestCase
         } catch (BatchSentException) {
         }
         $this->expectException(\LogicException::class);
-        $b->add(new InfoRequest());
+        $b->info();
     }
 
     public function testBatchFailingAsAWhole(): void
     {
         $fake = new FakeCentrifugo(static fn(): Response => FakeCentrifugo::json(500, 'down'));
         $b = FakeCentrifugo::client($fake)->newBatch();
-        $p = $b->add(new InfoRequest());
+        $p = $b->info();
         try {
             $b->send();
             self::fail('no error');
@@ -644,7 +680,7 @@ final class ClientTest extends TestCase
     {
         $fake = new FakeCentrifugo(static fn(): Response => FakeCentrifugo::json(200, ['replies' => []]));
         $b = FakeCentrifugo::client($fake)->newBatch();
-        $b->add(new InfoRequest());
+        $b->info();
         $this->expectException(DecodeException::class);
         $b->send();
     }
@@ -653,8 +689,8 @@ final class ClientTest extends TestCase
     {
         $fake = new FakeCentrifugo();
         $b = FakeCentrifugo::client($fake)->newBatch();
-        $b->add(new InfoRequest());
-        $b->add(new PublishRequest(channel: 'a'));
+        $b->info();
+        $b->publish(channel: 'a');
         try {
             $b->send();
             self::fail('no error');
@@ -705,8 +741,8 @@ final class ClientTest extends TestCase
         $c->info();
         $reply = FakeCentrifugo::json(200, ['replies' => [['error' => ['code' => 102]], ['info' => new \stdClass()]]]);
         $b = $c->newBatch();
-        $b->add(new InfoRequest());
-        $b->add(new InfoRequest());
+        $b->info();
+        $b->info();
         try {
             $b->send();
         } catch (BatchFailedCommandsException) {
@@ -717,7 +753,7 @@ final class ClientTest extends TestCase
         } catch (UnknownChannelException) {
         }
         try {
-            $c->publish(new PublishRequest(channel: 'a', data: \NAN));
+            $c->publish(channel: 'a', data: \NAN);
         } catch (InvalidRequestException) {
         }
         self::assertSame(['info', 'batch', 'info', 'publish'], array_map(static fn($i) => $i->method, $infos));
@@ -764,11 +800,11 @@ final class ClientTest extends TestCase
 
     public function testCommand(): void
     {
-        $cmd = Command::from(new PublishRequest(channel: 'news', data: ['text' => 'hi']));
+        $cmd = Command::publish(channel: 'news', data: ['text' => 'hi']);
         self::assertSame('publish', $cmd->method);
         self::assertSame('{"channel":"news","data":{"text":"hi"}}', $cmd->payload);
         self::assertSame('{"method":"publish","payload":{"channel":"news","data":{"text":"hi"}}}', $cmd->toJson());
         $this->expectException(InvalidRequestException::class);
-        Command::from(new PublishRequest(channel: 'news'));
+        Command::publish(channel: 'news');
     }
 }

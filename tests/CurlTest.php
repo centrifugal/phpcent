@@ -10,7 +10,6 @@ use Centrifugal\Phpcent\Exception\HttpException;
 use Centrifugal\Phpcent\Exception\NetworkException;
 use Centrifugal\Phpcent\Exception\TimeoutException;
 use Centrifugal\Phpcent\InfoResult;
-use Centrifugal\Phpcent\PublishRequest;
 use Centrifugal\Phpcent\Retry;
 use Centrifugal\Phpcent\Tests\Support\TestServer;
 use PHPUnit\Framework\TestCase;
@@ -41,7 +40,7 @@ final class CurlTest extends TestCase
 
     public function testRequest(): void
     {
-        $res = self::client('ok')->publish(new PublishRequest(channel: 'c', data: ['a' => 1]));
+        $res = self::client('ok')->publish(channel: 'c', data: ['a' => 1]);
         self::assertSame(1, $res->offset);
         self::assertSame('e', $res->epoch);
     }

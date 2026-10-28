@@ -9,16 +9,19 @@ use Centrifugal\Phpcent\Exception\BatchNotSentException;
 use Centrifugal\Phpcent\Exception\BatchSentException;
 use Centrifugal\Phpcent\Exception\CentException;
 use Centrifugal\Phpcent\Exception\InvalidRequestException;
+use Centrifugal\Phpcent\Internal\BroadcastRequest;
 use Centrifugal\Phpcent\Internal\Reply;
+use Centrifugal\Phpcent\Internal\Request;
 use Centrifugal\Phpcent\Internal\Validate;
 
 /**
  * Commands sent to Centrifugo in one request. Create one with
- * Client::newBatch, add requests - each add returns a Pending - then send:
+ * Client::newBatch, add commands - a method per API method, taking the
+ * fields of its request as named arguments and returning a Pending - then send:
  *
  *     $batch = $client->newBatch();
- *     $pub = $batch->add(new PublishRequest(channel: 'news', data: ['text' => 'hi']));
- *     $stats = $batch->add(new PresenceStatsRequest(channel: 'news'));
+ *     $pub = $batch->publish(channel: 'news', data: ['text' => 'hi']);
+ *     $stats = $batch->presenceStats(channel: 'news');
  *     $batch->send();               // throws unless every command succeeded
  *     $pub->result()->offset;
  *
@@ -26,6 +29,8 @@ use Centrifugal\Phpcent\Internal\Validate;
  */
 final class Batch implements \Countable
 {
+    use BatchMethods;
+
     /** @var list<string> */
     private array $commands = [];
 
@@ -65,7 +70,7 @@ final class Batch implements \Countable
      *
      * @return Pending<T>
      */
-    public function add(Request $request): Pending
+    private function add(Request $request): Pending
     {
         if ($this->sent) {
             throw new \LogicException('phpcent: command added to a batch that was already sent');

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Centrifugal\Phpcent\Tests\Integration;
 
 use Centrifugal\Phpcent\Client;
-use Centrifugal\Phpcent\ConnectionsRequest;
 use Centrifugal\Phpcent\Exception\CentException;
 use PHPUnit\Framework\TestCase;
 
@@ -51,7 +50,7 @@ abstract class IntegrationTestCase extends TestCase
     {
         $c = $this->client();
         try {
-            $c->connections(new ConnectionsRequest(user: 'nobody'));
+            $c->connections(user: 'nobody');
         } catch (CentException $e) {
             if (getenv('PHPCENT_TEST_PRO')) {
                 self::fail("PHPCENT_TEST_PRO is set, but the server is not Centrifugo PRO: {$e->getMessage()}");

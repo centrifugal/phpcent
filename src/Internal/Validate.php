@@ -4,10 +4,7 @@ declare(strict_types=1);
 
 namespace Centrifugal\Phpcent\Internal;
 
-use Centrifugal\Phpcent\BroadcastRequest;
 use Centrifugal\Phpcent\Exception\InvalidRequestException;
-use Centrifugal\Phpcent\PublishRequest;
-use Centrifugal\Phpcent\Request;
 
 /**
  * The rules the client checks before sending: those which hold for every

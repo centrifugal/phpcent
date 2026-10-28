@@ -21,25 +21,25 @@ composer require centrifugal/phpcent
 phpcent 7 replaces phpcent 6: see [MIGRATING.md](MIGRATING.md). phpcent
 implements the
 [Centrifugo server SDK specification](https://github.com/centrifugal/gocent/blob/v4_dev/spec.md),
-version 0.1.
+version 0.2.
 
 ## Example
 
 ```php
 use Centrifugal\Phpcent\Client;
-use Centrifugal\Phpcent\PublishRequest;
 
 $client = new Client('http://localhost:8000/api', apiKey: getenv('CENTRIFUGO_API_KEY'));
 
-$res = $client->publish(new PublishRequest(channel: 'news', data: ['text' => 'hello']));
+$res = $client->publish(channel: 'news', data: ['text' => 'hello']);
 echo "published at offset {$res->offset}\n";
 ```
 
-Every API method takes its request - a class generated from Centrifugo's
-`api.proto`, with its documentation, created with named arguments - and
-returns its result, throwing unless Centrifugo did everything asked. Create
-the client once and reuse it: it keeps its connection to Centrifugo alive
-between calls.
+There is a method for every API method, generated from Centrifugo's
+`api.proto` with its documentation. It takes the fields of the method's
+request as named arguments - pass them by name: their order follows
+`api.proto` and is not part of the API - and returns its result, throwing
+unless Centrifugo did everything asked. Create the client once and reuse it:
+it keeps its connection to Centrifugo alive between calls.
 
 ## Payloads
 
@@ -48,7 +48,7 @@ PHP values `json_encode` writes - arrays, `stdClass`, scalars, `null`,
 `JsonSerializable`:
 
 ```php
-$client->publish(new PublishRequest(channel: 'news', data: ['text' => 'hi', 'tags' => ['a', 'b']]));
+$client->publish(channel: 'news', data: ['text' => 'hi', 'tags' => ['a', 'b']]);
 ```
 
 Replies give payloads as `json_decode` gives them, objects as `stdClass` - so
@@ -56,9 +56,9 @@ a payload from a reply sent back unchanged is the same JSON value, `{}` and
 `{"0": "a"}` included, which arrays would turn into `[]` and `["a"]`:
 
 ```php
-$pub = $client->history(new HistoryRequest(channel: 'news', limit: 1))->publications[0];
+$pub = $client->history(channel: 'news', limit: 1)->publications[0];
 echo $pub->data->text;
-$client->publish(new PublishRequest(channel: 'archive', data: $pub->data));   // exactly the same
+$client->publish(channel: 'archive', data: $pub->data);   // exactly the same
 ```
 
 To read a payload as arrays, `Payload::toArray()` turns its objects into
@@ -76,8 +76,8 @@ A PHP string is a JSON string. JSON you already have, or encode with rules of
 your own, goes in `RawJson`, sent as it is - also inside an array:
 
 ```php
-$client->publish(new PublishRequest(channel: 'news', data: new RawJson($row['payload_json'])));
-$client->publish(new PublishRequest(channel: 'news', data: ['meta' => $meta, 'doc' => new RawJson($json)]));
+$client->publish(channel: 'news', data: new RawJson($row['payload_json']));
+$client->publish(channel: 'news', data: ['meta' => $meta, 'doc' => new RawJson($json)]);
 ```
 
 An empty array is a JSON array, `[]`; an empty object is `new \stdClass()`.
@@ -131,17 +131,12 @@ internal error, the publication may have happened. So retry a publication only
 with an `idempotencyKey`, and back off between a bounded number of attempts:
 
 ```php
-$request = new PublishRequest(
-    channel: 'orders:42',
-    data: $data,
-    // The same key on every attempt: a publication which happened in an
-    // earlier attempt, even one reported as failed, is not published again.
-    idempotencyKey: 'order-42-paid',
-);
 $backoff = Retry::exponentialBackoff(0.2, 5.0);
 for ($attempt = 1; ; $attempt++) {
     try {
-        $client->publish($request);
+        // The same key on every attempt: a publication which happened in an
+        // earlier attempt, even one reported as failed, is not published again.
+        $client->publish(channel: 'orders:42', data: $data, idempotencyKey: 'order-42-paid');
         break;
     } catch (CentException $e) {
         if (!Retry::retryable($e) || $attempt === 3) {
@@ -172,11 +167,11 @@ Retry a broadcast with `broadcastWithRetry` rather than a loop: see below.
 sends many commands at once. Both throw unless every part succeeded:
 
 ```php
-$client->broadcast(new BroadcastRequest(channels: ['user:1', 'user:2'], data: ['text' => 'hello'], idempotencyKey: $messageId));
+$client->broadcast(channels: ['user:1', 'user:2'], data: ['text' => 'hello'], idempotencyKey: $messageId);
 
 $batch = $client->newBatch();
-$pub = $batch->add(new PublishRequest(channel: 'news', data: $data));
-$stats = $batch->add(new PresenceStatsRequest(channel: 'news'));
+$pub = $batch->publish(channel: 'news', data: $data);     // the client's methods, without timeout
+$stats = $batch->presenceStats(channel: 'news');
 $batch->send();
 $pub->result()->offset;        // each command has its own result, or throws its own error
 $stats->result()->numClients;
@@ -197,7 +192,7 @@ parts:
 
 ```php
 try {
-    $client->broadcast($request);
+    $client->broadcast(channels: $channels, data: $data);
 } catch (BroadcastFailedChannelsException $e) {
     $logger->warning('broadcast failed in some channels', ['failed' => $e->result->failed()]);
 }
@@ -207,11 +202,11 @@ Retrying:
 
 - a **broadcast**: `broadcastWithRetry` does it. It sends again only the
   channels which may still succeed, all attempts with one `idempotencyKey` -
-  made for the call when the request has none - and returns every channel's
+  made for the call when none is given - and returns every channel's
   last outcome, as `broadcast` does:
 
   ```php
-  $res = $client->broadcastWithRetry($request, maxAttempts: 5, attemptTimeout: 2.0, timeout: 10.0);
+  $res = $client->broadcastWithRetry(channels: $channels, data: $data, maxAttempts: 5, attemptTimeout: 2.0, timeout: 10.0);
   ```
 
   By default it retries once, after about 100 milliseconds. `onAttemptError`
@@ -224,10 +219,14 @@ Retrying:
 
   ```php
   $backoff = Retry::exponentialBackoff(0.2, 5.0);
-  $res = $client->broadcastWithRetry($request, onAttemptError: function (BroadcastAttempt $a) use ($logger, $backoff): float {
-      $logger->info("attempt {$a->attempt}: " . count($a->retry) . ' channels to retry');
-      return $backoff($a->attempt);
-  });
+  $res = $client->broadcastWithRetry(
+      channels: $channels,
+      data: $data,
+      onAttemptError: function (BroadcastAttempt $a) use ($logger, $backoff): float {
+          $logger->info("attempt {$a->attempt}: " . count($a->retry) . ' channels to retry');
+          return $backoff($a->attempt);
+      },
+  );
   ```
 
   `$res->idempotencyKey` is the key the attempts used: to retry the broadcast
@@ -238,21 +237,21 @@ Retrying:
   It waits between attempts with `usleep`, in the request calling it. In a web
   request, give it a short `timeout`, so that a Centrifugo which is down does
   not hold the request - and the PHP-FPM worker - for every attempt's
-  `requestTimeout`. Retry for longer from a job queue: set the request's own
-  `idempotencyKey`, so that the job retries under the same key whichever way
-  the call failed, and hand the job what failed:
+  `requestTimeout`. Retry for longer from a job queue: give the broadcast an
+  `idempotencyKey` of its own, so that the job retries under the same key
+  whichever way the call failed, and hand the job what failed:
 
   ```php
-  $request = new BroadcastRequest(channels: $channels, data: $data, idempotencyKey: "message-{$messageId}");
+  $key = "message-{$messageId}";
   try {
-      $client->broadcastWithRetry($request, timeout: 2.0);
+      $client->broadcastWithRetry(channels: $channels, data: $data, idempotencyKey: $key, timeout: 2.0);
   } catch (BroadcastFailedChannelsException $e) {
       if ($e->retryableChannels() !== []) {
-          $queue->push(new RetryBroadcast($e->retryableChannels(), $data, $request->idempotencyKey));
+          $queue->push(new RetryBroadcast($e->retryableChannels(), $data, $key));
       }
   } catch (CentException $e) {
       if (Retry::retryable($e)) {   // failed as a whole: the network, a timeout
-          $queue->push(new RetryBroadcast($channels, $data, $request->idempotencyKey));
+          $queue->push(new RetryBroadcast($channels, $data, $key));
       }
   }
   ```
@@ -546,13 +545,14 @@ follows their changes.
 
 ## Commands for async consumers
 
-`Command::from($request)` checks a request as a client would and encodes it,
-for Centrifugo's [async consumers](https://centrifugal.dev/docs/server/consumers):
+`Command` has the client's methods too, as static methods without `timeout`:
+`Command::publish(...)` checks the call as a client would and encodes it, for
+Centrifugo's [async consumers](https://centrifugal.dev/docs/server/consumers):
 its `method` and `payload` for an outbox table, or `toJson()` for a Kafka
 message.
 
 ```php
-$cmd = Command::from(new PublishRequest(channel: 'news', data: ['text' => 'hi']));
+$cmd = Command::publish(channel: 'news', data: ['text' => 'hi']);
 $pdo->prepare('INSERT INTO centrifugo_outbox (method, payload, partition) VALUES (?, ?, 0)')
     ->execute([$cmd->method, $cmd->payload]);
 ```

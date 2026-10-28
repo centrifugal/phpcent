@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Centrifugal\Phpcent;
 
-use Centrifugal\Phpcent\Exception\InvalidRequestException;
+use Centrifugal\Phpcent\Internal\Request;
 use Centrifugal\Phpcent\Internal\Validate;
 
 /**
@@ -19,9 +19,20 @@ use Centrifugal\Phpcent\Internal\Validate;
  * Within a partition a consumer keeps commands in order: a channel's commands
  * keep their order only when every writer derives their partition from the
  * channel the same way - the channel as a Kafka message key, say.
+ *
+ * There is a method per API method, taking the fields of its request as named
+ * arguments. The request is checked as a Client checks it before sending - an
+ * invalid one throws InvalidRequestException here, rather than in Centrifugo,
+ * whose consumers drop a command they cannot run - and encoded:
+ *
+ *     $cmd = Command::publish(channel: 'news', data: ['text' => 'hi']);
+ *     $pdo->prepare('INSERT INTO centrifugo_outbox (method, payload, partition) VALUES (?, ?, 0)')
+ *         ->execute([$cmd->method, $cmd->payload]);
  */
 final class Command
 {
+    use CommandMethods;
+
     /**
      * @param string $method the API method, such as "publish"
      * @param string $payload the request, as JSON text
@@ -31,21 +42,8 @@ final class Command
         public readonly string $payload,
     ) {}
 
-    /**
-     * The command making the API call $request. The request is checked as a
-     * Client checks it before sending - an invalid one throws
-     * InvalidRequestException here, rather than in Centrifugo, whose consumers
-     * drop a command they cannot run - and encoded.
-     *
-     *     $cmd = Command::from(new PublishRequest(channel: 'news', data: ['text' => 'hi']));
-     *     $pdo->prepare('INSERT INTO centrifugo_outbox (method, payload, partition) VALUES (?, ?, 0)')
-     *         ->execute([$cmd->method, $cmd->payload]);
-     *
-     * @param Request<mixed> $request
-     *
-     * @throws InvalidRequestException
-     */
-    public static function from(Request $request): self
+    /** @param Request<mixed> $request */
+    private static function of(Request $request): self
     {
         return new self($request::apiMethod(), Validate::encode($request));
     }

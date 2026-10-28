@@ -187,7 +187,18 @@ function renderClass(string $class, string $level = '###'): string
             continue;
         }
         $doc = $m->getDocComment();
-        $methods[$m->getName()] = '#' . $level . ' `' . signature($m, $m->getName()) . "`\n\n" . text($doc);
+        $sig = signature($m, $m->getName());
+        // A generic return type - Pending<PublishResult> - says more than the native one.
+        if ($doc !== false && preg_match('/@return\s+(\w+<[^>\s]+>)/', $doc, $ret) === 1) {
+            $sig = preg_replace('/\): \w+$/', "): {$ret[1]}", $sig) ?? $sig;
+        }
+        $rows = [];
+        foreach (params($doc) as $name => [$t, $desc]) {
+            if ($desc !== '') {
+                $rows[] = "- `\${$name}` - {$desc}";
+            }
+        }
+        $methods[$m->getName()] = '#' . $level . ' `' . $sig . "`\n\n" . text($doc) . ($rows !== [] ? "\n\n" . implode("\n", $rows) : '');
     }
     ksort($methods);
 
@@ -226,7 +237,7 @@ function documented(string $class): bool
 function generate(): string
 {
     $root = classes(ROOT . '/src', 'Centrifugal\\Phpcent');
-    $order = ['Client', 'Batch', 'Pending', 'BatchResult', 'FailedCommand', 'BroadcastResult', 'ChannelResult', 'RawJson', 'Payload', 'Request', 'Message', 'Retry', 'BroadcastAttempt', 'RequestInfo', 'Command', 'SharedPoll'];
+    $order = ['Client', 'Batch', 'Pending', 'BatchResult', 'FailedCommand', 'BroadcastResult', 'ChannelResult', 'RawJson', 'Payload', 'Message', 'Retry', 'BroadcastAttempt', 'RequestInfo', 'Command', 'SharedPoll'];
     $main = array_values(array_filter($root, documented(...)));
     usort($main, static function (string $a, string $b) use ($order): int {
         $ia = array_search(substr($a, (int) strrpos($a, '\\') + 1), $order, true);

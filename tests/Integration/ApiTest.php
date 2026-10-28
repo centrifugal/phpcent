@@ -4,34 +4,17 @@ declare(strict_types=1);
 
 namespace Centrifugal\Phpcent\Tests\Integration;
 
-use Centrifugal\Phpcent\BroadcastRequest;
-use Centrifugal\Phpcent\ConnectionsRequest;
-use Centrifugal\Phpcent\DisconnectRequest;
 use Centrifugal\Phpcent\Exception\ApiException;
 use Centrifugal\Phpcent\Exception\BatchFailedCommandsException;
 use Centrifugal\Phpcent\Exception\BroadcastFailedChannelsException;
 use Centrifugal\Phpcent\Exception\HttpException;
 use Centrifugal\Phpcent\Exception\NotFoundException;
 use Centrifugal\Phpcent\Exception\UnknownChannelException;
-use Centrifugal\Phpcent\HistoryRemoveRequest;
-use Centrifugal\Phpcent\HistoryRequest;
-use Centrifugal\Phpcent\MapClearRequest;
-use Centrifugal\Phpcent\MapPublishRequest;
-use Centrifugal\Phpcent\MapReadStateRequest;
-use Centrifugal\Phpcent\MapRemoveRequest;
-use Centrifugal\Phpcent\MapStatsRequest;
-use Centrifugal\Phpcent\PresenceRequest;
-use Centrifugal\Phpcent\PresenceStatsRequest;
-use Centrifugal\Phpcent\PublishRequest;
 use Centrifugal\Phpcent\RawJson;
-use Centrifugal\Phpcent\RefreshRequest;
 use Centrifugal\Phpcent\Retry;
-use Centrifugal\Phpcent\SharedPollPublishRequest;
-use Centrifugal\Phpcent\SubscribeRequest;
 use Centrifugal\Phpcent\Token\ConnectionClaims;
 use Centrifugal\Phpcent\Token\Key;
 use Centrifugal\Phpcent\Token\Token;
-use Centrifugal\Phpcent\UnsubscribeRequest;
 
 /** The API client against a real Centrifugo. */
 final class ApiTest extends IntegrationTestCase
@@ -41,39 +24,39 @@ final class ApiTest extends IntegrationTestCase
         $c = $this->client();
         $ch = $this->unique();
         $raw = '{"n":1.0,"big":9007199254740993,"empty":{},"keys":{"0":"a"}}';
-        $res = $c->publish(new PublishRequest(channel: $ch, data: new RawJson($raw), tags: ['k' => 'v']));
+        $res = $c->publish(channel: $ch, data: new RawJson($raw), tags: ['k' => 'v']);
         self::assertSame(1, $res->offset);
         self::assertNotSame('', $res->epoch);
-        $pubs = $c->history(new HistoryRequest(channel: $ch, limit: 10))->publications;
+        $pubs = $c->history(channel: $ch, limit: 10)->publications;
         self::assertCount(1, $pubs);
         self::assertSame(['k' => 'v'], $pubs[0]->tags);
         self::assertSame($raw, json_encode($pubs[0]->data, \JSON_PRESERVE_ZERO_FRACTION));
         // Sent back unchanged, the payload is the same JSON value.
-        $c->publish(new PublishRequest(channel: $ch, data: $pubs[0]->data));
-        $again = $c->history(new HistoryRequest(channel: $ch, limit: 10, reverse: true))->publications[0];
+        $c->publish(channel: $ch, data: $pubs[0]->data);
+        $again = $c->history(channel: $ch, limit: 10, reverse: true)->publications[0];
         self::assertSame($raw, json_encode($again->data, \JSON_PRESERVE_ZERO_FRACTION));
-        $c->historyRemove(new HistoryRemoveRequest(channel: $ch));
-        self::assertSame([], $c->history(new HistoryRequest(channel: $ch, limit: 10))->publications);
+        $c->historyRemove(channel: $ch);
+        self::assertSame([], $c->history(channel: $ch, limit: 10)->publications);
     }
 
     public function testIdempotencyKey(): void
     {
         $c = $this->client();
         $ch = $this->unique();
-        $first = $c->publish(new PublishRequest(channel: $ch, data: 1, idempotencyKey: 'k1'));
-        $second = $c->publish(new PublishRequest(channel: $ch, data: 2, idempotencyKey: 'k1'));
+        $first = $c->publish(channel: $ch, data: 1, idempotencyKey: 'k1');
+        $second = $c->publish(channel: $ch, data: 2, idempotencyKey: 'k1');
         self::assertSame($first->offset, $second->offset);
-        self::assertCount(1, $c->history(new HistoryRequest(channel: $ch, limit: 10))->publications);
+        self::assertCount(1, $c->history(channel: $ch, limit: 10)->publications);
     }
 
     public function testBroadcast(): void
     {
         $c = $this->client();
         [$a, $b] = [$this->unique('a-'), $this->unique('b-')];
-        $res = $c->broadcast(new BroadcastRequest(channels: [$a, $b], data: ['x' => 1]));
+        $res = $c->broadcast(channels: [$a, $b], data: ['x' => 1]);
         self::assertSame([1, 1], array_map(static fn($ch) => $ch->result?->offset, $res->channels));
         try {
-            $c->broadcast(new BroadcastRequest(channels: [$a, 'unknown:x'], data: ['x' => 2]));
+            $c->broadcast(channels: [$a, 'unknown:x'], data: ['x' => 2]);
             self::fail('no error');
         } catch (BroadcastFailedChannelsException $e) {
             self::assertSame(['unknown:x'], array_map(static fn($f) => $f->channel, $e->failed));
@@ -87,11 +70,11 @@ final class ApiTest extends IntegrationTestCase
     {
         $c = $this->client();
         $a = $this->unique();
-        $res = $c->broadcastWithRetry(new BroadcastRequest(channels: [$a], data: 1));
+        $res = $c->broadcastWithRetry(channels: [$a], data: 1);
         self::assertStringStartsWith('phpcent-', $res->idempotencyKey);
         // Retried later with the key, nothing is published again.
-        $c->broadcast(new BroadcastRequest(channels: [$a], data: 1, idempotencyKey: $res->idempotencyKey));
-        self::assertCount(1, $c->history(new HistoryRequest(channel: $a, limit: 10))->publications);
+        $c->broadcast(channels: [$a], data: 1, idempotencyKey: $res->idempotencyKey);
+        self::assertCount(1, $c->history(channel: $a, limit: 10)->publications);
     }
 
     public function testBatch(): void
@@ -99,9 +82,9 @@ final class ApiTest extends IntegrationTestCase
         $c = $this->client();
         $ch = $this->unique();
         $b = $c->newBatch();
-        $pub = $b->add(new PublishRequest(channel: $ch, data: 1));
-        $hist = $b->add(new HistoryRequest(channel: $ch, limit: 1));
-        $bad = $b->add(new PublishRequest(channel: 'unknown:x', data: 1));
+        $pub = $b->publish(channel: $ch, data: 1);
+        $hist = $b->history(channel: $ch, limit: 1);
+        $bad = $b->publish(channel: 'unknown:x', data: 1);
         try {
             $b->send();
             self::fail('no error');
@@ -117,7 +100,7 @@ final class ApiTest extends IntegrationTestCase
     public function testRefusedRequestIsNotRetryable(): void
     {
         try {
-            $this->client()->history(new HistoryRequest(channel: 'unknown:x'));
+            $this->client()->history(channel: 'unknown:x');
             self::fail('no error');
         } catch (ApiException $e) {
             self::assertFalse(Retry::retryable($e));
@@ -130,7 +113,7 @@ final class ApiTest extends IntegrationTestCase
         // 104 which says so too. Against Centrifugo PRO it succeeds.
         $c = $this->client();
         try {
-            $c->connections(new ConnectionsRequest(user: 'nobody'));
+            $c->connections(user: 'nobody');
             self::assertTrue(true);
 
             return; // Centrifugo PRO
@@ -139,7 +122,7 @@ final class ApiTest extends IntegrationTestCase
             self::assertStringContainsString('Centrifugo PRO method', $e->getMessage());
         }
         $b = $c->newBatch();
-        $conns = $b->add(new ConnectionsRequest(user: 'nobody'));
+        $conns = $b->connections(user: 'nobody');
         try {
             $b->send();
         } catch (BatchFailedCommandsException) {
@@ -160,19 +143,19 @@ final class ApiTest extends IntegrationTestCase
     {
         $c = $this->client();
         $ch = 'map:' . $this->unique();
-        $c->mapPublish(new MapPublishRequest(channel: $ch, key: 'k1', data: ['v' => 1]));
-        $c->mapPublish(new MapPublishRequest(channel: $ch, key: 'k2', data: ['v' => 2]));
-        $keys = array_map(static fn($e) => $e->key, $c->mapReadState(new MapReadStateRequest(channel: $ch, limit: 10))->entries);
+        $c->mapPublish(channel: $ch, key: 'k1', data: ['v' => 1]);
+        $c->mapPublish(channel: $ch, key: 'k2', data: ['v' => 2]);
+        $keys = array_map(static fn($e) => $e->key, $c->mapReadState(channel: $ch, limit: 10)->entries);
         sort($keys);
         self::assertSame(['k1', 'k2'], $keys);
-        $c->mapRemove(new MapRemoveRequest(channel: $ch, key: 'k1'));
-        self::assertSame(1, $c->mapStats(new MapStatsRequest(channel: $ch))->numKeys);
-        $c->mapClear(new MapClearRequest(channel: $ch));
+        $c->mapRemove(channel: $ch, key: 'k1');
+        self::assertSame(1, $c->mapStats(channel: $ch)->numKeys);
+        $c->mapClear(channel: $ch);
     }
 
     public function testSharedPollPublish(): void
     {
-        $this->client()->sharedPollPublish(new SharedPollPublishRequest(channel: 'poll:' . $this->unique(), key: 'k', version: 1, data: ['v' => 1]));
+        $this->client()->sharedPollPublish(channel: 'poll:' . $this->unique(), key: 'k', version: 1, data: ['v' => 1]);
         self::assertTrue(true);
     }
 
@@ -192,17 +175,17 @@ final class ApiTest extends IntegrationTestCase
             self::assertIsArray($msg);
             self::assertArrayHasKey('connect', $msg, json_encode($msg) ?: '');
             self::assertStringContainsString($ch, json_encode($msg) ?: '');
-            $pres = $c->presence(new PresenceRequest(channel: $ch))->presence;
+            $pres = $c->presence(channel: $ch)->presence;
             self::assertSame([[$user, '{"name":"Alice"}']], array_values(array_map(static fn($i) => [$i->user, json_encode($i->connInfo)], $pres)));
-            self::assertSame(1, $c->presenceStats(new PresenceStatsRequest(channel: $ch))->numUsers);
-            $c->publish(new PublishRequest(channel: $ch, data: ['text' => 'hello']));
+            self::assertSame(1, $c->presenceStats(channel: $ch)->numUsers);
+            $c->publish(channel: $ch, data: ['text' => 'hello']);
             self::assertStringContainsString('hello', json_encode($s->next()) ?: '');
             $other = "{$ch}-2";
-            $c->subscribe(new SubscribeRequest(channel: $other, user: $user));
+            $c->subscribe(channel: $other, user: $user);
             self::assertStringContainsString($other, json_encode($s->next()) ?: '');
-            $c->unsubscribe(new UnsubscribeRequest(channel: $other, user: $user));
-            $c->refresh(new RefreshRequest(user: $user, expireAt: $exp->getTimestamp()));
-            $c->disconnect(new DisconnectRequest(user: $user));
+            $c->unsubscribe(channel: $other, user: $user);
+            $c->refresh(user: $user, expireAt: $exp->getTimestamp());
+            $c->disconnect(user: $user);
             while ($s->next() !== null) {
             }
             $s->close();

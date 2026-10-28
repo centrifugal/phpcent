@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Centrifugal\Phpcent\Tests\Integration;
 
-use Centrifugal\Phpcent\PresenceRequest;
-use Centrifugal\Phpcent\PublishRequest;
 use Centrifugal\Phpcent\Tests\Support\TestServer;
 
 /**
@@ -70,9 +68,9 @@ final class ProxyTest extends IntegrationTestCase
             self::assertSame(['welcome' => true], $reply['connect']['data']);
             self::assertIsArray($reply['connect']['subs']);
             self::assertArrayHasKey($ch, $reply['connect']['subs']);
-            $c->publish(new PublishRequest(channel: $ch, data: ['text' => 'hello']));
+            $c->publish(channel: $ch, data: ['text' => 'hello']);
             self::assertStringContainsString('hello', json_encode($s->next()) ?: '');
-            $pres = $c->presence(new PresenceRequest(channel: $ch))->presence;
+            $pres = $c->presence(channel: $ch)->presence;
             self::assertSame([[$user, '{"name":"Alice"}']], array_values(array_map(static fn($i) => [$i->user, json_encode($i->connInfo)], $pres)));
 
             // It expires: Centrifugo asks the refresh proxy, which ends it.

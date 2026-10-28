@@ -1,0 +1,95 @@
+# Centrifugo PRO for the integration tests, with what its methods need:
+#
+#	docker compose -f testdata/centrifugo-pro.compose.yml up -d --wait
+#	composer test-integration
+#	docker compose -f testdata/centrifugo-pro.compose.yml down
+#
+# The configuration is testdata/centrifugo.json, with the PRO features added
+# through environment variables: Redis for the engine, user status, user
+# blocking and token revocation; PostgreSQL for devices; push notifications
+# through the webpush provider in dry run, so nothing is ever sent. The VAPID
+# keys are for these tests only.
+#
+# The tests use Centrifugo PRO in sandbox mode: no license key is set, so it
+# runs with limits on connections, nodes and API requests, which the tests fit
+# in. Centrifugo PRO is commercial software, under the Centrifugal Labs License
+# Agreement (https://centrifugal.dev/license) - not under phpcent's MIT license.
+#
+# Centrifugo PRO exits when it cannot reach its Redis at start, so it waits
+# for Redis and PostgreSQL to be healthy.
+
+name: phpcent-pro
+
+services:
+  redis:
+    image: redis:7
+    # For the async consumer test, which adds commands to a stream.
+    ports:
+      - "46379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 1s
+      retries: 30
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: test
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "test"]
+      interval: 1s
+      retries: 30
+
+  centrifugo:
+    image: centrifugo/centrifugo-pro:v6.10.2
+    command: centrifugo -c /centrifugo/config.json
+    volumes:
+      - ./centrifugo.json:/centrifugo/config.json:ro
+    ports:
+      - "8100:8100"
+    # The proxy tests' backend runs on the host, which Centrifugo reaches as
+    # host.docker.internal - built in on Docker Desktop, mapped here on Linux.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      CENTRIFUGO_HEALTH_ENABLED: "true"
+      CENTRIFUGO_ENGINE_TYPE: redis
+      CENTRIFUGO_ENGINE_REDIS_ADDRESS: redis://redis:6379
+      CENTRIFUGO_USER_STATUS_ENABLED: "true"
+      CENTRIFUGO_USER_STATUS_REDIS_ADDRESS: redis://redis:6379
+      CENTRIFUGO_USER_BLOCK_STORAGE_TYPE: redis
+      CENTRIFUGO_USER_BLOCK_REDIS_ADDRESS: redis://redis:6379
+      CENTRIFUGO_TOKEN_REVOKE_STORAGE_TYPE: redis
+      CENTRIFUGO_TOKEN_REVOKE_REDIS_ADDRESS: redis://redis:6379
+      CENTRIFUGO_USER_TOKENS_INVALIDATE_STORAGE_TYPE: redis
+      CENTRIFUGO_USER_TOKENS_INVALIDATE_REDIS_ADDRESS: redis://redis:6379
+      CENTRIFUGO_DATABASE_ENABLED: "true"
+      CENTRIFUGO_DATABASE_POSTGRESQL_DSN: postgresql://test:test@postgres:5432/test
+      CENTRIFUGO_PUSH_NOTIFICATIONS_ENABLED: "true"
+      CENTRIFUGO_PUSH_NOTIFICATIONS_DRY_RUN: "true"
+      CENTRIFUGO_PUSH_NOTIFICATIONS_ENABLED_PROVIDERS: webpush
+      CENTRIFUGO_PUSH_NOTIFICATIONS_QUEUE_TYPE: redis
+      CENTRIFUGO_PUSH_NOTIFICATIONS_QUEUE_REDIS_REUSE_FROM_ENGINE: "true"
+      CENTRIFUGO_PUSH_NOTIFICATIONS_WEBPUSH_VAPID_PUBLIC_KEY: BJ16Mnup_xun6oJ4UW1JfCgY1QA5zeEoFqZ0VUbuu5ZXJkhsH2f7PGLcvhkJ_OAgFBDzkda_1LykKzXcVe99elg
+      CENTRIFUGO_PUSH_NOTIFICATIONS_WEBPUSH_VAPID_PRIVATE_KEY: TqaHuW-sLvwKJlREuBvmg_UvWuqFZuuEYoYU6WWXJrc
+      CENTRIFUGO_PUSH_NOTIFICATIONS_WEBPUSH_SUBJECT: mailto:test@example.com
+      # Bearer tokens of the API token test, which serves their keys on port
+      # 3101 of the host. The API key is accepted too, for the other tests.
+      CENTRIFUGO_HTTP_API_JWKS_ENABLED: "true"
+      CENTRIFUGO_HTTP_API_JWKS_ENDPOINT: http://host.docker.internal:3101/api_jwks
+      CENTRIFUGO_HTTP_API_JWKS_AUDIENCE: centrifugo-api
+      CENTRIFUGO_HTTP_API_JWKS_SCOPE: centrifugo:api
+      # Commands written by the async consumer test: cent.new_command.
+      CENTRIFUGO_CONSUMERS: >-
+        [{"name":"phpcent_commands","enabled":true,"type":"redis_stream","redis_stream":{"address":["redis://redis:6379"],"streams":["phpcent_commands"],"consumer_group":"centrifugo"}}]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8100/health"]
+      interval: 1s
+      retries: 30

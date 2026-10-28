@@ -1,0 +1,17 @@
+# Left out of the package Composer downloads: what only developing phpcent needs.
+/.github export-ignore
+/gen export-ignore
+/proto export-ignore
+/tests export-ignore
+/testdata export-ignore
+/.gitattributes export-ignore
+/.gitignore export-ignore
+/.php-cs-fixer.dist.php export-ignore
+/phpstan.neon.dist export-ignore
+/phpunit.xml.dist export-ignore
+/AGENTS.md export-ignore
+/CLAUDE.md export-ignore
+
+# Generated: collapsed in diffs.
+/generated/** linguist-generated=true
+/API.md linguist-generated=true

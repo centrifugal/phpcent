@@ -17,7 +17,8 @@ What changes:
   subclass per known code - and throws `BroadcastFailedChannelsException` or
   `BatchFailedCommandsException` when parts of a broadcast or batch failed.
   Network errors and HTTP statuses throw their own exceptions, not
-  `\Exception`.
+  `\Exception`. **Check every broadcast and batch you send**: see
+  [Broadcasts and batches now throw](#broadcasts-and-batches-now-throw).
 - **Payloads** go back exactly: replies give them as `stdClass`, which you can
   publish again unchanged. `setUseAssoc` is gone - `Payload::toArray($v)`
   gives arrays where you want them.
@@ -28,11 +29,58 @@ What changes:
   PRO's API tokens, shared poll signatures, commands for async consumers,
   `broadcastWithRetry`, and any PSR-18 HTTP client instead of curl.
 
+## Broadcasts and batches now throw
+
+This is the change most likely to break code which moved over unchanged.
+
+phpcent 6 returned Centrifugo's response for a broadcast or a batch, and a
+channel or command which failed was only an `error` inside it. Code which
+didn't look - most code - went on as if everything had been published.
+
+phpcent 7 throws when any part failed, even when the others succeeded:
+`BroadcastFailedChannelsException` for a broadcast, `BatchFailedCommandsException`
+for a batch. Not catching it means an exception where phpcent 6 was silent - in
+a web request, an error page, although most channels got the publication.
+
+Decide, for each broadcast and batch, which you want:
+
+- **A failure is an error** - an unknown channel is a bug, a broker failure
+  needs attention: let it throw, and your error reporting sees it.
+- **Best effort, as phpcent 6 behaved** - publish where it can, log the rest:
+  catch the exception. It holds every part's outcome, and the parts which
+  succeeded were published.
+
+```php
+try {
+    $client->broadcast(new BroadcastRequest(channels: $channels, data: $data));
+} catch (BroadcastFailedChannelsException $e) {
+    foreach ($e->result->failed() as $ch) {
+        $logger->warning("broadcast to {$ch->channel} failed: {$ch->error->getMessage()}");
+    }
+}
+
+try {
+    $batch->send();
+} catch (BatchFailedCommandsException $e) {
+    foreach ($e->failed as $f) {
+        $logger->warning("batch command #{$f->index} ({$f->method}) failed: {$f->error->getMessage()}");
+    }
+}
+```
+
+Catch these two exceptions only. A broadcast or batch which failed as a whole -
+the network, the credentials, Centrifugo down - throws its own exception, as
+any call does, and no part of it was published.
+
+To retry the channels which failed for a temporary reason, use
+`broadcastWithRetry` instead of `broadcast`: it sends again only those, under
+one `idempotencyKey`.
+
+## Programs
+
 The programs below are complete: each pair prints the same, run against
 Centrifugo with `http_api.key` set to `api_key` and `client.token.hmac_secret_key`
 to `client_secret`.
-
-## Programs
 
 ### Publish, history and errors
 

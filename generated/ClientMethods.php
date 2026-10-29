@@ -730,7 +730,8 @@ trait ClientMethods
      *
      * @param int $expireAt The Unix time in seconds when the invalidation expires.
      *     Optional, but a value matching the token expiration is recommended.
-     * @param string $user The ID of the user whose tokens to invalidate. Required.
+     * @param string $user The ID of the user whose tokens to invalidate. Required. ""
+     *     invalidates the tokens of anonymous users.
      * @param int $issuedBefore The Unix time in seconds: tokens issued before it are
      *     considered revoked. If not set, the current time is used.
      * @param string $channel Limits the invalidation to subscription tokens for this

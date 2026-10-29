@@ -401,7 +401,7 @@ Revokes all tokens of a user issued before a
 certain time (based on the iat claim of a JWT). Centrifugo PRO only.
 
 - `$expireAt` - The Unix time in seconds when the invalidation expires. Optional, but a value matching the token expiration is recommended.
-- `$user` - The ID of the user whose tokens to invalidate. Required.
+- `$user` - The ID of the user whose tokens to invalidate. Required. "" invalidates the tokens of anonymous users.
 - `$issuedBefore` - The Unix time in seconds: tokens issued before it are considered revoked. If not set, the current time is used.
 - `$channel` - Limits the invalidation to subscription tokens for this channel.
 - `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
@@ -1072,7 +1072,7 @@ Adds the command to the batch: its Pending holds the result once the
 batch is sent.
 
 - `$expireAt` - The Unix time in seconds when the invalidation expires. Optional, but a value matching the token expiration is recommended.
-- `$user` - The ID of the user whose tokens to invalidate. Required.
+- `$user` - The ID of the user whose tokens to invalidate. Required. "" invalidates the tokens of anonymous users.
 - `$issuedBefore` - The Unix time in seconds: tokens issued before it are considered revoked. If not set, the current time is used.
 - `$channel` - Limits the invalidation to subscription tokens for this channel.
 
@@ -2017,7 +2017,7 @@ certain time (based on the iat claim of a JWT). Centrifugo PRO only.
 The command making the call, checked as a Client checks it.
 
 - `$expireAt` - The Unix time in seconds when the invalidation expires. Optional, but a value matching the token expiration is recommended.
-- `$user` - The ID of the user whose tokens to invalidate. Required.
+- `$user` - The ID of the user whose tokens to invalidate. Required. "" invalidates the tokens of anonymous users.
 - `$issuedBefore` - The Unix time in seconds: tokens issued before it are considered revoked. If not set, the current time is used.
 - `$channel` - Limits the invalidation to subscription tokens for this channel.
 

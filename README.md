@@ -20,7 +20,7 @@ composer require centrifugal/phpcent
 
 phpcent 7 replaces phpcent 6: see [MIGRATING.md](MIGRATING.md). phpcent
 implements the
-[Centrifugo server SDK specification](https://github.com/centrifugal/gocent/blob/v4_dev/spec.md),
+[Centrifugo server SDK specification](https://github.com/centrifugal/gocent/blob/master/spec.md),
 version 0.2.
 
 ## Example
@@ -308,8 +308,7 @@ Rejected credentials make every call throw `UnauthorizedException`.
 
 Without `httpClient`, phpcent sends requests with ext-curl, keeping its
 connection to Centrifugo alive between calls - on PHP 8.5, between the requests
-a PHP-FPM worker serves too - closing idle ones after 50 seconds, and never
-following redirects. `curlOptions` adds options of your own, as phpcent 6's
+a PHP-FPM worker serves too - and never following redirects. `curlOptions` adds options of your own, as phpcent 6's
 setters did:
 
 ```php

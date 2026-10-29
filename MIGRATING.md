@@ -1,7 +1,7 @@
 # Migrating from phpcent 6 to phpcent 7
 
 phpcent 7 is a rewrite, to the
-[Centrifugo server SDK specification](https://github.com/centrifugal/gocent/blob/v4_dev/spec.md).
+[Centrifugo server SDK specification](https://github.com/centrifugal/gocent/blob/master/spec.md).
 It needs PHP 8.3 or newer, and lives in the `Centrifugal\Phpcent` namespace
 instead of `phpcent` - so both can be installed while you move code over, from
 two packages.

@@ -1,549 +1,522 @@
 <?php
 
-namespace phpcent;
+declare(strict_types=1);
+
+namespace Centrifugal\Phpcent;
+
+use Centrifugal\Phpcent\Exception\ApiException;
+use Centrifugal\Phpcent\Exception\BroadcastFailedChannelsException;
+use Centrifugal\Phpcent\Exception\CentException;
+use Centrifugal\Phpcent\Exception\ClosedException;
+use Centrifugal\Phpcent\Exception\InvalidConfigException;
+use Centrifugal\Phpcent\Exception\InvalidRequestException;
+use Centrifugal\Phpcent\Exception\TimeoutException;
+use Centrifugal\Phpcent\Internal\BroadcastRequest;
+use Centrifugal\Phpcent\Internal\CurlTransport;
+use Centrifugal\Phpcent\Internal\Headers;
+use Centrifugal\Phpcent\Internal\Limits;
+use Centrifugal\Phpcent\Internal\Methods;
+use Centrifugal\Phpcent\Internal\Psr18Transport;
+use Centrifugal\Phpcent\Internal\Reply;
+use Centrifugal\Phpcent\Internal\Request;
+use Centrifugal\Phpcent\Internal\Transport;
+use Centrifugal\Phpcent\Internal\Validate;
+use Psr\Http\Client\ClientInterface;
+use Psr\Http\Message\RequestFactoryInterface;
+use Psr\Http\Message\StreamFactoryInterface;
 
 /**
- * Centrifugo API Client
+ * Calls Centrifugo's HTTP server API. Create it once and reuse it:
  *
- * @package    phpcent
- * @copyright  Copyright (c) 2019 Centrifugal
- * @license    The MIT License (MIT)
+ *     $client = new Client('http://localhost:8000/api', apiKey: (string) getenv('CENTRIFUGO_API_KEY'));
+ *     $client->publish(channel: 'news', data: ['text' => 'hello']);
+ *
+ * There is a method per API method, taking the fields of its request as named
+ * arguments - pass them by name: their order follows api.proto and is not part
+ * of the API. Each returns its result, throwing unless Centrifugo did
+ * everything asked, and takes $timeout, in seconds; without one,
+ * requestTimeout bounds the call.
  */
-class Client
+final class Client
 {
-    private $url;
-    private $apikey;
-    private $secret;
+    use ClientMethods;
 
-    private $cert;
-    private $caPath;
+    public const string USER_AGENT = 'phpcent/7';
 
-    private $connectTimeoutOption;
-    private $timeoutOption;
-    private $forceIpResolveV4;
+    private readonly string $endpoint;
 
-    private $safety = true;
-    private $useAssoc = false;
+    /** @var ?\Closure(): string */
+    private readonly ?\Closure $endpointFunc;
+
+    /** @var ?\Closure(): string */
+    private readonly ?\Closure $tokenFunc;
+
+    /** @var ?\Closure(RequestInfo): void */
+    private readonly ?\Closure $onRequest;
+
+    /** @var array<string, string> */
+    private readonly array $headers;
+
+    private readonly Transport $transport;
+
+    private readonly float $requestTimeout;
+
+    private bool $closed = false;
 
     /**
-     * Construct new Client instance.
+     * @param ?string $apiEndpoint the base URL of the API,
+     *     "http://localhost:8000/api". Each method is sent to it plus its name,
+     *     "/publish".
+     * @param string $apiKey sent as X-API-Key. Leave it and bearerTokenFunc
+     *     unset when requests are authenticated another way - mutual TLS, a
+     *     proxy - or not at all.
+     * @param ?callable(): string $apiEndpointFunc instead of apiEndpoint, returns
+     *     it for each request, for addresses discovered rather than fixed
+     * @param ?callable(): string $bearerTokenFunc returns the token sent as
+     *     "Authorization: Bearer" with each request, for Centrifugo PRO's JWKS
+     *     authentication of the API - an ApiTokens's token method, say. Not
+     *     together with apiKey.
+     * @param ?ClientInterface $httpClient a PSR-18 client sending the requests,
+     *     instead of curl: Guzzle, Symfony HttpClient, a fake in tests. It is
+     *     never changed: credentials and headers go on each request. Its own
+     *     timeouts and redirect policy apply - PSR-18 has no way to give a
+     *     request a deadline: set them on it. Its timeouts throw
+     *     TimeoutException too.
+     * @param (RequestFactoryInterface&StreamFactoryInterface)|null $httpFactory
+     *     the PSR-17 factories for httpClient's requests; not needed when
+     *     httpClient implements them itself, as Symfony's Psr18Client does
+     * @param array<int, mixed> $curlOptions extra curl options for the default
+     *     transport: CURLOPT_CAINFO, CURLOPT_SSLCERT, CURLOPT_IPRESOLVE and the
+     *     like. Not the options phpcent sets itself.
+     * @param float $requestTimeout seconds bounding a call without a timeout of
+     *     its own, 10 by default. curl bounds the whole request by it -
+     *     connecting, sending, reading the reply. With httpClient, the
+     *     client's own timeouts bound the request instead.
+     * @param array<string, string> $headers extra headers for every request, for
+     *     a proxy in front of Centrifugo. Not X-API-Key, Authorization or
+     *     Content-Type. A User-Agent replaces phpcent's.
+     * @param ?callable(RequestInfo): void $onRequest called after every HTTP
+     *     request with a RequestInfo, for metrics; the call waits for it. It
+     *     must not throw: what it throws goes to the caller in place of the
+     *     call's outcome
      *
-     * @param string $url Centrifugo API endpoint
-     * @param string $apikey Centrifugo API key
-     * @param string $secret Centrifugo secret key.
-     *
+     * @throws InvalidConfigException naming the option and the fix
      */
-    public function __construct($url, $apikey = '', $secret = '')
-    {
-        $this->url = $url;
-        $this->apikey = $apikey;
-        $this->secret = $secret;
-    }
+    public function __construct(
+        ?string $apiEndpoint = null,
+        string $apiKey = '',
+        ?callable $apiEndpointFunc = null,
+        ?callable $bearerTokenFunc = null,
+        ?ClientInterface $httpClient = null,
+        (RequestFactoryInterface&StreamFactoryInterface)|null $httpFactory = null,
+        array $curlOptions = [],
+        float $requestTimeout = Limits::REQUEST_TIMEOUT,
+        array $headers = [],
+        ?callable $onRequest = null,
+    ) {
+        if ($apiEndpoint === null && $apiEndpointFunc === null) {
+            throw new InvalidConfigException('apiEndpoint is required, for example http://localhost:8000/api');
+        }
+        if ($apiEndpoint !== null && $apiEndpointFunc !== null) {
+            throw new InvalidConfigException('set apiEndpoint or apiEndpointFunc, not both');
+        }
+        $this->endpoint = $apiEndpoint !== null ? self::checkEndpoint($apiEndpoint, 'apiEndpoint') : '';
+        $this->endpointFunc = $apiEndpointFunc !== null ? $apiEndpointFunc(...) : null;
 
-    /**
-     * @param string $key
-     * @return Client
-     */
-    public function setApiKey($key)
-    {
-        $this->apikey = $key;
-        return $this;
-    }
+        if ($apiKey !== '' && $bearerTokenFunc !== null) {
+            throw new InvalidConfigException('set apiKey or bearerTokenFunc, not both: a request with a bearer token is judged by the token alone');
+        }
+        if (!Headers::validValue($apiKey)) {
+            throw new InvalidConfigException('apiKey must be printable ASCII: no line breaks, control or non-ASCII characters');
+        }
+        $this->tokenFunc = $bearerTokenFunc !== null ? $bearerTokenFunc(...) : null;
 
-    /**
-     * @param string $secret
-     * @return Client
-     */
-    public function setSecret($secret)
-    {
-        $this->secret = $secret;
-        return $this;
-    }
+        $h = [];
+        foreach ($headers as $name => $value) {
+            $name = (string) $name;
+            $lower = strtolower($name);
+            if ($lower === 'x-api-key') {
+                throw new InvalidConfigException('headers may not set X-API-Key; use apiKey');
+            }
+            if ($lower === 'authorization') {
+                throw new InvalidConfigException('headers may not set Authorization; use bearerTokenFunc');
+            }
+            if ($lower === 'content-type') {
+                throw new InvalidConfigException('headers may not set Content-Type');
+            }
+            if (!Headers::validName($name)) {
+                throw new InvalidConfigException("headers: \"{$name}\" is not a valid HTTP header name");
+            }
+            if (!\is_string($value) || !Headers::validValue($value)) {
+                throw new InvalidConfigException("headers: {$name} must be a string of printable ASCII: no line breaks, control or non-ASCII characters");
+            }
+            if ($lower === 'host' && $value === '') {
+                throw new InvalidConfigException('headers: Host must not be empty');
+            }
+            $h[$name] = $value;
+        }
+        $h['Content-Type'] = 'application/json';
+        if (!\in_array('user-agent', array_map(strtolower(...), array_keys($h)), true)) {
+            $h['User-Agent'] = self::USER_AGENT;
+        }
+        if ($apiKey !== '') {
+            $h['X-API-Key'] = $apiKey;
+        }
+        $this->headers = $h;
 
-    /**
-     * @param bool $safety
-     * @return Client
-     */
-    public function setSafety($safety)
-    {
-        $this->safety = $safety;
-        return $this;
-    }
+        if (!is_finite($requestTimeout) || $requestTimeout <= 0) {
+            throw new InvalidConfigException('requestTimeout must be a positive number of seconds');
+        }
+        $this->requestTimeout = $requestTimeout;
+        $this->onRequest = $onRequest !== null ? $onRequest(...) : null;
 
-    /**
-     * @param bool $useAssoc
-     * @return Client
-     */
-    public function setUseAssoc($useAssoc)
-    {
-        $this->useAssoc = $useAssoc;
-        return $this;
-    }
-
-    /**
-     * @param string $cert
-     * @return Client
-     */
-    public function setCert($cert)
-    {
-        $this->cert = $cert;
-        return $this;
-    }
-
-    /**
-     * @param string $caPath
-     * @return Client
-     */
-    public function setCAPath($caPath)
-    {
-        $this->caPath = $caPath;
-        return $this;
-    }
-
-    /**
-     * @param int $connectTimeoutOption
-     * @return Client
-     */
-    public function setConnectTimeoutOption($connectTimeoutOption)
-    {
-        $this->connectTimeoutOption = $connectTimeoutOption;
-        return $this;
-    }
-
-    /**
-     * @param int $timeoutOption
-     * @return Client
-     */
-    public function setTimeoutOption($timeoutOption)
-    {
-        $this->timeoutOption = $timeoutOption;
-        return $this;
-    }
-
-    /**
-     * Forces DNS to only resolve IPv4 addresses.
-     *
-     * @return Client
-     */
-    public function forceIpResolveV4()
-    {
-        $this->forceIpResolveV4 = true;
-        return $this;
-    }
-
-    /**
-     * Publish data into channel.
-     *
-     * @param string $channel
-     * @param array $data
-     * @param boolean $skipHistory (optional)
-     * @param array $tags (optional) map of string key/value tags attached to the publication
-     * @param string $idempotencyKey (optional) idempotency key for the publication
-     * @param boolean $delta (optional) enable delta compression for the publication
-     * @param int $version (optional) publication version (0 means not set)
-     * @param string $versionEpoch (optional) publication version epoch
-     * @return mixed
-     */
-    public function publish($channel, $data, $skipHistory = false, $tags = array(), $idempotencyKey = '', $delta = false, $version = 0, $versionEpoch = '')
-    {
-        $params = array(
-            'channel' => $channel,
-            'data' => $data,
-            'skip_history' => $skipHistory,
-        );
-        if (!empty($tags)) {
-            $params['tags'] = $tags;
-        }
-        if ($idempotencyKey !== '') {
-            $params['idempotency_key'] = $idempotencyKey;
-        }
-        if ($delta) {
-            $params['delta'] = $delta;
-        }
-        if ($version) {
-            $params['version'] = $version;
-        }
-        if ($versionEpoch !== '') {
-            $params['version_epoch'] = $versionEpoch;
-        }
-        return $this->send('publish', $params);
-    }
-
-    /**
-     * Broadcast the same data into multiple channels.
-     *
-     * @param array $channels
-     * @param array $data
-     * @param boolean $skipHistory (optional)
-     * @param array $tags (optional) map of string key/value tags attached to the publication
-     * @param string $idempotencyKey (optional) idempotency key for the publication
-     * @param boolean $delta (optional) enable delta compression for the publication
-     * @param int $version (optional) publication version (0 means not set)
-     * @param string $versionEpoch (optional) publication version epoch
-     * @return mixed
-     */
-    public function broadcast($channels, $data, $skipHistory = false, $tags = array(), $idempotencyKey = '', $delta = false, $version = 0, $versionEpoch = '')
-    {
-        $params = array(
-            'channels' => $channels,
-            'data' => $data,
-            'skip_history' => $skipHistory,
-        );
-        if (!empty($tags)) {
-            $params['tags'] = $tags;
-        }
-        if ($idempotencyKey !== '') {
-            $params['idempotency_key'] = $idempotencyKey;
-        }
-        if ($delta) {
-            $params['delta'] = $delta;
-        }
-        if ($version) {
-            $params['version'] = $version;
-        }
-        if ($versionEpoch !== '') {
-            $params['version_epoch'] = $versionEpoch;
-        }
-        return $this->send('broadcast', $params);
-    }
-
-    /**
-     * Subscribe user to channel.
-     *
-     * @param string $channel
-     * @param string $user
-     * @param string $client (optional)
-     * @param int $expireAt (optional) unix seconds in the future when subscription should expire
-     * @param array $info (optional) channel info attached to the subscription
-     * @param array $data (optional) custom data delivered to the client on subscribe
-     * @param array $recoverSince (optional) StreamPosition: ['offset' => int, 'epoch' => string]
-     * @param array $override (optional) SubscribeOptionOverride, e.g. ['presence' => ['value' => true]]
-     * @param string $session (optional) target a specific session of the user
-     * @return mixed
-     */
-    public function subscribe($channel, $user, $client = '', $expireAt = 0, $info = array(), $data = array(), $recoverSince = array(), $override = array(), $session = '')
-    {
-        $params = array(
-            'channel' => $channel,
-            'user' => $user,
-            'client' => $client,
-        );
-        if ($expireAt) {
-            $params['expire_at'] = $expireAt;
-        }
-        if (!empty($info)) {
-            $params['info'] = $info;
-        }
-        if (!empty($data)) {
-            $params['data'] = $data;
-        }
-        if (!empty($recoverSince)) {
-            $params['recover_since'] = $recoverSince;
-        }
-        if (!empty($override)) {
-            $params['override'] = $override;
-        }
-        if ($session !== '') {
-            $params['session'] = $session;
-        }
-        return $this->send('subscribe', $params);
-    }
-
-    /**
-     * Unsubscribe user from channel.
-     *
-     * @param string $channel
-     * @param string $user
-     * @param string $client (optional)
-     * @param string $session (optional) target a specific session of the user
-     * @return mixed
-     */
-    public function unsubscribe($channel, $user, $client = '', $session = '')
-    {
-        $params = array(
-            'channel' => $channel,
-            'user' => $user,
-            'client' => $client,
-        );
-        if ($session !== '') {
-            $params['session'] = $session;
-        }
-        return $this->send('unsubscribe', $params);
-    }
-
-    /**
-     * Disconnect user.
-     *
-     * @param string $user
-     * @param string $client (optional)
-     * @param array $disconnect (optional) Disconnect object: ['code' => int, 'reason' => string]
-     * @param array $whitelist (optional) channels to keep connected even when disconnecting the user
-     * @param string $session (optional) target a specific session of the user
-     * @return mixed
-     */
-    public function disconnect($user, $client = '', $disconnect = array(), $whitelist = array(), $session = '')
-    {
-        $params = array(
-            'user' => $user,
-            'client' => $client,
-        );
-        if (!empty($disconnect)) {
-            $params['disconnect'] = $disconnect;
-        }
-        if (!empty($whitelist)) {
-            $params['whitelist'] = $whitelist;
-        }
-        if ($session !== '') {
-            $params['session'] = $session;
-        }
-        return $this->send('disconnect', $params);
-    }
-
-    /**
-     * Get channel presence info.
-     *
-     * @param string $channel
-     * @return mixed
-     */
-    public function presence($channel)
-    {
-        return $this->send('presence', array(
-            'channel' => $channel,
-        ));
-    }
-
-    /**
-     * Get channel presence stats.
-     *
-     * @param string $channel
-     * @return mixed
-     */
-    public function presenceStats($channel)
-    {
-        return $this->send('presence_stats', array(
-            'channel' => $channel,
-        ));
-    }
-
-    /**
-     * Get channel history.
-     *
-     * @param string $channel
-     * @param int $limit (optional)
-     * @param array $since (optional)
-     * @param boolean $reverse (optional)
-     * @return mixed
-     */
-    public function history($channel, $limit = 0, $since = array(), $reverse = false)
-    {
-        $params = array('channel' => $channel, 'limit' => $limit, 'reverse' => $reverse);
-        if (!empty($since)) {
-            $params['since'] = $since;
-        }
-        return $this->send('history', $params);
-    }
-
-    /**
-     * Remove channel history.
-     *
-     * @param string $channel
-     * @return mixed
-     */
-    public function historyRemove($channel)
-    {
-        return $this->send('history_remove', array(
-            'channel' => $channel,
-        ));
-    }
-
-    /**
-     * Get all active channels.
-     * 
-     * @param string $pattern (optional)
-     * @return mixed
-     */
-    public function channels($pattern = '')
-    {
-        return $this->send("channels", array(
-            'pattern' => $pattern,
-        ));
-    }
-
-    /**
-     * Get server info.
-     *
-     * @return mixed
-     */
-    public function info()
-    {
-        return $this->send('info');
-    }
-
-    /**
-     * Sending many commands in one request
-     *
-     * @param array $data
-     * @return mixed
-     */
-    public function batch(array $data)
-    {
-        return $this->send('batch', $data);
-    }
-
-    /**
-     * Generate connection JWT. See https://centrifugal.dev/docs/server/authentication.
-     * Keep in mind that this method does not support all claims of Centrifugo JWT connection
-     * token at this point. You can use any JWT library to generate Centrifugo tokens.
-     *
-     * @param string $userId - current user ID as string.
-     * @param int $exp - time in the future as unix seconds for token expiration.
-     * @param array $info
-     * @param array $channels
-     * @param array $meta
-     * @return string
-     */
-    public function generateConnectionToken($userId, $exp = 0, $info = array(), $channels = array(), $meta = array())
-    {
-        $header = array('typ' => 'JWT', 'alg' => 'HS256');
-        $payload = array('sub' => (string) $userId);
-        if (!empty($info)) {
-            $payload['info'] = $info;
-        }
-        if (!empty($meta)) {
-            $payload['meta'] = $meta;
-        }
-        if (!empty($channels)) {
-            $payload['channels'] = $channels;
-        }
-        if ($exp) {
-            $payload['exp'] = $exp;
-        }
-        $segments = array();
-        $segments[] = $this->urlsafeB64Encode(json_encode($header));
-        $segments[] = $this->urlsafeB64Encode(json_encode($payload));
-        $signing_input = implode('.', $segments);
-        $signature = $this->sign($signing_input, $this->secret);
-        $segments[] = $this->urlsafeB64Encode($signature);
-        return implode('.', $segments);
-    }
-
-    /**
-     * Generate subscription JWT. See https://centrifugal.dev/docs/server/channel_token_auth.
-     * Keep in mind that this method does not support all claims of Centrifugo JWT subscription
-     * token at this point. You can use any JWT library to generate Centrifugo tokens.
-     *
-     * @param string $userId - current user ID as string.
-     * @param string $channel - channel token generated for.
-     * @param int $exp - time in the future as unix seconds for token expiration.
-     * @param array $info
-     * @return string
-     */
-    public function generateSubscriptionToken($userId, $channel, $exp = 0, $info = array())
-    {
-        $header = array('typ' => 'JWT', 'alg' => 'HS256');
-        $payload = array('channel' => (string)$channel, 'sub' => (string)$userId);
-        if (!empty($info)) {
-            $payload['info'] = $info;
-        }
-        if ($exp) {
-            $payload['exp'] = $exp;
-        }
-        $segments = array();
-        $segments[] = $this->urlsafeB64Encode(json_encode($header));
-        $segments[] = $this->urlsafeB64Encode(json_encode($payload));
-        $signing_input = implode('.', $segments);
-        $signature = $this->sign($signing_input, $this->secret);
-        $segments[] = $this->urlsafeB64Encode($signature);
-        return implode('.', $segments);
-    }
-
-    public function _json_last_error_msg()
-    {
-        return json_last_error_msg();
-    }
-
-    private function send($method, $params = array())
-    {
-        $response = \json_decode($this->request($method, $params), $this->useAssoc);
-        if (JSON_ERROR_NONE !== json_last_error()) {
-            throw new \Exception(
-                'json_decode error: ' . $this->_json_last_error_msg()
-            );
-        }
-        return $response;
-    }
-
-    private function urlsafeB64Encode($input)
-    {
-        return str_replace('=', '', strtr(base64_encode($input), '+/', '-_'));
-    }
-
-    private function sign($msg, $key)
-    {
-        return hash_hmac('sha256', $msg, $key, true);
-    }
-
-    private function request($method, $params)
-    {
-        $ch = curl_init();
-        if ($this->connectTimeoutOption) {
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $this->connectTimeoutOption);
-        }
-        if ($this->timeoutOption) {
-            curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeoutOption);
-        }
-        if ($this->forceIpResolveV4) {
-            curl_setopt($ch, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
-        }
-        if (!$this->safety) {
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+        if ($httpClient !== null) {
+            if ($curlOptions !== []) {
+                throw new InvalidConfigException('curlOptions are for the default transport: configure httpClient instead');
+            }
+            $factory = $httpFactory ?? $httpClient;
+            if (!$factory instanceof RequestFactoryInterface || !$factory instanceof StreamFactoryInterface) {
+                throw new InvalidConfigException(
+                    'httpClient needs PSR-17 factories for its requests: pass httpFactory - new GuzzleHttp\Psr7\HttpFactory() '
+                    . 'or new Nyholm\Psr7\Factory\Psr17Factory(), say',
+                );
+            }
+            $this->transport = new Psr18Transport($httpClient, $factory, $factory);
         } else {
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
-            if ($this->cert) {
-                curl_setopt($ch, CURLOPT_CAINFO, $this->cert);
+            if ($httpFactory !== null) {
+                throw new InvalidConfigException('httpFactory is for httpClient: set both, or neither');
             }
-            if ($this->caPath) {
-                curl_setopt($ch, CURLOPT_CAPATH, $this->caPath);
+            if (!CurlTransport::available()) {
+                throw new InvalidConfigException('the default transport needs ext-curl: enable it, or pass a PSR-18 httpClient');
             }
+            $this->transport = new CurlTransport($curlOptions);
         }
-        curl_setopt($ch, CURLOPT_USERAGENT, 'curl/7.39.0');
-        curl_setopt($ch, CURLOPT_HEADER, 0);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, \json_encode((object)$params));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getHeaders());
-        curl_setopt($ch, CURLOPT_URL, $this->getUrl($method));
-        $data = curl_exec($ch);
-        $error = curl_error($ch);
-        $headers = curl_getinfo($ch);
-        if (PHP_VERSION_ID < 80000) {
-            curl_close($ch);
-        }
-        if (empty($headers["http_code"]) || ($headers["http_code"] != 200)) {
-            throw new \Exception(
-                "Response code: "
-                    . $headers["http_code"]
-                    . PHP_EOL
-                    . "cURL error: " . $error . PHP_EOL
-            );
-        }
-        return $data;
     }
 
-    private function getUrl($method)
+    // Broadcast: the public methods are generated, with the fields of
+    // BroadcastRequest as their arguments.
+
+    private function sendBroadcast(BroadcastRequest $request, ?float $timeout): BroadcastResult
     {
-        return rtrim($this->url, '/') . '/' . $method;
+        $channels = array_values($request->channels);
+        $result = $this->result($request, $timeout);
+
+        return BroadcastResult::fromWire($result, 'broadcast result', $channels, $request->idempotencyKey)->check();
     }
 
-    private function getHeaders()
-    {
-        $headers = [
-            'Content-Type: application/json',
-            'X-API-Key: '.$this->apikey
-        ];
+    /** @param ?callable(BroadcastAttempt): ?float $onAttemptError */
+    private function retryBroadcast(
+        BroadcastRequest $request,
+        int $maxAttempts,
+        ?float $attemptTimeout,
+        ?callable $onAttemptError,
+        ?float $timeout,
+    ): BroadcastResult {
+        if ($maxAttempts < 1) {
+            throw new InvalidRequestException('invalid broadcast request: maxAttempts must be 1 or more');
+        }
+        if ($attemptTimeout !== null && (!is_finite($attemptTimeout) || $attemptTimeout <= 0)) {
+            throw new InvalidRequestException('invalid broadcast request: attemptTimeout must be positive');
+        }
+        Validate::encode($request);
+        // Without a timeout the call has no bound of its own: each attempt has
+        // attemptTimeout, or requestTimeout as a call alone would, so that an
+        // attempt which hangs leaves time to retry.
+        $deadline = $timeout !== null ? $this->deadline($timeout) : \INF;
+        $perAttempt = $attemptTimeout ?? $this->requestTimeout;
 
-        return $headers;
+        $channels = array_values($request->channels);
+        $key = $request->idempotencyKey !== '' ? $request->idempotencyKey : 'phpcent-' . self::randomKey();
+        /** @var list<ChannelResult> $final */
+        $final = array_map(static fn(string $ch): ChannelResult => new ChannelResult($ch), $channels);
+        // Positions in channels of what the next attempt sends: positions, not
+        // names, so that a channel listed twice keeps both entries.
+        $pending = array_keys($channels);
+        $replied = false;
+        $attempts = 0;
+        $last = null;
+        $backoff = Retry::exponentialBackoff(Limits::BACKOFF_BASE, Limits::BACKOFF_LIMIT);
+
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            $left = $deadline - self::now();
+            if ($left <= 0) {
+                $last ??= new TimeoutException('broadcast: timed out');
+                break;
+            }
+            $attemptReq = clone $request;
+            $attemptReq->channels = array_map(static fn(int $p): string => $channels[$p], $pending);
+            $attemptReq->idempotencyKey = $key;
+            try {
+                $res = $this->sendBroadcast($attemptReq, min($left, $perAttempt));
+                $err = null;
+            } catch (InvalidRequestException $e) {
+                throw $e;
+            } catch (BroadcastFailedChannelsException $e) {
+                [$res, $err] = [$e->result, $e];
+            } catch (\Throwable $e) {
+                if (!$e instanceof CentException) {
+                    throw $e;
+                }
+                [$res, $err] = [BroadcastResult::failedAsWhole($attemptReq->channels, $e, 1, $key), $e];
+            }
+            $attempts++;
+            foreach ($pending as $i => $pos) {
+                $final[$pos] = $res->channels[$i]->withAttempts($final[$pos]->attempts + 1);
+            }
+            if ($err === null || $err instanceof BroadcastFailedChannelsException) {
+                $replied = true;
+            }
+            $last = $err;
+            // An ended deadline leaves no time for another attempt.
+            if ($err === null || !Retry::retryable($err) || $attempt === $maxAttempts || self::now() >= $deadline) {
+                break;
+            }
+            $pending = array_values(array_filter($pending, static fn(int $pos): bool => Retry::retryable($final[$pos]->error)));
+            $wait = null;
+            if ($onAttemptError !== null) {
+                $info = new BroadcastAttempt($attempt, $err, array_map(static fn(int $p): ChannelResult => $final[$p], $pending), new BroadcastResult(array_values($final), $key, $attempts, $replied), $key);
+
+                $wait = $onAttemptError($info);
+            }
+            $delay = $wait ?? $backoff($attempt);
+            $sleep = max(0.0, min($delay, $deadline - self::now()));
+            if ($sleep > 0) {
+                usleep((int) ($sleep * 1e6));
+            }
+            $this->checkOpen();
+        }
+        $out = self::outcome(new BroadcastResult(array_values($final), $key, $attempts, $replied), $replied, $last);
+        if ($out instanceof \Throwable) {
+            throw $out;
+        }
+
+        return $out;
+    }
+
+    // Batches.
+
+    /**
+     * An empty Batch sent by this client. Without $parallel the commands run
+     * one by one, in the order added - but Centrifugo PRO sends a sequential
+     * batch's publications to its broker together: each channel's take effect
+     * in order, publications into different channels may not, unless the
+     * namespace sets publication_grouping_disabled. With $parallel, Centrifugo
+     * runs them concurrently, with no order.
+     */
+    public function newBatch(bool $parallel = false): Batch
+    {
+        return new Batch($this, $parallel);
+    }
+
+    // Shutdown.
+
+    /**
+     * Stops the client: calls made from now on throw ClosedException, and its
+     * connections are closed. A broadcast being retried stops at its next
+     * attempt.
+     */
+    public function close(): void
+    {
+        $this->closed = true;
+        $this->transport->close();
+    }
+
+    // Sending.
+
+    /**
+     * @template T
+     *
+     * @param Request<T> $request
+     *
+     * @return T
+     */
+    private function invoke(Request $request, ?float $timeout): mixed
+    {
+        $method = $request::apiMethod();
+
+        return $request::decodeResult($this->result($request, $timeout), "{$method} result");
+    }
+
+    /** @param Request<mixed> $request */
+    private function result(Request $request, ?float $timeout): \stdClass
+    {
+        $method = $request::apiMethod();
+        $deadline = $this->deadline($timeout);
+        /** @var array{\stdClass, ?ApiException} $out */
+        $out = $this->call(
+            $method,
+            static fn(): string => Validate::encode($request),
+            1,
+            $deadline,
+            static function (string $raw) use ($method): array {
+                $out = Reply::result($raw, $method);
+
+                return [$out, $out[1] === null ? 0 : 1];
+            },
+        );
+        [$result, $err] = $out;
+        if ($err !== null) {
+            throw $err;
+        }
+
+        return $result;
+    }
+
+    /**
+     * @internal
+     *
+     * @return list<\stdClass>
+     */
+    public function sendBatch(string $body, int $n, ?float $timeout): array
+    {
+        /** @var list<\stdClass> */
+        return $this->call(
+            'batch',
+            static fn(): string => $body,
+            $n,
+            $this->deadline($timeout),
+            static function (string $raw) use ($n): array {
+                $replies = Reply::batch($raw, $n);
+
+                return [$replies, \count(array_filter($replies, static fn(\stdClass $r): bool => isset($r->error)))];
+            },
+        );
+    }
+
+    /** @internal */
+    public function checkOpen(): void
+    {
+        if ($this->closed) {
+            throw new ClosedException('client closed');
+        }
+    }
+
+    /**
+     * @param \Closure(): string $makeBody
+     * @param \Closure(string): array{mixed, int} $parse
+     */
+    private function call(string $method, \Closure $makeBody, int $commands, float $deadline, \Closure $parse): mixed
+    {
+        $this->checkOpen();
+        $start = self::now();
+        $status = 0;
+        try {
+            [$out, $failed] = $parse($this->roundtrip($method, $makeBody, $deadline, $status));
+        } catch (\Throwable $e) {
+            $this->report($method, $commands, 0, $start, $status, $e);
+
+            throw $e;
+        }
+        $this->report($method, $commands, $failed, $start, $status, null);
+
+        return $out;
+    }
+
+    /** @param \Closure(): string $makeBody */
+    private function roundtrip(string $method, \Closure $makeBody, float $deadline, int &$status): string
+    {
+        $base = $this->endpoint;
+        if ($this->endpointFunc !== null) {
+            $base = self::checkEndpoint(($this->endpointFunc)(), 'apiEndpointFunc');
+        }
+        $headers = $this->headers;
+        if ($this->tokenFunc !== null) {
+            $token = ($this->tokenFunc)();
+            if ($token === '' || !Headers::validValue($token)) {
+                throw new InvalidConfigException('bearerTokenFunc returned an empty token, or one which is not printable ASCII');
+            }
+            $headers['Authorization'] = 'Bearer ' . $token;
+        }
+        $body = $makeBody();
+        $left = $deadline - self::now();
+        if ($left <= 0) {
+            throw new TimeoutException("{$method}: timed out");
+        }
+        $resp = $this->transport->post("{$base}/{$method}", $headers, $body, $left, $method);
+        $status = $resp->status;
+        if ($resp->status !== 200) {
+            throw Reply::httpError($method, $resp);
+        }
+
+        return $resp->body;
+    }
+
+    private function report(string $method, int $commands, int $failed, float $start, int $status, ?\Throwable $error): void
+    {
+        if ($this->onRequest !== null) {
+            ($this->onRequest)(new RequestInfo($method, $commands, $failed, self::now() - $start, $status, $error));
+        }
+    }
+
+    private function deadline(?float $timeout): float
+    {
+        if ($timeout === null) {
+            $timeout = $this->requestTimeout;
+        } elseif (!is_finite($timeout) || $timeout <= 0) {
+            throw new InvalidRequestException('timeout must be a positive number of seconds: null for requestTimeout');
+        }
+
+        return self::now() + $timeout;
+    }
+
+    private static function now(): float
+    {
+        return hrtime(true) / 1e9;
+    }
+
+    private static function randomKey(): string
+    {
+        return rtrim(strtr(base64_encode(random_bytes(18)), '+/', '-_'), '=');
+    }
+
+    /**
+     * The final result of broadcastWithRetry, or the exception to throw:
+     * BroadcastFailedChannelsException when some attempt got a reply, the last
+     * attempt's exception otherwise.
+     */
+    private static function outcome(BroadcastResult $res, bool $replied, ?\Throwable $last): BroadcastResult|\Throwable
+    {
+        if (!$replied) {
+            if ($last === null) {
+                return new \LogicException('phpcent: broadcastWithRetry: no reply and no error');
+            }
+            if (property_exists($last, 'idempotencyKey')) {
+                $last->idempotencyKey = $res->idempotencyKey;
+            }
+
+            return $last;
+        }
+        try {
+            return $res->check();
+        } catch (BroadcastFailedChannelsException $e) {
+            return $e;
+        }
+    }
+
+    /** The endpoint without a trailing slash, or InvalidConfigException naming what is wrong. */
+    private static function checkEndpoint(string $addr, string $option): string
+    {
+        $u = parse_url($addr);
+        if ($u === false) {
+            throw new InvalidConfigException("{$option}: \"{$addr}\" is not a valid URL");
+        }
+        $scheme = strtolower($u['scheme'] ?? '');
+        if ($scheme !== 'http' && $scheme !== 'https') {
+            throw new InvalidConfigException("{$option}: \"{$addr}\" must be an absolute http:// or https:// URL");
+        }
+        if (($u['host'] ?? '') === '') {
+            throw new InvalidConfigException("{$option}: \"{$addr}\" has no host");
+        }
+        if (isset($u['query']) || isset($u['fragment']) || isset($u['user']) || isset($u['pass'])) {
+            throw new InvalidConfigException("{$option}: \"{$addr}\" must not have a query, fragment or credentials; use apiKey");
+        }
+        $path = rtrim($u['path'] ?? '', '/');
+        $last = substr($path, (int) strrpos($path, '/') + 1);
+        if (isset(Methods::PRO[$last])) {
+            throw new InvalidConfigException("{$option}: \"{$addr}\" ends with the method \"{$last}\"; it is the API base URL, such as http://localhost:8000/api");
+        }
+        $host = str_contains($u['host'], ':') && !str_starts_with($u['host'], '[') ? "[{$u['host']}]" : $u['host'];
+
+        return $scheme . '://' . $host . (isset($u['port']) ? ':' . $u['port'] : '') . $path;
     }
 }

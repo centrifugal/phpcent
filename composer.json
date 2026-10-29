@@ -1,26 +1,101 @@
 {
     "name": "centrifugal/phpcent",
-    "description": "PHP library to communicate with Centrifugo HTTP API",
+    "description": "PHP SDK for Centrifugo's HTTP server API: every API method, tokens, proxy handlers and the endpoints client SDKs call",
+    "type": "library",
     "keywords": [
         "centrifugo",
         "websocket",
         "realtime",
-        "messaging"
+        "messaging",
+        "pubsub",
+        "jwt",
+        "jwks"
     ],
     "homepage": "https://github.com/centrifugal/phpcent",
-    "version": "6.0.3",
     "license": "MIT",
+    "authors": [
+        {
+            "name": "Centrifugal Labs LTD",
+            "homepage": "https://centrifugal.dev"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/centrifugal/phpcent/issues",
+        "docs": "https://centrifugal.dev/docs/server/server_api"
+    },
     "require": {
-        "php": ">=7.0.0",
+        "php": ">=8.3",
         "ext-json": "*",
-        "ext-curl": "*"
+        "psr/http-client": "^1.0",
+        "psr/http-factory": "^1.0",
+        "psr/http-message": "^1.1 || ^2.0",
+        "psr/http-server-handler": "^1.0"
     },
     "require-dev": {
-        "phpunit/phpunit": "9.*"
+        "friendsofphp/php-cs-fixer": "^3.64",
+        "nyholm/psr7": "^1.8",
+        "phpstan/phpstan": "^2.1",
+        "phpstan/phpstan-strict-rules": "^2.0",
+        "phpunit/phpunit": "^12.0"
+    },
+    "suggest": {
+        "ext-curl": "The default HTTP transport; not needed with a PSR-18 client of your own",
+        "ext-openssl": "For RSA and ECDSA tokens",
+        "ext-sodium": "For Ed25519 tokens"
     },
     "autoload": {
         "psr-4": {
-            "phpcent\\": "src"
+            "Centrifugal\\Phpcent\\": [
+                "src/",
+                "generated/"
+            ]
         }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Centrifugal\\Phpcent\\Tests\\": "tests/",
+            "Centrifugal\\Phpcent\\Gen\\": "gen/"
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "platform-check": true,
+        "process-timeout": 0,
+        "platform": {
+            "php": "8.3.0"
+        }
+    },
+    "minimum-stability": "stable",
+    "scripts": {
+        "generate": "php gen/generate.php",
+        "generate-check": "php gen/generate.php --check",
+        "docs": "php gen/api_docs.php",
+        "docs-check": "php gen/api_docs.php --check",
+        "lint": [
+            "php-cs-fixer check --diff",
+            "phpstan analyse --no-progress --memory-limit=1G"
+        ],
+        "fix": "php-cs-fixer fix",
+        "test": "phpunit --testsuite unit",
+        "test-integration": "phpunit --testsuite integration",
+        "check": [
+            "@generate-check",
+            "@docs-check",
+            "@lint",
+            "@test"
+        ],
+        "sync-proto": "php gen/sync_proto.php"
+    },
+    "scripts-descriptions": {
+        "generate": "Regenerate generated/ from proto/",
+        "generate-check": "Fail when generated/ is stale",
+        "docs": "Regenerate API.md, the API reference, from the docblocks",
+        "docs-check": "Fail when API.md is stale",
+        "lint": "php-cs-fixer and PHPStan at max level",
+        "fix": "Format the code with php-cs-fixer",
+        "test": "Unit tests",
+        "test-integration": "Integration tests, against the Centrifugo of testdata/ on :8100",
+        "check": "What CI runs, but integration",
+        "sync-proto": "Copy api.proto and proxy.proto from a Centrifugo tag (CENTRIFUGO_REF=v6.10.2), and regenerate"
     }
 }

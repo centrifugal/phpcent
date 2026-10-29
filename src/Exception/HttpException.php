@@ -10,6 +10,8 @@ namespace Centrifugal\Phpcent\Exception;
  */
 class HttpException extends \RuntimeException implements CentException
 {
+    use IdempotencyKey;
+
     /**
      * @param int $statusCode the reply's HTTP status
      * @param string $body the start of the reply's body, for diagnostics

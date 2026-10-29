@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Centrifugal\Phpcent\Token;
 
+use Centrifugal\Phpcent\Exception\InvalidRequestException;
+
 /**
  * Issues the tokens a Client sends to Centrifugo PRO: its token method is the
  * client's bearerTokenFunc. It signs a token with Token::api and reuses it for
@@ -38,13 +40,13 @@ final class ApiTokens
         private readonly float $ttl = 300.0,
     ) {
         if (($key === null) === ($currentKey === null)) {
-            throw new \InvalidArgumentException('token: ApiTokens takes key or currentKey, one of them');
+            throw new InvalidRequestException('token: ApiTokens takes key or currentKey, one of them');
         }
         if ($claims->expiresAt !== null || $claims->issuedAt !== null) {
-            throw new \InvalidArgumentException('token: ApiTokens sets expiresAt and issuedAt itself: leave them unset, and set ttl');
+            throw new InvalidRequestException('token: ApiTokens sets expiresAt and issuedAt itself: leave them unset, and set ttl');
         }
         if (!is_finite($ttl) || $ttl <= 0) {
-            throw new \InvalidArgumentException('token: ApiTokens ttl must be a positive number of seconds');
+            throw new InvalidRequestException('token: ApiTokens ttl must be a positive number of seconds');
         }
         $this->currentKey = $currentKey !== null ? $currentKey(...) : null;
     }

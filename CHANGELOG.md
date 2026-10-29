@@ -13,7 +13,9 @@ Migrating from phpcent 6: see [MIGRATING.md](MIGRATING.md).
 * Payloads: PHP values or `RawJson`, sent as the same JSON value; replies give `stdClass`, which goes back exactly; NaN, infinities and binary strings refused before sending.
 * Tokens: connection, subscription and Centrifugo PRO server API tokens with every claim (HS256, RS256, ES256/384/512, EdDSA), JWKS, `ApiTokens`.
 * Endpoints for client SDKs (connection and subscription tokens, shared poll signatures, JWKS) and a handler for every proxy type, generated from `proxy.proto`. Each is a framework-free core with PSR-15 and plain PHP adapters.
-* `Command::publish(...)` and the other methods, for Centrifugo's async consumers; `SharedPoll::sign` for shared poll signatures.
+* `Command::publish(...)` and the other methods, for Centrifugo's async consumers - `json_encode($command)` gives the payload as an object; `SharedPoll::sign` for shared poll signatures, its expiry required: a time, or `Expiry::Never`.
+* Fields the protos mark required are required named arguments. Results render with Centrifugo's field names under `json_encode`, errors as `{code, message}`; `$result->failed` is a property.
+* With a PSR-18 client, its timeouts throw `TimeoutException` and its TLS certificate errors are not retryable. `Pending::resolved` and the public constructors of results and partial-failure exceptions make test doubles.
 
 v6.0.0 - v6.0.3
 ===============

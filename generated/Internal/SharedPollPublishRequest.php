@@ -7,6 +7,7 @@ declare(strict_types=1);
 namespace Centrifugal\Phpcent\Internal;
 
 use Centrifugal\Phpcent\Message;
+use Centrifugal\Phpcent\RawJson;
 use Centrifugal\Phpcent\SharedPollPublishResult;
 
 /**
@@ -80,6 +81,12 @@ final class SharedPollPublishRequest implements Message, Request
         }
 
         return '{' . implode(',', $p) . '}';
+    }
+
+    /** The message as toJson gives it, for a json_encode of your own. */
+    public function jsonSerialize(): RawJson
+    {
+        return new RawJson($this->toJson());
     }
 
     /** @internal */

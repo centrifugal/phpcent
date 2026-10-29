@@ -13,7 +13,8 @@ use Centrifugal\Phpcent\Http\HttpResponse;
  * Unauthorized - also as a previous exception of another - with 403, on which
  * client SDKs stop asking, and disconnect or unsubscribe; any other exception
  * with 500, which they retry. A malformed request gets 400, a wrong method 405.
- * onError, when set, is told of every 500 and 400, with the exception.
+ * onError, when set, is told of every 500 and 400, with the exception; it
+ * must not throw.
  *
  * @internal
  */

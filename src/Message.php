@@ -7,8 +7,11 @@ namespace Centrifugal\Phpcent;
 /**
  * A message of Centrifugo's protocols - a request or result of the server API
  * or of the proxy - generated from its proto.
+ *
+ * json_encode renders it as toJson does, with Centrifugo's field names -
+ * num_clients, not numClients - for a response or a log of your own.
  */
-interface Message
+interface Message extends \JsonSerializable
 {
     /**
      * The message as Centrifugo reads it: JSON, fields at their zero value left

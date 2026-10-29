@@ -8,6 +8,7 @@ namespace Centrifugal\Phpcent\Internal;
 
 use Centrifugal\Phpcent\MapClearResult;
 use Centrifugal\Phpcent\Message;
+use Centrifugal\Phpcent\RawJson;
 
 /**
  * MapClearRequest removes all state and stream data of a map channel.
@@ -51,6 +52,12 @@ final class MapClearRequest implements Message, Request
         }
 
         return '{' . implode(',', $p) . '}';
+    }
+
+    /** The message as toJson gives it, for a json_encode of your own. */
+    public function jsonSerialize(): RawJson
+    {
+        return new RawJson($this->toJson());
     }
 
     /** @internal */

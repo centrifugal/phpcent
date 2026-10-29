@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Centrifugal\Phpcent\Internal;
 
+use Centrifugal\Phpcent\Exception\ApiException;
 use Centrifugal\Phpcent\Exception\InvalidRequestException;
 use Centrifugal\Phpcent\RawJson;
 
@@ -89,6 +90,21 @@ final class Encode
     private static function encodeValue(mixed $v): string
     {
         return json_encode($v, self::FLAGS);
+    }
+
+    /**
+     * How an error in a result renders as JSON: {code, message} for an
+     * ApiException, {message} for any other.
+     *
+     * @return array{code?: int, message: string}
+     */
+    public static function error(\Throwable $e): array
+    {
+        if ($e instanceof ApiException) {
+            return ['code' => $e->getCode(), 'message' => $e->serverMessage];
+        }
+
+        return ['message' => $e->getMessage()];
     }
 
     /**

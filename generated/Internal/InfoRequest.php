@@ -8,6 +8,7 @@ namespace Centrifugal\Phpcent\Internal;
 
 use Centrifugal\Phpcent\InfoResult;
 use Centrifugal\Phpcent\Message;
+use Centrifugal\Phpcent\RawJson;
 
 /**
  * InfoRequest returns information about the running Centrifugo nodes.
@@ -41,6 +42,12 @@ final class InfoRequest implements Message, Request
     public function toJson(string $path = ''): string
     {
         return '{}';
+    }
+
+    /** The message as toJson gives it, for a json_encode of your own. */
+    public function jsonSerialize(): RawJson
+    {
+        return new RawJson($this->toJson());
     }
 
     /** @internal */

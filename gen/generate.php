@@ -108,6 +108,15 @@ function skipped(Proto $s): array
     return $names;
 }
 
+/**
+ * Whether the proto marks the field plainly "Required." - a required
+ * parameter then. "Required unless ..." stays optional.
+ */
+function required(ProtoField $f): bool
+{
+    return preg_match('/\bRequired\./', implode(' ', $f->doc)) === 1;
+}
+
 /** A field's native type, its PHPDoc type, and its default. */
 function fieldType(ProtoField $f): array
 {
@@ -350,6 +359,7 @@ function emitMessage(ProtoMessage $m, string $namespace, string $proto, string $
     }
     if ($namespace !== 'Centrifugal\\Phpcent') {
         $uses[] = 'Centrifugal\\Phpcent\\Message';
+        $uses[] = 'Centrifugal\\Phpcent\\RawJson';
     }
     if ($command !== null) {
         // A request is internal: the types of its fields and its result are
@@ -436,6 +446,9 @@ function emitMessage(ProtoMessage $m, string $namespace, string $proto, string $
     }
     $out .= "    }\n";
 
+    $out .= "\n    /** The message as toJson gives it, for a json_encode of your own. */\n";
+    $out .= "    public function jsonSerialize(): RawJson\n    {\n        return new RawJson(\$this->toJson());\n    }\n";
+
     // fromWire: from the objects json_decode gives.
     $out .= "\n    /** @internal */\n";
     $out .= "    public static function fromWire(mixed \$v, string \$path): static\n    {\n";
@@ -468,7 +481,7 @@ const BROADCAST_DOC = <<<'DOC'
         try {
             $client->broadcast(channels: $channels, data: $data);
         } catch (BroadcastFailedChannelsException $e) {
-            $logger->warning('broadcast failed in some channels', ['failed' => $e->result->failed()]);
+            $logger->warning('broadcast failed in some channels', ['failed' => $e->result->failed]);
         }
 
     Retry it with broadcastWithRetry, which sends again only the channels which
@@ -521,6 +534,7 @@ function lines(string $text): array
 function fieldParams(Command $c): array
 {
     $docs = [];
+    $required = [];
     $params = [];
     $args = [];
     foreach ($c->request->fields as $f) {
@@ -529,14 +543,24 @@ function fieldParams(Command $c): array
             throw new \RuntimeException("api.proto: {$c->request->name}.{$f->name} would be the method's own \${$name} parameter");
         }
         [$type, $docType, $default] = fieldType($f);
+        if (required($f)) {
+            $docType = str_replace('|null', '', $docType);
+        }
         $text = docText(fieldDoc($c->request, $f));
         $docs[] = "@param {$docType} \${$name}" . ($text !== [] ? ' ' . array_shift($text) : '');
         foreach ($text as $t) {
             $docs[] = '    ' . $t;
         }
-        $params[] = "{$type} \${$name} = {$default}";
+        if (required($f)) {
+            // Required first: an optional parameter before a required one is
+            // deprecated. Named arguments make the order no part of the API.
+            $required[] = ltrim($type, '?') . " \${$name}";
+        } else {
+            $params[] = "{$type} \${$name} = {$default}";
+        }
         $args[] = "{$name}: \${$name}";
     }
+    $params = [...$required, ...$params];
 
     // One argument a line when they don't fit one: the body is indented by 8.
     $request = \count($args) <= 2
@@ -586,7 +610,8 @@ function emitClientMethods(array $cmds): string
     $out .= "    abstract private function sendBroadcast(BroadcastRequest \$request, ?float \$timeout): BroadcastResult;\n\n";
     $out .= "    /** @param ?callable(BroadcastAttempt): ?float \$onAttemptError */\n";
     $out .= "    abstract private function retryBroadcast(BroadcastRequest \$request, int \$maxAttempts, ?float \$attemptTimeout, ?callable \$onAttemptError, ?float \$timeout): BroadcastResult;\n";
-    $timeoutDoc = '@param ?float $timeout Seconds bounding the call: requestTimeout when null.';
+    $timeoutDoc = ['@param ?float $timeout Seconds bounding the call: requestTimeout when null. With an',
+        '    httpClient of your own, its timeouts bound the request instead.'];
     foreach ($cmds as $c) {
         [$fieldDocs, $params, $request] = fieldParams($c);
         $name = camel($c->method);
@@ -594,7 +619,7 @@ function emitClientMethods(array $cmds): string
         if ($c->method === 'broadcast') {
             $doc = [...$doc, '', ...lines(BROADCAST_DOC)];
         }
-        $doc = [...$doc, '', ...$fieldDocs, $timeoutDoc, '', '@throws CentException'];
+        $doc = [...$doc, '', ...$fieldDocs, ...$timeoutDoc, '', '@throws CentException'];
         $returns = $c->method === 'broadcast' ? 'BroadcastResult' : $c->result;
         $call = $c->method === 'broadcast' ? "\$this->sendBroadcast({$request}, \$timeout)" : "\$this->invoke({$request}, \$timeout)";
         $out .= method($doc, "public function {$name}", [...$params, '?float $timeout = null'], $returns, "return {$call};");

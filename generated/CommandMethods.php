@@ -86,7 +86,7 @@ trait CommandMethods
      * @throws InvalidRequestException
      */
     public static function publish(
-        string $channel = '',
+        string $channel,
         mixed $data = null,
         string $b64data = '',
         bool $skipHistory = false,
@@ -139,7 +139,7 @@ trait CommandMethods
      * @throws InvalidRequestException
      */
     public static function broadcast(
-        array $channels = [],
+        array $channels,
         mixed $data = null,
         string $b64data = '',
         bool $skipHistory = false,
@@ -195,7 +195,7 @@ trait CommandMethods
      * @throws InvalidRequestException
      */
     public static function subscribe(
-        string $channel = '',
+        string $channel,
         string $user = '',
         int $expireAt = 0,
         mixed $info = null,
@@ -245,7 +245,7 @@ trait CommandMethods
      * @throws InvalidRequestException
      */
     public static function unsubscribe(
-        string $channel = '',
+        string $channel,
         string $user = '',
         string $client = '',
         string $session = '',
@@ -313,7 +313,7 @@ trait CommandMethods
      * @throws InvalidRequestException
      */
     public static function presence(
-        string $channel = '',
+        string $channel,
     ): self {
         return self::of(new PresenceRequest(channel: $channel));
     }
@@ -330,7 +330,7 @@ trait CommandMethods
      * @throws InvalidRequestException
      */
     public static function presenceStats(
-        string $channel = '',
+        string $channel,
     ): self {
         return self::of(new PresenceStatsRequest(channel: $channel));
     }
@@ -351,7 +351,7 @@ trait CommandMethods
      * @throws InvalidRequestException
      */
     public static function history(
-        string $channel = '',
+        string $channel,
         int $limit = 0,
         ?StreamPosition $since = null,
         bool $reverse = false,
@@ -376,7 +376,7 @@ trait CommandMethods
      * @throws InvalidRequestException
      */
     public static function historyRemove(
-        string $channel = '',
+        string $channel,
     ): self {
         return self::of(new HistoryRemoveRequest(channel: $channel));
     }
@@ -494,7 +494,7 @@ trait CommandMethods
      * @throws InvalidRequestException
      */
     public static function updateUserStatus(
-        array $users = [],
+        array $users,
         string $state = '',
     ): self {
         return self::of(new UpdateUserStatusRequest(users: $users, state: $state));
@@ -510,7 +510,7 @@ trait CommandMethods
      * @throws InvalidRequestException
      */
     public static function getUserStatus(
-        array $users = [],
+        array $users,
     ): self {
         return self::of(new GetUserStatusRequest(users: $users));
     }
@@ -525,7 +525,7 @@ trait CommandMethods
      * @throws InvalidRequestException
      */
     public static function deleteUserStatus(
-        array $users = [],
+        array $users,
     ): self {
         return self::of(new DeleteUserStatusRequest(users: $users));
     }
@@ -544,8 +544,8 @@ trait CommandMethods
      * @throws InvalidRequestException
      */
     public static function blockUser(
+        string $user,
         int $expireAt = 0,
-        string $user = '',
     ): self {
         return self::of(new BlockUserRequest(expireAt: $expireAt, user: $user));
     }
@@ -560,7 +560,7 @@ trait CommandMethods
      * @throws InvalidRequestException
      */
     public static function unblockUser(
-        string $user = '',
+        string $user,
     ): self {
         return self::of(new UnblockUserRequest(user: $user));
     }
@@ -579,8 +579,8 @@ trait CommandMethods
      * @throws InvalidRequestException
      */
     public static function revokeToken(
+        string $uid,
         int $expireAt = 0,
-        string $uid = '',
     ): self {
         return self::of(new RevokeTokenRequest(expireAt: $expireAt, uid: $uid));
     }
@@ -602,8 +602,8 @@ trait CommandMethods
      * @throws InvalidRequestException
      */
     public static function invalidateUserTokens(
+        string $user,
         int $expireAt = 0,
-        string $user = '',
         int $issuedBefore = 0,
         string $channel = '',
     ): self {
@@ -641,10 +641,10 @@ trait CommandMethods
      * @throws InvalidRequestException
      */
     public static function deviceRegister(
+        string $provider,
+        string $token,
+        string $platform,
         string $id = '',
-        string $provider = '',
-        string $token = '',
-        string $platform = '',
         string $user = '',
         array $meta = [],
         array $topics = [],
@@ -726,7 +726,7 @@ trait CommandMethods
      *
      * The command making the call, checked as a Client checks it.
      *
-     * @param DeviceFilter|null $filter Selects the devices to list. Required.
+     * @param DeviceFilter $filter Selects the devices to list. Required.
      * @param bool $includeTotalCount Includes the total count for the filter in the
      *     result.
      * @param bool $includeMeta Includes meta of each device.
@@ -740,7 +740,7 @@ trait CommandMethods
      * @throws InvalidRequestException
      */
     public static function deviceList(
-        ?DeviceFilter $filter = null,
+        DeviceFilter $filter,
         bool $includeTotalCount = false,
         bool $includeMeta = false,
         bool $includeTopics = false,
@@ -808,8 +808,8 @@ trait CommandMethods
      * @throws InvalidRequestException
      */
     public static function deviceTopicUpdate(
-        string $deviceId = '',
-        string $op = '',
+        string $deviceId,
+        string $op,
         array $topics = [],
         string $user = '',
     ): self {
@@ -863,8 +863,8 @@ trait CommandMethods
      * @throws InvalidRequestException
      */
     public static function userTopicUpdate(
-        string $user = '',
-        string $op = '',
+        string $user,
+        string $op,
         array $topics = [],
     ): self {
         return self::of(new UserTopicUpdateRequest(
@@ -881,8 +881,8 @@ trait CommandMethods
      *
      * The command making the call, checked as a Client checks it.
      *
-     * @param PushRecipient|null $recipient Who receives the notification. Required.
-     * @param PushNotification|null $notification The notification to send. Required.
+     * @param PushRecipient $recipient Who receives the notification. Required.
+     * @param PushNotification $notification The notification to send. Required.
      * @param string $uid A unique identifier of the request, can be used to cancel the
      *     push. UUID v4 is recommended; different requests must use different
      *     uids.
@@ -906,8 +906,8 @@ trait CommandMethods
      * @throws InvalidRequestException
      */
     public static function sendPushNotification(
-        ?PushRecipient $recipient = null,
-        ?PushNotification $notification = null,
+        PushRecipient $recipient,
+        PushNotification $notification,
         string $uid = '',
         int $sendAt = 0,
         bool $optimizeForReliability = false,
@@ -947,9 +947,9 @@ trait CommandMethods
      * @throws InvalidRequestException
      */
     public static function updatePushStatus(
-        string $analyticsUid = '',
-        string $status = '',
-        string $deviceId = '',
+        string $analyticsUid,
+        string $status,
+        string $deviceId,
         string $msgId = '',
     ): self {
         return self::of(new UpdatePushStatusRequest(
@@ -971,7 +971,7 @@ trait CommandMethods
      * @throws InvalidRequestException
      */
     public static function cancelPush(
-        string $uid = '',
+        string $uid,
     ): self {
         return self::of(new CancelPushRequest(uid: $uid));
     }
@@ -1009,8 +1009,8 @@ trait CommandMethods
      * @throws InvalidRequestException
      */
     public static function mapPublish(
-        string $channel = '',
-        string $key = '',
+        string $channel,
+        string $key,
         mixed $data = null,
         string $b64data = '',
         mixed $streamData = null,
@@ -1055,8 +1055,8 @@ trait CommandMethods
      * @throws InvalidRequestException
      */
     public static function mapRemove(
-        string $channel = '',
-        string $key = '',
+        string $channel,
+        string $key,
         string $idempotencyKey = '',
     ): self {
         return self::of(new MapRemoveRequest(
@@ -1091,7 +1091,7 @@ trait CommandMethods
      * @throws InvalidRequestException
      */
     public static function mapReadState(
-        string $channel = '',
+        string $channel,
         string $cursor = '',
         int $limit = 0,
         string $key = '',
@@ -1127,7 +1127,7 @@ trait CommandMethods
      * @throws InvalidRequestException
      */
     public static function mapReadStream(
-        string $channel = '',
+        string $channel,
         int $sinceOffset = 0,
         string $sinceEpoch = '',
         int $limit = 0,
@@ -1152,7 +1152,7 @@ trait CommandMethods
      * @throws InvalidRequestException
      */
     public static function mapStats(
-        string $channel = '',
+        string $channel,
     ): self {
         return self::of(new MapStatsRequest(channel: $channel));
     }
@@ -1167,7 +1167,7 @@ trait CommandMethods
      * @throws InvalidRequestException
      */
     public static function mapClear(
-        string $channel = '',
+        string $channel,
     ): self {
         return self::of(new MapClearRequest(channel: $channel));
     }
@@ -1191,11 +1191,11 @@ trait CommandMethods
      * @throws InvalidRequestException
      */
     public static function sharedPollPublish(
-        string $channel = '',
-        string $key = '',
+        string $channel,
+        string $key,
+        int $version,
         mixed $data = null,
         string $b64data = '',
-        int $version = 0,
         string $epoch = '',
     ): self {
         return self::of(new SharedPollPublishRequest(

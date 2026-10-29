@@ -10,6 +10,8 @@ namespace Centrifugal\Phpcent\Exception;
  */
 final class NetworkException extends \RuntimeException implements CentException
 {
+    use IdempotencyKey;
+
     /**
      * @param bool $certificate the server's TLS certificate was refused, which
      *     no retry fixes

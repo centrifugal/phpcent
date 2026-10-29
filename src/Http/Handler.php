@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Centrifugal\Phpcent\Http;
 
+use Centrifugal\Phpcent\Exception\InvalidConfigException;
 use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -26,7 +27,7 @@ abstract class Handler
     public function __construct(?callable $onError, protected readonly int $maxBody)
     {
         if ($maxBody <= 0) {
-            throw new \InvalidArgumentException('maxBody must be a positive number of bytes');
+            throw new InvalidConfigException('maxBody must be a positive number of bytes');
         }
         $this->onError = $onError !== null ? $onError(...) : null;
     }
@@ -74,7 +75,9 @@ abstract class Handler
      *         return response($res->body, $res->status, $res->headers);
      *     });
      *
-     * @param array<array-key, string|array<string>> $headers
+     * @param array<array-key, string|null|array<string|null>> $headers as
+     *     frameworks give them - Laravel's and Symfony's $request->headers->all()
+     *     included
      * @param array<string, mixed> $query
      */
     public function handle(string $method, array $headers = [], string $body = '', array $query = [], string $path = '', mixed $raw = null): HttpResponse
@@ -166,7 +169,7 @@ abstract class Handler
     }
 
     /**
-     * @param array<array-key, string|array<string>> $headers
+     * @param array<array-key, string|null|array<string|null>> $headers
      *
      * @return array<string, string>
      */
@@ -175,7 +178,7 @@ abstract class Handler
         $out = [];
         foreach ($headers as $name => $value) {
             $name = strtolower((string) $name);
-            $value = \is_array($value) ? implode(', ', $value) : $value;
+            $value = \is_array($value) ? implode(', ', array_filter($value, \is_string(...))) : (string) $value;
             $out[$name] = isset($out[$name]) ? "{$out[$name]}, {$value}" : $value;
         }
 

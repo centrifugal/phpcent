@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Centrifugal\Phpcent\Token;
 
+use Centrifugal\Phpcent\Exception\InvalidConfigException;
+use Centrifugal\Phpcent\Exception\InvalidRequestException;
+
 /**
  * A key signing tokens, matching the one Centrifugo verifies with. Make one
  * with Key::hmac, Key::rsa, Key::ecdsa, Key::ed25519 or Key::fromPem.
@@ -45,7 +48,7 @@ final class Key
     public function withKeyId(string $kid): self
     {
         if ($kid === '') {
-            throw new \InvalidArgumentException('token: a key ID must not be empty');
+            throw new InvalidRequestException('token: a key ID must not be empty');
         }
 
         return new self($this->alg, $this->sign, $this->jwk, $kid);
@@ -55,7 +58,7 @@ final class Key
     public static function hmac(#[\SensitiveParameter] string $secret): self
     {
         if ($secret === '') {
-            throw new \InvalidArgumentException('token: empty HMAC secret');
+            throw new InvalidRequestException('token: empty HMAC secret');
         }
 
         return new self('HS256', static fn(string $data): string => hash_hmac('sha256', $data, $secret, true), null);
@@ -70,7 +73,7 @@ final class Key
         $key = self::openssl($privateKey, $passphrase);
         $d = self::details($key);
         if (($d['type'] ?? null) !== \OPENSSL_KEYTYPE_RSA) {
-            throw new \InvalidArgumentException('token: Key::rsa takes an RSA private key');
+            throw new InvalidRequestException('token: Key::rsa takes an RSA private key');
         }
         $jwk = ['kty' => 'RSA', 'n' => self::b64(ltrim(self::part($d, 'rsa', 'n'), "\0")), 'e' => self::b64(ltrim(self::part($d, 'rsa', 'e'), "\0"))];
 
@@ -93,11 +96,11 @@ final class Key
         $key = self::openssl($privateKey, $passphrase);
         $d = self::details($key);
         if (($d['type'] ?? null) !== \OPENSSL_KEYTYPE_EC) {
-            throw new \InvalidArgumentException('token: Key::ecdsa takes an EC private key');
+            throw new InvalidRequestException('token: Key::ecdsa takes an EC private key');
         }
         $curve = self::part($d, 'ec', 'curve_name');
         if (!isset(self::EC_CURVES[$curve])) {
-            throw new \InvalidArgumentException("token: ECDSA curve {$curve}, want P-256, P-384 or P-521");
+            throw new InvalidRequestException("token: ECDSA curve {$curve}, want P-256, P-384 or P-521");
         }
         [$alg, $crv, $size, $digest] = self::EC_CURVES[$curve];
         $jwk = [
@@ -125,12 +128,12 @@ final class Key
     public static function ed25519(#[\SensitiveParameter] string $privateKey): self
     {
         if (!\function_exists('sodium_crypto_sign_detached')) {
-            throw new \RuntimeException('token: Ed25519 keys need ext-sodium');
+            throw new InvalidConfigException('token: Ed25519 keys need ext-sodium');
         }
         $secret = match (\strlen($privateKey)) {
             SODIUM_CRYPTO_SIGN_SEEDBYTES => sodium_crypto_sign_secretkey(sodium_crypto_sign_seed_keypair($privateKey)),
             SODIUM_CRYPTO_SIGN_SECRETKEYBYTES => $privateKey,
-            default => throw new \InvalidArgumentException('token: an Ed25519 key is a 32-byte seed or a 64-byte secret key'),
+            default => throw new InvalidRequestException('token: an Ed25519 key is a 32-byte seed or a 64-byte secret key'),
         };
         $public = sodium_crypto_sign_publickey_from_secretkey($secret);
 
@@ -158,7 +161,7 @@ final class Key
         return match (self::details($key)['type'] ?? null) {
             \OPENSSL_KEYTYPE_RSA => self::rsa($key),
             \OPENSSL_KEYTYPE_EC => self::ecdsa($key),
-            default => throw new \InvalidArgumentException('token: unsupported private key type: want RSA, ECDSA or Ed25519'),
+            default => throw new InvalidRequestException('token: unsupported private key type: want RSA, ECDSA or Ed25519'),
         };
     }
 
@@ -190,11 +193,11 @@ final class Key
             return $key;
         }
         if (!\function_exists('openssl_pkey_get_private')) {
-            throw new \RuntimeException('token: RSA and ECDSA keys need ext-openssl');
+            throw new InvalidConfigException('token: RSA and ECDSA keys need ext-openssl');
         }
         $k = openssl_pkey_get_private($key, $passphrase);
         if ($k === false) {
-            throw new \InvalidArgumentException('token: not a PEM private key: ' . openssl_error_string());
+            throw new InvalidRequestException('token: not a PEM private key: ' . openssl_error_string());
         }
 
         return $k;
@@ -205,7 +208,7 @@ final class Key
     {
         $d = openssl_pkey_get_details($key);
         if ($d === false) {
-            throw new \InvalidArgumentException('token: cannot read the key: ' . openssl_error_string());
+            throw new InvalidRequestException('token: cannot read the key: ' . openssl_error_string());
         }
 
         return $d;
@@ -220,7 +223,7 @@ final class Key
     {
         $v = \is_array($details[$kind] ?? null) ? ($details[$kind][$name] ?? null) : null;
         if (!\is_string($v)) {
-            throw new \InvalidArgumentException("token: the key has no {$kind} {$name}");
+            throw new InvalidRequestException("token: the key has no {$kind} {$name}");
         }
 
         return $v;

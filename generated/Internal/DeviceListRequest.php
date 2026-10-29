@@ -9,6 +9,7 @@ namespace Centrifugal\Phpcent\Internal;
 use Centrifugal\Phpcent\DeviceFilter;
 use Centrifugal\Phpcent\DeviceListResult;
 use Centrifugal\Phpcent\Message;
+use Centrifugal\Phpcent\RawJson;
 
 /**
  * DeviceListRequest returns a paginated list of registered devices.
@@ -86,6 +87,12 @@ final class DeviceListRequest implements Message, Request
         }
 
         return '{' . implode(',', $p) . '}';
+    }
+
+    /** The message as toJson gives it, for a json_encode of your own. */
+    public function jsonSerialize(): RawJson
+    {
+        return new RawJson($this->toJson());
     }
 
     /** @internal */

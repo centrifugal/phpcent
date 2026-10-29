@@ -14,6 +14,9 @@ use Centrifugal\Phpcent\Exception\InvalidRequestException;
  */
 final class Validate
 {
+    /** null is "no data", as everywhere in phpcent: how to publish JSON null. */
+    private const string NULL_HINT = " (to publish JSON null, pass data: new RawJson('null'))";
+
     /**
      * The request's JSON, or InvalidRequestException for a request the client
      * can tell is wrong.
@@ -28,14 +31,14 @@ final class Validate
                 throw new InvalidRequestException('invalid publish request: channel is required');
             }
             if ($request->data === null && $request->b64data === '') {
-                throw new InvalidRequestException('invalid publish request: data or b64data is required');
+                throw new InvalidRequestException('invalid publish request: data or b64data is required' . self::NULL_HINT);
             }
         } elseif ($request instanceof BroadcastRequest) {
             if ($request->channels === []) {
                 throw new InvalidRequestException('invalid broadcast request: channels is required');
             }
             if ($request->data === null && $request->b64data === '') {
-                throw new InvalidRequestException('invalid broadcast request: data or b64data is required');
+                throw new InvalidRequestException('invalid broadcast request: data or b64data is required' . self::NULL_HINT);
             }
             foreach ($request->channels as $i => $ch) {
                 if ($ch === '') {

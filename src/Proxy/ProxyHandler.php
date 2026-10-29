@@ -72,7 +72,7 @@ abstract class ProxyHandler extends Handler
      *     request: it takes the decoded request and the HTTP request - with the
      *     headers Centrifugo passed on
      * @param ?callable(HttpRequest, \Throwable): void $onError told of every 500
-     *     and 400, with the exception
+     *     and 400, with the exception; it must not throw
      */
     public function __construct(callable $func, ?callable $onError = null, int $maxBody = self::DEFAULT_MAX_BODY)
     {

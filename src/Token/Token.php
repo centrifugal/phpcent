@@ -30,7 +30,7 @@ final class Token
     {
         $c = $claims;
         if ($c->channels !== [] && $c->subs !== []) {
-            throw new \InvalidArgumentException('token: set channels or subs, not both: Centrifugo ignores channels when subs is set');
+            throw new InvalidRequestException('token: set channels or subs, not both: Centrifugo ignores channels when subs is set');
         }
         $p = self::registered($c->user, $c->expiresAt, $c->issuedAt, $c->id, $c->audience, $c->issuer);
         if (($at = self::sessionExpiry($c->connectionExpiresAt)) !== null) {
@@ -49,7 +49,7 @@ final class Token
             $subs = [];
             foreach ($c->subs as $ch => $opts) {
                 if (!$opts instanceof SubscribeOptions) {
-                    throw new \InvalidArgumentException("token: subs[{$ch}] must be a SubscribeOptions");
+                    throw new InvalidRequestException("token: subs[{$ch}] must be a " . SubscribeOptions::class . ', not ' . get_debug_type($opts));
                 }
                 $subs[] = Encode::string((string) $ch, 'subs') . ':' . $opts->toJson("subs[{$ch}].");
             }
@@ -77,7 +77,7 @@ final class Token
     {
         $c = $claims;
         if ($c->channel === '') {
-            throw new \InvalidArgumentException('token: a subscription token needs a channel');
+            throw new InvalidRequestException('token: a subscription token needs a channel');
         }
         $p = self::registered($c->user, $c->expiresAt, $c->issuedAt, $c->id, $c->audience, $c->issuer);
         $p[] = '"channel":' . Encode::string($c->channel, 'channel');
@@ -119,24 +119,24 @@ final class Token
     {
         $c = $claims;
         if ($key->jwk() === null) {
-            throw new \InvalidArgumentException(
+            throw new InvalidRequestException(
                 'token: an API token needs an RSA, ECDSA or Ed25519 key: Centrifugo PRO verifies it with the public keys of its JWKS endpoint',
             );
         }
         if ($key->kid === '') {
-            throw new \InvalidArgumentException('token: an API token needs a key ID, by which Centrifugo PRO finds the key: use withKeyId');
+            throw new InvalidRequestException('token: an API token needs a key ID, by which Centrifugo PRO finds the key: use withKeyId');
         }
         if ($c->audience === '' && $c->scope === []) {
-            throw new \InvalidArgumentException(
+            throw new InvalidRequestException(
                 'token: set audience or scope, required by http_api.jwks, so that client tokens signed with the same keys can\'t call the server API',
             );
         }
         if ($c->expiresAt === null) {
-            throw new \InvalidArgumentException('token: set expiresAt: Centrifugo PRO accepts an API token without one while its key is published');
+            throw new InvalidRequestException('token: set expiresAt: Centrifugo PRO accepts an API token without one while its key is published');
         }
         foreach ($c->scope as $s) {
             if (!\is_string($s) || $s === '' || preg_match('/\s/', $s) === 1) {
-                throw new \InvalidArgumentException('token: a scope is empty or has a space');
+                throw new InvalidRequestException('token: a scope is empty or has a space');
             }
         }
         $p = self::registered($c->subject, $c->expiresAt, $c->issuedAt, $c->id, $c->audience, $c->issuer);
@@ -167,20 +167,20 @@ final class Token
     public static function jwks(Key ...$keys): string
     {
         if ($keys === []) {
-            throw new \InvalidArgumentException('token: a JWKS without keys');
+            throw new InvalidRequestException('token: a JWKS without keys');
         }
         $out = [];
         $seen = [];
         foreach (array_values($keys) as $i => $k) {
             $jwk = $k->jwk();
             if ($jwk === null) {
-                throw new \InvalidArgumentException("token: JWKS key #{$i} has no public key to publish: an HMAC key");
+                throw new InvalidRequestException("token: JWKS key #{$i} has no public key to publish: an HMAC key");
             }
             if ($k->kid === '') {
-                throw new \InvalidArgumentException("token: JWKS key #{$i} has no key ID: set one with withKeyId");
+                throw new InvalidRequestException("token: JWKS key #{$i} has no key ID: set one with withKeyId");
             }
             if (isset($seen[$k->kid])) {
-                throw new \InvalidArgumentException("token: JWKS key ID \"{$k->kid}\" used twice");
+                throw new InvalidRequestException("token: JWKS key ID \"{$k->kid}\" used twice");
             }
             $seen[$k->kid] = true;
             $kty = $jwk['kty'];

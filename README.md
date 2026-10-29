@@ -28,7 +28,7 @@ version 0.2.
 ```php
 use Centrifugal\Phpcent\Client;
 
-$client = new Client('http://localhost:8000/api', apiKey: getenv('CENTRIFUGO_API_KEY'));
+$client = new Client('http://localhost:8000/api', apiKey: (string) getenv('CENTRIFUGO_API_KEY'));
 
 $res = $client->publish(channel: 'news', data: ['text' => 'hello']);
 echo "published at offset {$res->offset}\n";
@@ -44,8 +44,9 @@ it keeps its connection to Centrifugo alive between calls.
 ## Payloads
 
 `data`, `info`, `meta` and the other payloads are JSON values, given as the
-PHP values `json_encode` writes - arrays, `stdClass`, scalars, `null`,
-`JsonSerializable`:
+PHP values `json_encode` writes - arrays, `stdClass`, scalars,
+`JsonSerializable`. A `null` argument means no value; a JSON `null` is
+`new RawJson('null')`:
 
 ```php
 $client->publish(channel: 'news', data: ['text' => 'hi', 'tags' => ['a', 'b']]);
@@ -99,7 +100,11 @@ $client->info(timeout: 0.5);
 ```
 
 The timeout bounds the whole call - connecting, sending, the reply's headers
-and body - and however a call times out, it throws `TimeoutException`.
+and body - and however a call times out, it throws `TimeoutException`. With an
+`httpClient` of your own the client's timeouts bound each request instead -
+PSR-18 has no way to give a request a deadline - so set them on it:
+`new \GuzzleHttp\Client(['timeout' => 5])`. Its timeouts throw
+`TimeoutException` too.
 `broadcastWithRetry` makes several requests in one call: its `timeout` bounds
 them all, waits between them included, and `attemptTimeout` each one.
 
@@ -194,7 +199,7 @@ parts:
 try {
     $client->broadcast(channels: $channels, data: $data);
 } catch (BroadcastFailedChannelsException $e) {
-    $logger->warning('broadcast failed in some channels', ['failed' => $e->result->failed()]);
+    $logger->warning('broadcast failed in some channels', ['failed' => $e->result->failed]);
 }
 ```
 
@@ -255,8 +260,9 @@ Retrying:
       }
   }
   ```
-- a **batch**: build a new one, with the same keys, from the commands
-  `$e->failed` lists with a retryable error. A batch is sent once.
+- a **batch**: build a new one, with the same keys, from the commands whose
+  index `$e->failed` lists with a retryable error - keep the arguments you
+  added them with. A batch is sent once.
 
 `newBatch()` runs the commands one by one, in order; `parallel: true` runs
 them concurrently. Centrifugo PRO sends a batch's publications to its broker
@@ -333,10 +339,10 @@ request. PSR-18 has no way to give a request a deadline, so with your own
 client its timeouts apply, not phpcent's - set them on the client - and so
 does its redirect policy.
 
-Tracing comes from the HTTP client: an OpenTelemetry-instrumented PSR-18
-client, say. `onRequest` is told of every request - method, commands and how
-many failed, duration, status, error - for metrics without a dependency of
-phpcent's.
+Tracing comes from the HTTP client: OpenTelemetry's curl instrumentation, or
+an instrumented PSR-18 client with its timeouts set. `onRequest` is told of
+every request - method, commands and how many failed, duration, status, error
+- for metrics without a dependency of phpcent's. It must not throw.
 
 ## Testing your code
 
@@ -368,8 +374,28 @@ self::assertSame('/api/publish', $centrifugo->sent[0]->getUri()->getPath());
 self::assertSame('order-42-paid', json_decode((string) $centrifugo->sent[0]->getBody())->idempotency_key);
 ```
 
-`php-http/mock-client` is a ready-made one. For an error, answer as
-Centrifugo does: `{"error":{"code":102,"message":"unknown channel"}}`.
+`php-http/mock-client` is a ready-made one. Answer as Centrifugo does, at
+`/api/<method>`:
+
+- a method: `{"result":{...}}`, or an error: `{"error":{"code":102,"message":"unknown channel"}}`;
+- a broadcast, one response per channel, in order:
+  `{"result":{"responses":[{"result":{"offset":1}},{"error":{"code":102,"message":"unknown channel"}}]}}`;
+- a batch, one reply per command, in order:
+  `{"replies":[{"publish":{"offset":1}},{"error":{"code":102,"message":"unknown channel"}}]}`.
+
+A test double of your own returns phpcent's results and throws its
+exceptions, partial failures included:
+
+```php
+$ok = new ChannelResult('news', new PublishResult(offset: 1));
+$bad = new ChannelResult('unknown:x', error: ApiException::fromCode(102, 'unknown channel'));
+throw new BroadcastFailedChannelsException([$bad], 2, new BroadcastResult([$ok, $bad], replied: true));
+```
+
+and for a batch, `Pending::resolved($result)` or
+`Pending::resolved(error: $e)` as each command's outcome, with
+`new BatchFailedCommandsException($failed, $total, new BatchResult(true, $failed))`
+of `new FailedCommand($index, $method, $error)`.
 
 ## Shutdown
 
@@ -429,8 +455,10 @@ $subscribeHandler = new SubscribeHandler(function (SubscribeRequest $req, HttpRe
 
 Return a result to accept the request, throw `ProxyError` to reject it with an
 error the client receives, or `Disconnect` to close the client's connection;
-any other exception fails the request, and goes to `onError` to be logged.
-Payloads arrive as `stdClass`, and go back exactly. Keep proxy endpoints
+any other exception fails the request, and goes to `onError` to be logged -
+`onError` itself must not throw. Error codes are in [400, 1999], disconnect
+codes in [4000, 4999], and a disconnect reason is at most 32 bytes. Payloads
+arrive as `stdClass`, and go back exactly. Keep proxy endpoints
 reachable by Centrifugo only: whoever can call them can claim to be any user.
 
 ## Tokens
@@ -547,8 +575,9 @@ follows their changes.
 `Command` has the client's methods too, as static methods without `timeout`:
 `Command::publish(...)` checks the call as a client would and encodes it, for
 Centrifugo's [async consumers](https://centrifugal.dev/docs/server/consumers):
-its `method` and `payload` for an outbox table, or `toJson()` for a Kafka
-message.
+its `method` and `payload` for an outbox table - `payload` is JSON text, for a
+`jsonb` column - or `toJson()` for a Kafka message. `json_encode($cmd)`, as
+queues and ORMs call it, gives the same message, `payload` an object.
 
 ```php
 $cmd = Command::publish(channel: 'news', data: ['text' => 'hi']);

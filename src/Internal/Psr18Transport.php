@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Centrifugal\Phpcent\Internal;
 
 use Centrifugal\Phpcent\Exception\NetworkException;
+use Centrifugal\Phpcent\Exception\TimeoutException;
 use Psr\Http\Client\ClientExceptionInterface;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
@@ -15,10 +16,22 @@ use Psr\Http\Message\StreamFactoryInterface;
  * connection handling apply - PSR-18 has no way to give a request a deadline.
  * The client is never changed: credentials and headers go on each request.
  *
+ * PSR-18 has no timeout or certificate exceptions either: the client's
+ * exception is a TimeoutException when the call's time ran out or its
+ * message says it timed out - curl's error 28, Guzzle's and Symfony's
+ * wording - and a NetworkException with $certificate set when it says a TLS
+ * certificate was refused.
+ *
  * @internal
  */
 final class Psr18Transport implements Transport
 {
+    /** A timeout, as curl - and so Guzzle - and Symfony's client word it. */
+    private const string TIMEOUT = '/cURL error 28\b|timed out|timeout reached/i';
+
+    /** A TLS certificate refused: curl's errors for it, or the word. */
+    private const string CERTIFICATE = '/cURL error (?:51|58|60|77|83|90|91)\b|certificate/i';
+
     public function __construct(
         private readonly ClientInterface $client,
         private readonly RequestFactoryInterface $requests,
@@ -31,10 +44,17 @@ final class Psr18Transport implements Transport
         foreach ($headers as $name => $value) {
             $req = $req->withHeader($name, $value);
         }
+        $start = hrtime(true);
         try {
             $resp = $this->client->sendRequest($req);
         } catch (ClientExceptionInterface $e) {
-            throw new NetworkException("{$method}: " . $e::class . ': ' . $e->getMessage(), false, $e);
+            $why = "{$method}: " . $e::class . ': ' . $e->getMessage();
+            $text = self::messages($e);
+            if ((hrtime(true) - $start) / 1e9 >= $timeout || preg_match(self::TIMEOUT, $text) === 1) {
+                throw new TimeoutException("{$method}: timed out: " . $e::class . ': ' . $e->getMessage(), 0, $e);
+            }
+
+            throw new NetworkException($why, preg_match(self::CERTIFICATE, $text) === 1, $e);
         }
         $status = $resp->getStatusCode();
         $respHeaders = [];
@@ -69,4 +89,15 @@ final class Psr18Transport implements Transport
     }
 
     public function close(): void {}
+
+    /** The messages of $e and the exceptions it wraps. */
+    private static function messages(\Throwable $e): string
+    {
+        $out = [];
+        for ($x = $e; $x !== null; $x = $x->getPrevious()) {
+            $out[] = $x->getMessage();
+        }
+
+        return implode("\n", $out);
+    }
 }

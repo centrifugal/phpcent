@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Centrifugal\Phpcent;
 
+use Centrifugal\Phpcent\Internal\Encode;
+
 /** The outcome of a broadcast in one channel. */
-final class ChannelResult
+final class ChannelResult implements \JsonSerializable
 {
     /**
      * @param string $channel the channel, as the request named it
@@ -23,6 +25,20 @@ final class ChannelResult
         public readonly ?\Throwable $error = null,
         public readonly int $attempts = 0,
     ) {}
+
+    /** @return array{channel: string, result?: PublishResult, error?: array{code?: int, message: string}, attempts: int} */
+    public function jsonSerialize(): array
+    {
+        $out = ['channel' => $this->channel];
+        if ($this->error !== null) {
+            $out['error'] = Encode::error($this->error);
+        } else {
+            $out['result'] = $this->result ?? new PublishResult();
+        }
+        $out['attempts'] = $this->attempts;
+
+        return $out;
+    }
 
     /** @internal */
     public function withAttempts(int $attempts): self

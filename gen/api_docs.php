@@ -246,15 +246,27 @@ function generate(): string
         return [$ia === false ? 99 : $ia, $a] <=> [$ib === false ? 99 : $ib, $b];
     });
     $errors = array_values(array_filter(classes(ROOT . '/src/Exception', 'Centrifugal\\Phpcent\\Exception'), documented(...)));
-    $tree = [];
+    // The class tree: each exception under the one it extends, phpcent's
+    // own at the top with the PHP exception they extend.
+    $children = [];
     foreach ($errors as $e) {
-        $depth = 0;
-        for ($p = (new \ReflectionClass($e))->getParentClass(); $p !== false && str_starts_with($p->getName(), 'Centrifugal'); $p = $p->getParentClass()) {
-            $depth++;
+        $r = new \ReflectionClass($e);
+        if ($r->isInterface()) {
+            continue;
         }
-        $parent = (new \ReflectionClass($e))->getParentClass();
-        $tree[] = str_repeat('  ', $depth) . '- `' . (new \ReflectionClass($e))->getShortName() . '`' . ($depth === 0 && $parent !== false ? " (a `\\{$parent->getName()}`)" : '');
+        $parent = $r->getParentClass();
+        $children[$parent !== false && str_starts_with($parent->getName(), 'Centrifugal') ? $parent->getName() : ''][] = $e;
     }
+    $tree = [];
+    $walk = static function (string $of, int $depth) use (&$walk, &$tree, $children): void {
+        foreach ($children[$of] ?? [] as $e) {
+            $r = new \ReflectionClass($e);
+            $parent = $r->getParentClass();
+            $tree[] = str_repeat('  ', $depth) . '- `' . $r->getShortName() . '`' . ($depth === 0 && $parent !== false ? " (a `\\{$parent->getName()}`)" : '');
+            $walk($e, $depth + 1);
+        }
+    };
+    $walk('', 0);
 
     $out = [
         '# phpcent API reference',

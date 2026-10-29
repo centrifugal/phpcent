@@ -8,6 +8,7 @@ namespace Centrifugal\Phpcent\Internal;
 
 use Centrifugal\Phpcent\DeleteUserStatusResult;
 use Centrifugal\Phpcent\Message;
+use Centrifugal\Phpcent\RawJson;
 
 /**
  * DeleteUserStatusRequest deletes the status of users. Centrifugo PRO only.
@@ -51,6 +52,12 @@ final class DeleteUserStatusRequest implements Message, Request
         }
 
         return '{' . implode(',', $p) . '}';
+    }
+
+    /** The message as toJson gives it, for a json_encode of your own. */
+    public function jsonSerialize(): RawJson
+    {
+        return new RawJson($this->toJson());
     }
 
     /** @internal */

@@ -8,6 +8,7 @@ namespace Centrifugal\Phpcent\Internal;
 
 use Centrifugal\Phpcent\DeviceRemoveResult;
 use Centrifugal\Phpcent\Message;
+use Centrifugal\Phpcent\RawJson;
 
 /**
  * DeviceRemoveRequest removes devices, selected by ids and/or users.
@@ -57,6 +58,12 @@ final class DeviceRemoveRequest implements Message, Request
         }
 
         return '{' . implode(',', $p) . '}';
+    }
+
+    /** The message as toJson gives it, for a json_encode of your own. */
+    public function jsonSerialize(): RawJson
+    {
+        return new RawJson($this->toJson());
     }
 
     /** @internal */

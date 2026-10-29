@@ -16,6 +16,8 @@ namespace Centrifugal\Phpcent\Exception;
  */
 class ApiException extends \RuntimeException implements CentException
 {
+    use IdempotencyKey;
+
     /** The code subclasses stand for. */
     public const int CODE = 0;
 

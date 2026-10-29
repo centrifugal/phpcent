@@ -65,7 +65,7 @@ final class TokenTest extends TestCase
         );
         self::assertSame(
             '1700000000:0:92dd64af5612afde06cad03bb63435d951e037cb55a087af05c2a1399abade0e',
-            SharedPoll::signAt('shared_poll_secret', '', 'poll:prices', [], null, 1700000000),
+            SharedPoll::signAt('shared_poll_secret', '', 'poll:prices', [], Expiry::Never, 1700000000),
         );
     }
 
@@ -266,13 +266,26 @@ final class TokenTest extends TestCase
 
     public function testSharedPollSign(): void
     {
-        $sig = SharedPoll::sign('s', user: 'u', channel: 'c', keys: ['a']);
+        $sig = SharedPoll::sign('s', user: 'u', channel: 'c', keys: ['a'], expiresAt: Expiry::Never);
         self::assertMatchesRegularExpression('/^\d+:0:[0-9a-f]{64}$/', $sig);
         self::assertNotSame(
-            SharedPoll::signAt('s', 'alice', 'news:tech', [], null, 1),
-            SharedPoll::signAt('s', 'alice:news', 'tech', [], null, 1),
+            SharedPoll::signAt('s', 'alice', 'news:tech', [], Expiry::Never, 1),
+            SharedPoll::signAt('s', 'alice:news', 'tech', [], Expiry::Never, 1),
         );
-        $this->expectException(\InvalidArgumentException::class);
-        SharedPoll::sign('', user: 'u', channel: 'c', keys: []);
+        // The expiry is chosen explicitly: never is spelled, a number refused.
+        try {
+            // @phpstan-ignore arguments.count
+            SharedPoll::sign('s', user: 'u', channel: 'c', keys: []);
+            self::fail('signed without an expiry');
+        } catch (\ArgumentCountError) {
+        }
+        try {
+            // @phpstan-ignore argument.type
+            SharedPoll::sign('s', user: 'u', channel: 'c', keys: [], expiresAt: 3600);
+            self::fail('signed with a number');
+        } catch (\TypeError) {
+        }
+        $this->expectException(InvalidRequestException::class);
+        SharedPoll::sign('', user: 'u', channel: 'c', keys: [], expiresAt: Expiry::Never);
     }
 }

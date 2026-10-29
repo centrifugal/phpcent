@@ -12,9 +12,22 @@ use Centrifugal\Phpcent\Internal\Reply;
 /**
  * The outcome of a broadcast: one entry per channel, in the order the request
  * listed them.
+ *
+ * json_encode renders it with Centrifugo's field names: {"channels",
+ * "idempotency_key", "attempts", "replied"}, each channel as {"channel",
+ * "result" when it succeeded, "error" when it failed, "attempts"}, an error as
+ * {"code", "message"}.
  */
-final class BroadcastResult
+final class BroadcastResult implements \JsonSerializable
 {
+    /**
+     * The channels which did not get the publication, with their errors, in
+     * the order of the request.
+     *
+     * @var list<ChannelResult>
+     */
+    public readonly array $failed;
+
     /**
      * @param list<ChannelResult> $channels every channel's outcome
      * @param string $idempotencyKey the key the broadcast was sent with: the
@@ -33,17 +46,19 @@ final class BroadcastResult
         public readonly string $idempotencyKey = '',
         public readonly int $attempts = 0,
         public readonly bool $replied = false,
-    ) {}
+    ) {
+        $this->failed = array_values(array_filter($channels, static fn(ChannelResult $c): bool => $c->error !== null));
+    }
 
-    /**
-     * The channels which did not get the publication, with their errors, in
-     * the order of the request.
-     *
-     * @return list<ChannelResult>
-     */
-    public function failed(): array
+    /** @return array{channels: list<ChannelResult>, idempotency_key: string, attempts: int, replied: bool} */
+    public function jsonSerialize(): array
     {
-        return array_values(array_filter($this->channels, static fn(ChannelResult $c): bool => $c->error !== null));
+        return [
+            'channels' => $this->channels,
+            'idempotency_key' => $this->idempotencyKey,
+            'attempts' => $this->attempts,
+            'replied' => $this->replied,
+        ];
     }
 
     /**
@@ -107,9 +122,8 @@ final class BroadcastResult
      */
     public function check(): self
     {
-        $failed = $this->failed();
-        if ($failed !== []) {
-            throw new BroadcastFailedChannelsException($failed, \count($this->channels), $this);
+        if ($this->failed !== []) {
+            throw new BroadcastFailedChannelsException($this->failed, \count($this->channels), $this);
         }
 
         return $this;

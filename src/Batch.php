@@ -73,7 +73,7 @@ final class Batch implements \Countable
     private function add(Request $request): Pending
     {
         if ($this->sent) {
-            throw new \LogicException('phpcent: command added to a batch that was already sent');
+            throw new BatchSentException('phpcent: command added to a batch that was already sent');
         }
         $i = \count($this->commands);
         $method = $request::apiMethod();

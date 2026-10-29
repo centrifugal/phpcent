@@ -73,7 +73,7 @@ final class Retry
      *     $backoff = Retry::exponentialBackoff(0.1, 2.0);
      *     for ($attempt = 1; ; $attempt++) {
      *         try {
-     *             return $client->publish($request);
+     *             return $client->publish(channel: 'news', data: $data, idempotencyKey: $key);
      *         } catch (CentException $e) {
      *             if (!Retry::retryable($e) || $attempt === 3) {
      *                 throw $e;

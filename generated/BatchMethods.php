@@ -92,7 +92,7 @@ trait BatchMethods
      * @return Pending<PublishResult>
      */
     public function publish(
-        string $channel = '',
+        string $channel,
         mixed $data = null,
         string $b64data = '',
         bool $skipHistory = false,
@@ -147,7 +147,7 @@ trait BatchMethods
      * @return Pending<BroadcastResult>
      */
     public function broadcast(
-        array $channels = [],
+        array $channels,
         mixed $data = null,
         string $b64data = '',
         bool $skipHistory = false,
@@ -204,7 +204,7 @@ trait BatchMethods
      * @return Pending<SubscribeResult>
      */
     public function subscribe(
-        string $channel = '',
+        string $channel,
         string $user = '',
         int $expireAt = 0,
         mixed $info = null,
@@ -255,7 +255,7 @@ trait BatchMethods
      * @return Pending<UnsubscribeResult>
      */
     public function unsubscribe(
-        string $channel = '',
+        string $channel,
         string $user = '',
         string $client = '',
         string $session = '',
@@ -325,7 +325,7 @@ trait BatchMethods
      * @return Pending<PresenceResult>
      */
     public function presence(
-        string $channel = '',
+        string $channel,
     ): Pending {
         return $this->add(new PresenceRequest(channel: $channel));
     }
@@ -343,7 +343,7 @@ trait BatchMethods
      * @return Pending<PresenceStatsResult>
      */
     public function presenceStats(
-        string $channel = '',
+        string $channel,
     ): Pending {
         return $this->add(new PresenceStatsRequest(channel: $channel));
     }
@@ -365,7 +365,7 @@ trait BatchMethods
      * @return Pending<HistoryResult>
      */
     public function history(
-        string $channel = '',
+        string $channel,
         int $limit = 0,
         ?StreamPosition $since = null,
         bool $reverse = false,
@@ -391,7 +391,7 @@ trait BatchMethods
      * @return Pending<HistoryRemoveResult>
      */
     public function historyRemove(
-        string $channel = '',
+        string $channel,
     ): Pending {
         return $this->add(new HistoryRemoveRequest(channel: $channel));
     }
@@ -514,7 +514,7 @@ trait BatchMethods
      * @return Pending<UpdateUserStatusResult>
      */
     public function updateUserStatus(
-        array $users = [],
+        array $users,
         string $state = '',
     ): Pending {
         return $this->add(new UpdateUserStatusRequest(users: $users, state: $state));
@@ -531,7 +531,7 @@ trait BatchMethods
      * @return Pending<GetUserStatusResult>
      */
     public function getUserStatus(
-        array $users = [],
+        array $users,
     ): Pending {
         return $this->add(new GetUserStatusRequest(users: $users));
     }
@@ -547,7 +547,7 @@ trait BatchMethods
      * @return Pending<DeleteUserStatusResult>
      */
     public function deleteUserStatus(
-        array $users = [],
+        array $users,
     ): Pending {
         return $this->add(new DeleteUserStatusRequest(users: $users));
     }
@@ -567,8 +567,8 @@ trait BatchMethods
      * @return Pending<BlockUserResult>
      */
     public function blockUser(
+        string $user,
         int $expireAt = 0,
-        string $user = '',
     ): Pending {
         return $this->add(new BlockUserRequest(expireAt: $expireAt, user: $user));
     }
@@ -584,7 +584,7 @@ trait BatchMethods
      * @return Pending<UnblockUserResult>
      */
     public function unblockUser(
-        string $user = '',
+        string $user,
     ): Pending {
         return $this->add(new UnblockUserRequest(user: $user));
     }
@@ -604,8 +604,8 @@ trait BatchMethods
      * @return Pending<RevokeTokenResult>
      */
     public function revokeToken(
+        string $uid,
         int $expireAt = 0,
-        string $uid = '',
     ): Pending {
         return $this->add(new RevokeTokenRequest(expireAt: $expireAt, uid: $uid));
     }
@@ -628,8 +628,8 @@ trait BatchMethods
      * @return Pending<InvalidateUserTokensResult>
      */
     public function invalidateUserTokens(
+        string $user,
         int $expireAt = 0,
-        string $user = '',
         int $issuedBefore = 0,
         string $channel = '',
     ): Pending {
@@ -668,10 +668,10 @@ trait BatchMethods
      * @return Pending<DeviceRegisterResult>
      */
     public function deviceRegister(
+        string $provider,
+        string $token,
+        string $platform,
         string $id = '',
-        string $provider = '',
-        string $token = '',
-        string $platform = '',
         string $user = '',
         array $meta = [],
         array $topics = [],
@@ -756,7 +756,7 @@ trait BatchMethods
      * Adds the command to the batch: its Pending holds the result once the
      * batch is sent.
      *
-     * @param DeviceFilter|null $filter Selects the devices to list. Required.
+     * @param DeviceFilter $filter Selects the devices to list. Required.
      * @param bool $includeTotalCount Includes the total count for the filter in the
      *     result.
      * @param bool $includeMeta Includes meta of each device.
@@ -770,7 +770,7 @@ trait BatchMethods
      * @return Pending<DeviceListResult>
      */
     public function deviceList(
-        ?DeviceFilter $filter = null,
+        DeviceFilter $filter,
         bool $includeTotalCount = false,
         bool $includeMeta = false,
         bool $includeTopics = false,
@@ -840,8 +840,8 @@ trait BatchMethods
      * @return Pending<DeviceTopicUpdateResult>
      */
     public function deviceTopicUpdate(
-        string $deviceId = '',
-        string $op = '',
+        string $deviceId,
+        string $op,
         array $topics = [],
         string $user = '',
     ): Pending {
@@ -897,8 +897,8 @@ trait BatchMethods
      * @return Pending<UserTopicUpdateResult>
      */
     public function userTopicUpdate(
-        string $user = '',
-        string $op = '',
+        string $user,
+        string $op,
         array $topics = [],
     ): Pending {
         return $this->add(new UserTopicUpdateRequest(
@@ -916,8 +916,8 @@ trait BatchMethods
      * Adds the command to the batch: its Pending holds the result once the
      * batch is sent.
      *
-     * @param PushRecipient|null $recipient Who receives the notification. Required.
-     * @param PushNotification|null $notification The notification to send. Required.
+     * @param PushRecipient $recipient Who receives the notification. Required.
+     * @param PushNotification $notification The notification to send. Required.
      * @param string $uid A unique identifier of the request, can be used to cancel the
      *     push. UUID v4 is recommended; different requests must use different
      *     uids.
@@ -941,8 +941,8 @@ trait BatchMethods
      * @return Pending<SendPushNotificationResult>
      */
     public function sendPushNotification(
-        ?PushRecipient $recipient = null,
-        ?PushNotification $notification = null,
+        PushRecipient $recipient,
+        PushNotification $notification,
         string $uid = '',
         int $sendAt = 0,
         bool $optimizeForReliability = false,
@@ -983,9 +983,9 @@ trait BatchMethods
      * @return Pending<UpdatePushStatusResult>
      */
     public function updatePushStatus(
-        string $analyticsUid = '',
-        string $status = '',
-        string $deviceId = '',
+        string $analyticsUid,
+        string $status,
+        string $deviceId,
         string $msgId = '',
     ): Pending {
         return $this->add(new UpdatePushStatusRequest(
@@ -1008,7 +1008,7 @@ trait BatchMethods
      * @return Pending<CancelPushResult>
      */
     public function cancelPush(
-        string $uid = '',
+        string $uid,
     ): Pending {
         return $this->add(new CancelPushRequest(uid: $uid));
     }
@@ -1047,8 +1047,8 @@ trait BatchMethods
      * @return Pending<MapPublishResult>
      */
     public function mapPublish(
-        string $channel = '',
-        string $key = '',
+        string $channel,
+        string $key,
         mixed $data = null,
         string $b64data = '',
         mixed $streamData = null,
@@ -1094,8 +1094,8 @@ trait BatchMethods
      * @return Pending<MapRemoveResult>
      */
     public function mapRemove(
-        string $channel = '',
-        string $key = '',
+        string $channel,
+        string $key,
         string $idempotencyKey = '',
     ): Pending {
         return $this->add(new MapRemoveRequest(
@@ -1131,7 +1131,7 @@ trait BatchMethods
      * @return Pending<MapReadStateResult>
      */
     public function mapReadState(
-        string $channel = '',
+        string $channel,
         string $cursor = '',
         int $limit = 0,
         string $key = '',
@@ -1168,7 +1168,7 @@ trait BatchMethods
      * @return Pending<MapReadStreamResult>
      */
     public function mapReadStream(
-        string $channel = '',
+        string $channel,
         int $sinceOffset = 0,
         string $sinceEpoch = '',
         int $limit = 0,
@@ -1194,7 +1194,7 @@ trait BatchMethods
      * @return Pending<MapStatsResult>
      */
     public function mapStats(
-        string $channel = '',
+        string $channel,
     ): Pending {
         return $this->add(new MapStatsRequest(channel: $channel));
     }
@@ -1210,7 +1210,7 @@ trait BatchMethods
      * @return Pending<MapClearResult>
      */
     public function mapClear(
-        string $channel = '',
+        string $channel,
     ): Pending {
         return $this->add(new MapClearRequest(channel: $channel));
     }
@@ -1235,11 +1235,11 @@ trait BatchMethods
      * @return Pending<SharedPollPublishResult>
      */
     public function sharedPollPublish(
-        string $channel = '',
-        string $key = '',
+        string $channel,
+        string $key,
+        int $version,
         mixed $data = null,
         string $b64data = '',
-        int $version = 0,
         string $epoch = '',
     ): Pending {
         return $this->add(new SharedPollPublishRequest(

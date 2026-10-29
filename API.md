@@ -28,7 +28,7 @@ new Client(
 Calls Centrifugo's HTTP server API. Create it once and reuse it:
 
 ```php
-$client = new Client('http://localhost:8000/api', apiKey: getenv('CENTRIFUGO_API_KEY'));
+$client = new Client('http://localhost:8000/api', apiKey: (string) getenv('CENTRIFUGO_API_KEY'));
 $client->publish(channel: 'news', data: ['text' => 'hello']);
 ```
 
@@ -42,24 +42,24 @@ requestTimeout bounds the call.
 - `$apiKey` `string` - sent as X-API-Key. Leave it and bearerTokenFunc unset when requests are authenticated another way - mutual TLS, a proxy - or not at all.
 - `$apiEndpointFunc` `?callable(): string` - instead of apiEndpoint, returns it for each request, for addresses discovered rather than fixed
 - `$bearerTokenFunc` `?callable(): string` - returns the token sent as "Authorization: Bearer" with each request, for Centrifugo PRO's JWKS authentication of the API - an ApiTokens's token method, say. Not together with apiKey.
-- `$httpClient` `?ClientInterface` - a PSR-18 client sending the requests, instead of curl: Guzzle, Symfony HttpClient, a fake in tests. It is never changed: credentials and headers go on each request. Its own timeouts and redirect policy apply - PSR-18 has no way to give a request a deadline.
+- `$httpClient` `?ClientInterface` - a PSR-18 client sending the requests, instead of curl: Guzzle, Symfony HttpClient, a fake in tests. It is never changed: credentials and headers go on each request. Its own timeouts and redirect policy apply - PSR-18 has no way to give a request a deadline: set them on it. Its timeouts throw TimeoutException too.
 - `$httpFactory` `(RequestFactoryInterface&StreamFactoryInterface)|null` - the PSR-17 factories for httpClient's requests; not needed when httpClient implements them itself, as Symfony's Psr18Client does
 - `$curlOptions` `array<int, mixed>` - extra curl options for the default transport: CURLOPT_CAINFO, CURLOPT_SSLCERT, CURLOPT_IPRESOLVE and the like. Not the options phpcent sets itself.
-- `$requestTimeout` `float` - seconds bounding a call without a timeout of its own, 10 by default. curl bounds the whole request by it - connecting, sending, reading the reply.
+- `$requestTimeout` `float` - seconds bounding a call without a timeout of its own, 10 by default. curl bounds the whole request by it - connecting, sending, reading the reply. With httpClient, the client's own timeouts bound the request instead.
 - `$headers` `array<string, string>` - extra headers for every request, for a proxy in front of Centrifugo. Not X-API-Key, Authorization or Content-Type. A User-Agent replaces phpcent's.
-- `$onRequest` `?callable(RequestInfo): void` - called after every HTTP request with a RequestInfo, for metrics; the call waits for it
+- `$onRequest` `?callable(RequestInfo): void` - called after every HTTP request with a RequestInfo, for metrics; the call waits for it. It must not throw: what it throws goes to the caller in place of the call's outcome
 
-#### `blockUser(int $expireAt = 0, string $user = '', ?float $timeout = null): BlockUserResult`
+#### `blockUser(string $user, int $expireAt = 0, ?float $timeout = null): BlockUserResult`
 
 Blocks a user: the user is disconnected and can not
 connect again until unblocked or the block expires. Centrifugo PRO only.
 
 - `$expireAt` - The Unix time in seconds when the block expires. Optional, but a reasonably small value is recommended to keep the set of blocked users small.
 - `$user` - The ID of the user to block. Required.
-- `$timeout` - Seconds bounding the call: requestTimeout when null.
+- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `broadcast(
-    array $channels = [],
+    array $channels,
     mixed $data = null,
     string $b64data = '',
     bool $skipHistory = false,
@@ -87,7 +87,7 @@ To go on despite some failed channels:
 try {
     $client->broadcast(channels: $channels, data: $data);
 } catch (BroadcastFailedChannelsException $e) {
-    $logger->warning('broadcast failed in some channels', ['failed' => $e->result->failed()]);
+    $logger->warning('broadcast failed in some channels', ['failed' => $e->result->failed]);
 }
 ```
 
@@ -103,10 +103,10 @@ may still succeed, with one $idempotencyKey.
 - `$delta` - Tells Centrifugo to construct a delta update, if possible, when broadcasting the publications to subscribers.
 - `$version` - When > 0, the version of the document being sent: publications with a version less than or equal to one already seen are ignored. Only works in channels with history enabled.
 - `$versionEpoch` - The epoch of version. When it changes, Centrifugo accepts the publication even if its version is lower than before.
-- `$timeout` - Seconds bounding the call: requestTimeout when null.
+- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `broadcastWithRetry(
-    array $channels = [],
+    array $channels,
     mixed $data = null,
     string $b64data = '',
     bool $skipHistory = false,
@@ -164,13 +164,13 @@ It throws as broadcast does.
 - `$onAttemptError` - Called after an attempt which failed in a way a retry may fix, except the last; returns the seconds to wait before the next attempt, or null for the default wait.
 - `$timeout` - Seconds bounding the whole call, waits included: no bound but each attempt's when null.
 
-#### `cancelPush(string $uid = '', ?float $timeout = null): CancelPushResult`
+#### `cancelPush(string $uid, ?float $timeout = null): CancelPushResult`
 
 Cancels a delayed push notification (sent with
 $sendAt). Centrifugo PRO only.
 
 - `$uid` - The uid of the push notification to cancel. Required.
-- `$timeout` - Seconds bounding the call: requestTimeout when null.
+- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `channels(string $pattern = '', ?float $timeout = null): ChannelsResult`
 
@@ -178,7 +178,7 @@ Returns active channels (with one or more subscribers).
 It can be heavy on large deployments: there is no pagination.
 
 - `$pattern` - Filters channels by name, using gobwas/glob syntax.
-- `$timeout` - Seconds bounding the call: requestTimeout when null.
+- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `close(): void`
 
@@ -200,17 +200,17 @@ $labelFilter must be set. Centrifugo PRO only.
 - `$user` - Returns only the connections of this user ID.
 - `$expression` - A CEL expression to filter connections.
 - `$labelFilter` - Restricts the listing to clients whose labels match this filter. Centrifugo PRO only.
-- `$timeout` - Seconds bounding the call: requestTimeout when null.
+- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
-#### `deleteUserStatus(array $users = [], ?float $timeout = null): DeleteUserStatusResult`
+#### `deleteUserStatus(array $users, ?float $timeout = null): DeleteUserStatusResult`
 
 Deletes the status of users. Centrifugo PRO only.
 
 - `$users` - The list of user IDs to delete the status for. Required.
-- `$timeout` - Seconds bounding the call: requestTimeout when null.
+- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `deviceList(
-    ?DeviceFilter $filter = null,
+    DeviceFilter $filter,
     bool $includeTotalCount = false,
     bool $includeMeta = false,
     bool $includeTopics = false,
@@ -230,13 +230,13 @@ Centrifugo PRO only.
 - `$includeWebpushKeys` - Includes $webpushKeys of each device (webpush only).
 - `$cursor` - The pagination cursor: $nextCursor of the previous page, empty for the first page.
 - `$limit` - The maximum number of devices to return.
-- `$timeout` - Seconds bounding the call: requestTimeout when null.
+- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `deviceRegister(
+    string $provider,
+    string $token,
+    string $platform,
     string $id = '',
-    string $provider = '',
-    string $token = '',
-    string $platform = '',
     string $user = '',
     array $meta = [],
     array $topics = [],
@@ -257,7 +257,7 @@ updates a registered one. Centrifugo PRO only.
 - `$topics` - The full list of the device's topic subscriptions, replacing the previous one. The user's topics are attached automatically.
 - `$timezone` - The IANA time zone of the device user, for example Europe/Nicosia.
 - `$locale` - The locale of the device user as an IETF BCP 47 language tag, for example en-US.
-- `$timeout` - Seconds bounding the call: requestTimeout when null.
+- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `deviceRemove(array $ids = [], array $users = [], ?float $timeout = null): DeviceRemoveResult`
 
@@ -266,7 +266,7 @@ Centrifugo PRO only.
 
 - `$ids` - Selects devices to remove by ID.
 - `$users` - Selects devices to remove by user.
-- `$timeout` - Seconds bounding the call: requestTimeout when null.
+- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `deviceTopicList(
     ?DeviceTopicFilter $filter = null,
@@ -285,11 +285,11 @@ subscriptions. Centrifugo PRO only.
 - `$includeDevice` - Includes the Device of each item.
 - `$cursor` - The pagination cursor: $nextCursor of the previous page, empty for the first page.
 - `$limit` - The maximum number of items to return.
-- `$timeout` - Seconds bounding the call: requestTimeout when null.
+- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `deviceTopicUpdate(
-    string $deviceId = '',
-    string $op = '',
+    string $deviceId,
+    string $op,
     array $topics = [],
     string $user = '',
     ?float $timeout = null,
@@ -303,7 +303,7 @@ Centrifugo PRO only.
 - `$op` - The operation: add, remove or set. Required.
 - `$topics` - The topics for the operation.
 - `$user` - An optional ownership guard: the update is applied only if the device currently belongs to this user. Otherwise the call fails with a conflict error (or not found if there is no such device).
-- `$timeout` - Seconds bounding the call: requestTimeout when null.
+- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `deviceUpdate(
     array $ids = [],
@@ -326,7 +326,7 @@ users. Centrifugo PRO only.
 - `$topicsUpdate` - Updates the device topics.
 - `$timezoneUpdate` - Updates the device timezone.
 - `$localeUpdate` - Updates the device locale.
-- `$timeout` - Seconds bounding the call: requestTimeout when null.
+- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `disconnect(
     string $user = '',
@@ -348,17 +348,17 @@ Disconnects a user's connections.
 - `$session` - Limits the call to the connection with this session ID. user is still required.
 - `$labelFilter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
 - `$allUsers` - Works as SubscribeRequest::$allUsers. Centrifugo PRO only.
-- `$timeout` - Seconds bounding the call: requestTimeout when null.
+- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
-#### `getUserStatus(array $users = [], ?float $timeout = null): GetUserStatusResult`
+#### `getUserStatus(array $users, ?float $timeout = null): GetUserStatusResult`
 
 Returns the status of users. Centrifugo PRO only.
 
 - `$users` - The list of user IDs to get the status for. Required.
-- `$timeout` - Seconds bounding the call: requestTimeout when null.
+- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `history(
-    string $channel = '',
+    string $channel,
     int $limit = 0,
     ?StreamPosition $since = null,
     bool $reverse = false,
@@ -372,26 +372,26 @@ History must be enabled for the channel.
 - `$limit` - The maximum number of publications to return; -1 returns all the channel keeps. If not set, only the current stream position is returned, without publications.
 - `$since` - Returns publications after this stream position.
 - `$reverse` - Iterates in reverse order, from latest to earliest.
-- `$timeout` - Seconds bounding the call: requestTimeout when null.
+- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
-#### `historyRemove(string $channel = '', ?float $timeout = null): HistoryRemoveResult`
+#### `historyRemove(string $channel, ?float $timeout = null): HistoryRemoveResult`
 
 Removes publications from the history of a channel.
 The current top stream position is kept, so clients do not get
 disconnected because of insufficient state.
 
 - `$channel` - The name of the channel. Required.
-- `$timeout` - Seconds bounding the call: requestTimeout when null.
+- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `info(?float $timeout = null): InfoResult`
 
 Returns information about the running Centrifugo nodes.
 
-- `$timeout` - Seconds bounding the call: requestTimeout when null.
+- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `invalidateUserTokens(
+    string $user,
     int $expireAt = 0,
-    string $user = '',
     int $issuedBefore = 0,
     string $channel = '',
     ?float $timeout = null,
@@ -404,18 +404,18 @@ certain time (based on the iat claim of a JWT). Centrifugo PRO only.
 - `$user` - The ID of the user whose tokens to invalidate. Required.
 - `$issuedBefore` - The Unix time in seconds: tokens issued before it are considered revoked. If not set, the current time is used.
 - `$channel` - Limits the invalidation to subscription tokens for this channel.
-- `$timeout` - Seconds bounding the call: requestTimeout when null.
+- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
-#### `mapClear(string $channel = '', ?float $timeout = null): MapClearResult`
+#### `mapClear(string $channel, ?float $timeout = null): MapClearResult`
 
 Removes all state and stream data of a map channel.
 
 - `$channel` - The name of the map channel. Required.
-- `$timeout` - Seconds bounding the call: requestTimeout when null.
+- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `mapPublish(
-    string $channel = '',
-    string $key = '',
+    string $channel,
+    string $key,
     mixed $data = null,
     string $b64data = '',
     mixed $streamData = null,
@@ -445,10 +445,10 @@ Publishes or updates a key in a map channel.
 - `$versionEpoch` - Scopes version. A different epoch resets version comparison.
 - `$score` - Currently not used by the server API.
 - `$keyMode` - Makes the publish conditional: "if_new" writes only if the key does not exist, "if_exists" only if it exists. Empty always writes.
-- `$timeout` - Seconds bounding the call: requestTimeout when null.
+- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `mapReadState(
-    string $channel = '',
+    string $channel,
     string $cursor = '',
     int $limit = 0,
     string $key = '',
@@ -468,10 +468,10 @@ optional pagination.
 - `$asc` - Sorts ordered state by score ascending instead of descending. Ignored for unordered channels.
 - `$revisionOffset` - The offset of the position from a previous state read, used with $revisionEpoch.
 - `$revisionEpoch` - The epoch of the position from a previous state read. If the epoch changed, the call fails with an unrecoverable position error.
-- `$timeout` - Seconds bounding the call: requestTimeout when null.
+- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `mapReadStream(
-    string $channel = '',
+    string $channel,
     int $sinceOffset = 0,
     string $sinceEpoch = '',
     int $limit = 0,
@@ -486,11 +486,11 @@ Reads the change stream of a map channel.
 - `$sinceEpoch` - The epoch of the since position. It must match the current stream epoch.
 - `$limit` - The maximum number of entries: -1 means no limit, 0 returns only the stream position.
 - `$reverse` - Returns entries newest first.
-- `$timeout` - Seconds bounding the call: requestTimeout when null.
+- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `mapRemove(
-    string $channel = '',
-    string $key = '',
+    string $channel,
+    string $key,
     string $idempotencyKey = '',
     ?float $timeout = null,
 ): MapRemoveResult`
@@ -500,14 +500,14 @@ Removes a key from a map channel.
 - `$channel` - The name of the map channel. Required.
 - `$key` - The key to remove. Required.
 - `$idempotencyKey` - Drops duplicate removals upon retries, as it does for MapPublishRequest: a removal with a key already used in the channel is not applied again, and its result is suppressed with $suppressReason "idempotency". Keys are kept for 5 minutes by default.
-- `$timeout` - Seconds bounding the call: requestTimeout when null.
+- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
-#### `mapStats(string $channel = '', ?float $timeout = null): MapStatsResult`
+#### `mapStats(string $channel, ?float $timeout = null): MapStatsResult`
 
 Returns statistics about a map channel.
 
 - `$channel` - The name of the map channel. Required.
-- `$timeout` - Seconds bounding the call: requestTimeout when null.
+- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `newBatch(bool $parallel = false): Batch`
 
@@ -518,25 +518,25 @@ in order, publications into different channels may not, unless the
 namespace sets publication_grouping_disabled. With $parallel, Centrifugo
 runs them concurrently, with no order.
 
-#### `presence(string $channel = '', ?float $timeout = null): PresenceResult`
+#### `presence(string $channel, ?float $timeout = null): PresenceResult`
 
 Returns the online presence of a channel: all clients
 currently subscribed to it. Presence must be enabled for the channel.
 
 - `$channel` - The name of the channel. Required.
-- `$timeout` - Seconds bounding the call: requestTimeout when null.
+- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
-#### `presenceStats(string $channel = '', ?float $timeout = null): PresenceStatsResult`
+#### `presenceStats(string $channel, ?float $timeout = null): PresenceStatsResult`
 
 Returns short presence information of a channel: the
 number of clients and of unique users. Presence must be enabled for the
 channel.
 
 - `$channel` - The name of the channel. Required.
-- `$timeout` - Seconds bounding the call: requestTimeout when null.
+- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `publish(
-    string $channel = '',
+    string $channel,
     mixed $data = null,
     string $b64data = '',
     bool $skipHistory = false,
@@ -559,7 +559,7 @@ Publishes data into a channel.
 - `$delta` - Tells Centrifugo to construct a delta update, if possible, when broadcasting the publication to subscribers.
 - `$version` - When > 0, the version of the document being sent: publications with a version less than or equal to one already seen are ignored. Only works in channels with history enabled.
 - `$versionEpoch` - The epoch of version. When it changes, Centrifugo accepts the publication even if its version is lower than before.
-- `$timeout` - Seconds bounding the call: requestTimeout when null.
+- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `refresh(
     string $user = '',
@@ -585,9 +585,9 @@ non-expiring.
 - `$session` - Limits the call to the connection with this session ID. user is still required.
 - `$labelFilter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
 - `$allUsers` - Works as SubscribeRequest::$allUsers. Centrifugo PRO only.
-- `$timeout` - Seconds bounding the call: requestTimeout when null.
+- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
-#### `revokeToken(int $expireAt = 0, string $uid = '', ?float $timeout = null): RevokeTokenResult`
+#### `revokeToken(string $uid, int $expireAt = 0, ?float $timeout = null): RevokeTokenResult`
 
 Revokes a token by its unique ID (jti claim of a JWT).
 Clients using the token are disconnected shortly, and can not connect
@@ -595,11 +595,11 @@ with it again. Centrifugo PRO only.
 
 - `$expireAt` - The Unix time in seconds when the revocation expires. Optional, but a value matching the token expiration is recommended.
 - `$uid` - The unique ID of the token to revoke (jti claim). Required.
-- `$timeout` - Seconds bounding the call: requestTimeout when null.
+- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `sendPushNotification(
-    ?PushRecipient $recipient = null,
-    ?PushNotification $notification = null,
+    PushRecipient $recipient,
+    PushNotification $notification,
     string $uid = '',
     int $sendAt = 0,
     bool $optimizeForReliability = false,
@@ -625,14 +625,14 @@ Centrifugo PRO only.
 - `$localizations` - Optional per language/locale localizations. Setting them enables templating.
 - `$useTemplating` - Enables templating of the notification. Only works with a filter recipient.
 - `$useMeta` - Additionally loads device meta while sending, making it available in templating.
-- `$timeout` - Seconds bounding the call: requestTimeout when null.
+- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `sharedPollPublish(
-    string $channel = '',
-    string $key = '',
+    string $channel,
+    string $key,
+    int $version,
     mixed $data = null,
     string $b64data = '',
-    int $version = 0,
     string $epoch = '',
     ?float $timeout = null,
 ): SharedPollPublishResult`
@@ -647,10 +647,10 @@ versioned mode and publish_enabled on the namespace.
 - `$b64data` - Data as base64, for binary payloads. Centrifugo decodes it.
 - `$version` - The item version, must be >= 1. Required. A version not higher than the current one within the same epoch is silently dropped.
 - `$epoch` - The channel-level publisher epoch. A change resets per-key versions and unsubscribes current subscribers with insufficient state.
-- `$timeout` - Seconds bounding the call: requestTimeout when null.
+- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `subscribe(
-    string $channel = '',
+    string $channel,
     string $user = '',
     int $expireAt = 0,
     mixed $info = null,
@@ -683,17 +683,17 @@ for the caller.
 - `$session` - Limits the call to the connection with this session ID. user is still required.
 - `$labelFilter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
 - `$allUsers` - When user is empty, targets every connection on every node instead of the anonymous-only bucket. No effect when user is non-empty. Without $labelFilter it acts on every connection. Centrifugo PRO only.
-- `$timeout` - Seconds bounding the call: requestTimeout when null.
+- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
-#### `unblockUser(string $user = '', ?float $timeout = null): UnblockUserResult`
+#### `unblockUser(string $user, ?float $timeout = null): UnblockUserResult`
 
 Unblocks a user. Centrifugo PRO only.
 
 - `$user` - The ID of the user to unblock. Required.
-- `$timeout` - Seconds bounding the call: requestTimeout when null.
+- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `unsubscribe(
-    string $channel = '',
+    string $channel,
     string $user = '',
     string $client = '',
     string $session = '',
@@ -710,12 +710,12 @@ Unsubscribes a user from a channel.
 - `$session` - Limits the call to the connection with this session ID. user is still required.
 - `$labelFilter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
 - `$allUsers` - Works as SubscribeRequest::$allUsers. Centrifugo PRO only.
-- `$timeout` - Seconds bounding the call: requestTimeout when null.
+- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `updatePushStatus(
-    string $analyticsUid = '',
-    string $status = '',
-    string $deviceId = '',
+    string $analyticsUid,
+    string $status,
+    string $deviceId,
     string $msgId = '',
     ?float $timeout = null,
 ): UpdatePushStatusResult`
@@ -727,20 +727,16 @@ push notification to analytics. Experimental. Centrifugo PRO only.
 - `$status` - The status of the push notification: delivered or interacted. Required.
 - `$deviceId` - The Centrifugo device ID. Required.
 - `$msgId` - The message ID issued by the provider.
-- `$timeout` - Seconds bounding the call: requestTimeout when null.
+- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
-#### `updateUserStatus(
-    array $users = [],
-    string $state = '',
-    ?float $timeout = null,
-): UpdateUserStatusResult`
+#### `updateUserStatus(array $users, string $state = '', ?float $timeout = null): UpdateUserStatusResult`
 
 Marks users as active and online now, and sets
 their state when one is given. Centrifugo PRO only.
 
 - `$users` - The list of user IDs to update the status for. Required.
 - `$state` - An optional custom state to store in the user status. It can be restricted by the user_status.state_regex option.
-- `$timeout` - Seconds bounding the call: requestTimeout when null.
+- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `userTopicList(
     ?UserTopicFilter $filter = null,
@@ -757,11 +753,11 @@ subscriptions. Centrifugo PRO only.
 - `$includeTotalCount` - Includes the total count for the filter in the result.
 - `$cursor` - The pagination cursor: $nextCursor of the previous page, empty for the first page.
 - `$limit` - The maximum number of items to return.
-- `$timeout` - Seconds bounding the call: requestTimeout when null.
+- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `userTopicUpdate(
-    string $user = '',
-    string $op = '',
+    string $user,
+    string $op,
     array $topics = [],
     ?float $timeout = null,
 ): UserTopicUpdateResult`
@@ -772,7 +768,7 @@ applied to the user's registered devices. Centrifugo PRO only.
 - `$user` - The user ID. Required.
 - `$op` - The operation: add, remove or set. Required.
 - `$topics` - The topics for the operation.
-- `$timeout` - Seconds bounding the call: requestTimeout when null.
+- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 ### `Batch`
 
@@ -790,7 +786,7 @@ $pub->result()->offset;
 
 A batch is sent once.
 
-#### `blockUser(int $expireAt = 0, string $user = ''): Pending<BlockUserResult>`
+#### `blockUser(string $user, int $expireAt = 0): Pending<BlockUserResult>`
 
 Blocks a user: the user is disconnected and can not
 connect again until unblocked or the block expires. Centrifugo PRO only.
@@ -802,7 +798,7 @@ batch is sent.
 - `$user` - The ID of the user to block. Required.
 
 #### `broadcast(
-    array $channels = [],
+    array $channels,
     mixed $data = null,
     string $b64data = '',
     bool $skipHistory = false,
@@ -829,7 +825,7 @@ when any channel failed.
 - `$version` - When > 0, the version of the document being sent: publications with a version less than or equal to one already seen are ignored. Only works in channels with history enabled.
 - `$versionEpoch` - The epoch of version. When it changes, Centrifugo accepts the publication even if its version is lower than before.
 
-#### `cancelPush(string $uid = ''): Pending<CancelPushResult>`
+#### `cancelPush(string $uid): Pending<CancelPushResult>`
 
 Cancels a delayed push notification (sent with
 $sendAt). Centrifugo PRO only.
@@ -864,7 +860,7 @@ batch is sent.
 
 #### `count(): int`
 
-#### `deleteUserStatus(array $users = []): Pending<DeleteUserStatusResult>`
+#### `deleteUserStatus(array $users): Pending<DeleteUserStatusResult>`
 
 Deletes the status of users. Centrifugo PRO only.
 
@@ -874,7 +870,7 @@ batch is sent.
 - `$users` - The list of user IDs to delete the status for. Required.
 
 #### `deviceList(
-    ?DeviceFilter $filter = null,
+    DeviceFilter $filter,
     bool $includeTotalCount = false,
     bool $includeMeta = false,
     bool $includeTopics = false,
@@ -898,10 +894,10 @@ batch is sent.
 - `$limit` - The maximum number of devices to return.
 
 #### `deviceRegister(
+    string $provider,
+    string $token,
+    string $platform,
     string $id = '',
-    string $provider = '',
-    string $token = '',
-    string $platform = '',
     string $user = '',
     array $meta = [],
     array $topics = [],
@@ -956,12 +952,7 @@ batch is sent.
 - `$cursor` - The pagination cursor: $nextCursor of the previous page, empty for the first page.
 - `$limit` - The maximum number of items to return.
 
-#### `deviceTopicUpdate(
-    string $deviceId = '',
-    string $op = '',
-    array $topics = [],
-    string $user = '',
-): Pending<DeviceTopicUpdateResult>`
+#### `deviceTopicUpdate(string $deviceId, string $op, array $topics = [], string $user = ''): Pending<DeviceTopicUpdateResult>`
 
 Changes the topics of a device. The device topic
 list is what decides who gets a push sent to a topic.
@@ -1022,7 +1013,7 @@ batch is sent.
 - `$labelFilter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
 - `$allUsers` - Works as SubscribeRequest::$allUsers. Centrifugo PRO only.
 
-#### `getUserStatus(array $users = []): Pending<GetUserStatusResult>`
+#### `getUserStatus(array $users): Pending<GetUserStatusResult>`
 
 Returns the status of users. Centrifugo PRO only.
 
@@ -1032,7 +1023,7 @@ batch is sent.
 - `$users` - The list of user IDs to get the status for. Required.
 
 #### `history(
-    string $channel = '',
+    string $channel,
     int $limit = 0,
     ?StreamPosition $since = null,
     bool $reverse = false,
@@ -1049,7 +1040,7 @@ batch is sent.
 - `$since` - Returns publications after this stream position.
 - `$reverse` - Iterates in reverse order, from latest to earliest.
 
-#### `historyRemove(string $channel = ''): Pending<HistoryRemoveResult>`
+#### `historyRemove(string $channel): Pending<HistoryRemoveResult>`
 
 Removes publications from the history of a channel.
 The current top stream position is kept, so clients do not get
@@ -1068,8 +1059,8 @@ Adds the command to the batch: its Pending holds the result once the
 batch is sent.
 
 #### `invalidateUserTokens(
+    string $user,
     int $expireAt = 0,
-    string $user = '',
     int $issuedBefore = 0,
     string $channel = '',
 ): Pending<InvalidateUserTokensResult>`
@@ -1085,7 +1076,7 @@ batch is sent.
 - `$issuedBefore` - The Unix time in seconds: tokens issued before it are considered revoked. If not set, the current time is used.
 - `$channel` - Limits the invalidation to subscription tokens for this channel.
 
-#### `mapClear(string $channel = ''): Pending<MapClearResult>`
+#### `mapClear(string $channel): Pending<MapClearResult>`
 
 Removes all state and stream data of a map channel.
 
@@ -1095,8 +1086,8 @@ batch is sent.
 - `$channel` - The name of the map channel. Required.
 
 #### `mapPublish(
-    string $channel = '',
-    string $key = '',
+    string $channel,
+    string $key,
     mixed $data = null,
     string $b64data = '',
     mixed $streamData = null,
@@ -1130,7 +1121,7 @@ batch is sent.
 - `$keyMode` - Makes the publish conditional: "if_new" writes only if the key does not exist, "if_exists" only if it exists. Empty always writes.
 
 #### `mapReadState(
-    string $channel = '',
+    string $channel,
     string $cursor = '',
     int $limit = 0,
     string $key = '',
@@ -1154,7 +1145,7 @@ batch is sent.
 - `$revisionEpoch` - The epoch of the position from a previous state read. If the epoch changed, the call fails with an unrecoverable position error.
 
 #### `mapReadStream(
-    string $channel = '',
+    string $channel,
     int $sinceOffset = 0,
     string $sinceEpoch = '',
     int $limit = 0,
@@ -1172,7 +1163,7 @@ batch is sent.
 - `$limit` - The maximum number of entries: -1 means no limit, 0 returns only the stream position.
 - `$reverse` - Returns entries newest first.
 
-#### `mapRemove(string $channel = '', string $key = '', string $idempotencyKey = ''): Pending<MapRemoveResult>`
+#### `mapRemove(string $channel, string $key, string $idempotencyKey = ''): Pending<MapRemoveResult>`
 
 Removes a key from a map channel.
 
@@ -1183,7 +1174,7 @@ batch is sent.
 - `$key` - The key to remove. Required.
 - `$idempotencyKey` - Drops duplicate removals upon retries, as it does for MapPublishRequest: a removal with a key already used in the channel is not applied again, and its result is suppressed with $suppressReason "idempotency". Keys are kept for 5 minutes by default.
 
-#### `mapStats(string $channel = ''): Pending<MapStatsResult>`
+#### `mapStats(string $channel): Pending<MapStatsResult>`
 
 Returns statistics about a map channel.
 
@@ -1192,7 +1183,7 @@ batch is sent.
 
 - `$channel` - The name of the map channel. Required.
 
-#### `presence(string $channel = ''): Pending<PresenceResult>`
+#### `presence(string $channel): Pending<PresenceResult>`
 
 Returns the online presence of a channel: all clients
 currently subscribed to it. Presence must be enabled for the channel.
@@ -1202,7 +1193,7 @@ batch is sent.
 
 - `$channel` - The name of the channel. Required.
 
-#### `presenceStats(string $channel = ''): Pending<PresenceStatsResult>`
+#### `presenceStats(string $channel): Pending<PresenceStatsResult>`
 
 Returns short presence information of a channel: the
 number of clients and of unique users. Presence must be enabled for the
@@ -1214,7 +1205,7 @@ batch is sent.
 - `$channel` - The name of the channel. Required.
 
 #### `publish(
-    string $channel = '',
+    string $channel,
     mixed $data = null,
     string $b64data = '',
     bool $skipHistory = false,
@@ -1267,7 +1258,7 @@ batch is sent.
 - `$labelFilter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
 - `$allUsers` - Works as SubscribeRequest::$allUsers. Centrifugo PRO only.
 
-#### `revokeToken(int $expireAt = 0, string $uid = ''): Pending<RevokeTokenResult>`
+#### `revokeToken(string $uid, int $expireAt = 0): Pending<RevokeTokenResult>`
 
 Revokes a token by its unique ID (jti claim of a JWT).
 Clients using the token are disconnected shortly, and can not connect
@@ -1293,8 +1284,8 @@ batch before anything is sent. An empty batch sends nothing.
 - `$timeout` - seconds bounding the call: requestTimeout when null
 
 #### `sendPushNotification(
-    ?PushRecipient $recipient = null,
-    ?PushNotification $notification = null,
+    PushRecipient $recipient,
+    PushNotification $notification,
     string $uid = '',
     int $sendAt = 0,
     bool $optimizeForReliability = false,
@@ -1324,11 +1315,11 @@ batch is sent.
 - `$useMeta` - Additionally loads device meta while sending, making it available in templating.
 
 #### `sharedPollPublish(
-    string $channel = '',
-    string $key = '',
+    string $channel,
+    string $key,
+    int $version,
     mixed $data = null,
     string $b64data = '',
-    int $version = 0,
     string $epoch = '',
 ): Pending<SharedPollPublishResult>`
 
@@ -1347,7 +1338,7 @@ batch is sent.
 - `$epoch` - The channel-level publisher epoch. A change resets per-key versions and unsubscribes current subscribers with insufficient state.
 
 #### `subscribe(
-    string $channel = '',
+    string $channel,
     string $user = '',
     int $expireAt = 0,
     mixed $info = null,
@@ -1383,7 +1374,7 @@ batch is sent.
 - `$labelFilter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
 - `$allUsers` - When user is empty, targets every connection on every node instead of the anonymous-only bucket. No effect when user is non-empty. Without $labelFilter it acts on every connection. Centrifugo PRO only.
 
-#### `unblockUser(string $user = ''): Pending<UnblockUserResult>`
+#### `unblockUser(string $user): Pending<UnblockUserResult>`
 
 Unblocks a user. Centrifugo PRO only.
 
@@ -1393,7 +1384,7 @@ batch is sent.
 - `$user` - The ID of the user to unblock. Required.
 
 #### `unsubscribe(
-    string $channel = '',
+    string $channel,
     string $user = '',
     string $client = '',
     string $session = '',
@@ -1414,9 +1405,9 @@ batch is sent.
 - `$allUsers` - Works as SubscribeRequest::$allUsers. Centrifugo PRO only.
 
 #### `updatePushStatus(
-    string $analyticsUid = '',
-    string $status = '',
-    string $deviceId = '',
+    string $analyticsUid,
+    string $status,
+    string $deviceId,
     string $msgId = '',
 ): Pending<UpdatePushStatusResult>`
 
@@ -1431,7 +1422,7 @@ batch is sent.
 - `$deviceId` - The Centrifugo device ID. Required.
 - `$msgId` - The message ID issued by the provider.
 
-#### `updateUserStatus(array $users = [], string $state = ''): Pending<UpdateUserStatusResult>`
+#### `updateUserStatus(array $users, string $state = ''): Pending<UpdateUserStatusResult>`
 
 Marks users as active and online now, and sets
 their state when one is given. Centrifugo PRO only.
@@ -1460,7 +1451,7 @@ batch is sent.
 - `$cursor` - The pagination cursor: $nextCursor of the previous page, empty for the first page.
 - `$limit` - The maximum number of items to return.
 
-#### `userTopicUpdate(string $user = '', string $op = '', array $topics = []): Pending<UserTopicUpdateResult>`
+#### `userTopicUpdate(string $user, string $op, array $topics = []): Pending<UserTopicUpdateResult>`
 
 Changes the topics of a user. The change is also
 applied to the user's registered devices. Centrifugo PRO only.
@@ -1475,6 +1466,11 @@ batch is sent.
 ### `Pending`
 
 The outcome of one command of a batch, available once the batch is sent.
+
+#### `static resolved(mixed $result = null, ?Throwable $error = null): self<R>`
+
+A Pending of no batch, whose result() returns $result or throws $error:
+for test doubles of code which reads a batch's outcomes.
 
 #### `result(): mixed`
 
@@ -1491,15 +1487,15 @@ new BatchResult(bool $replied, array $failed = [])
 ```
 
 The outcome of a sent batch as a whole. Each command's own outcome is in the
-Pending Batch::add returned.
+Pending its method returned.
+
+json_encode renders it as {"replied", "failed"}, each failed command as
+{"index", "method", "error"} and an error as {"code", "message"}.
 
 - `$replied` `bool` - true when Centrifugo replied to every command, the failed ones included; false when the batch failed as a whole. True for an empty batch.
-- `$failed` `list<FailedCommand>`
+- `$failed` `list<FailedCommand>` - the commands which failed, with their errors, in the order they were added - as the exception's $failed lists them
 
-#### `failed(): list<FailedCommand>`
-
-The commands which failed, with their errors, in the order they were
-added.
+#### `jsonSerialize(): array`
 
 ### `FailedCommand`
 
@@ -1527,15 +1523,17 @@ new BroadcastResult(
 The outcome of a broadcast: one entry per channel, in the order the request
 listed them.
 
+json_encode renders it with Centrifugo's field names: {"channels",
+"idempotency_key", "attempts", "replied"}, each channel as {"channel",
+"result" when it succeeded, "error" when it failed, "attempts"}, an error as
+{"code", "message"}.
+
 - `$channels` `list<ChannelResult>` - every channel's outcome
 - `$idempotencyKey` `string` - the key the broadcast was sent with: the request's, or the one broadcastWithRetry made when the request had none. A later retry with it does not publish again into the channels which got the publication.
 - `$attempts` `int` - how many times the broadcast was tried: 1 from broadcast, up to maxAttempts from broadcastWithRetry, 0 when it was refused before sending
 - `$replied` `bool` - true when Centrifugo carried the broadcast out and replied for every channel, the failed ones included; false when it failed as a whole
 
-#### `failed(): list<ChannelResult>`
-
-The channels which did not get the publication, with their errors, in
-the order of the request.
+#### `jsonSerialize(): array`
 
 ### `ChannelResult`
 
@@ -1554,6 +1552,8 @@ The outcome of a broadcast in one channel.
 - `$result` `?PublishResult` - the publication's position in the channel's history, when it succeeded
 - `$error` `?\Throwable` - null when the publication succeeded; the channel's ApiException, or the error of the whole broadcast when it failed as a whole
 - `$attempts` `int` - how many times the channel was sent: more than 1 when broadcastWithRetry retried it
+
+#### `jsonSerialize(): array`
 
 ### `RawJson`
 
@@ -1610,6 +1610,9 @@ and null stay as they are.
 A message of Centrifugo's protocols - a request or result of the server API
 or of the proxy - generated from its proto.
 
+json_encode renders it as toJson does, with Centrifugo's field names -
+num_clients, not numClients - for a response or a log of your own.
+
 #### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value left
@@ -1635,7 +1638,7 @@ idempotencyKey:
 $backoff = Retry::exponentialBackoff(0.1, 2.0);
 for ($attempt = 1; ; $attempt++) {
     try {
-        return $client->publish($request);
+        return $client->publish(channel: 'news', data: $data, idempotencyKey: $key);
     } catch (CentException $e) {
         if (!Retry::retryable($e) || $attempt === 3) {
             throw $e;
@@ -1718,7 +1721,9 @@ https://centrifugal.dev/docs/server/consumers.
 
 Consumers take it as its method and payload apart - the outbox table's
 method and payload columns, a message attribute - or as the JSON message
-{"method": ..., "payload": ...} of toJson (Kafka, NATS JetStream).
+{"method": ..., "payload": ...} of toJson (Kafka, NATS JetStream). A
+json_encode of the command - by a queue or an ORM, say - gives that message
+too, with payload as a JSON object, not as a string.
 
 Within a partition a consumer keeps commands in order: a channel's commands
 keep their order only when every writer derives their partition from the
@@ -1735,7 +1740,10 @@ $pdo->prepare('INSERT INTO centrifugo_outbox (method, payload, partition) VALUES
     ->execute([$cmd->method, $cmd->payload]);
 ```
 
-#### `static blockUser(int $expireAt = 0, string $user = ''): Command`
+The outbox table's payload column is jsonb, and $cmd->payload goes into it
+as it is: JSON text, which PostgreSQL stores as the object.
+
+#### `static blockUser(string $user, int $expireAt = 0): Command`
 
 Blocks a user: the user is disconnected and can not
 connect again until unblocked or the block expires. Centrifugo PRO only.
@@ -1746,7 +1754,7 @@ The command making the call, checked as a Client checks it.
 - `$user` - The ID of the user to block. Required.
 
 #### `static broadcast(
-    array $channels = [],
+    array $channels,
     mixed $data = null,
     string $b64data = '',
     bool $skipHistory = false,
@@ -1771,7 +1779,7 @@ The command making the call, checked as a Client checks it.
 - `$version` - When > 0, the version of the document being sent: publications with a version less than or equal to one already seen are ignored. Only works in channels with history enabled.
 - `$versionEpoch` - The epoch of version. When it changes, Centrifugo accepts the publication even if its version is lower than before.
 
-#### `static cancelPush(string $uid = ''): Command`
+#### `static cancelPush(string $uid): Command`
 
 Cancels a delayed push notification (sent with
 $sendAt). Centrifugo PRO only.
@@ -1805,7 +1813,7 @@ The command making the call, checked as a Client checks it.
 - `$expression` - A CEL expression to filter connections.
 - `$labelFilter` - Restricts the listing to clients whose labels match this filter. Centrifugo PRO only.
 
-#### `static deleteUserStatus(array $users = []): Command`
+#### `static deleteUserStatus(array $users): Command`
 
 Deletes the status of users. Centrifugo PRO only.
 
@@ -1814,7 +1822,7 @@ The command making the call, checked as a Client checks it.
 - `$users` - The list of user IDs to delete the status for. Required.
 
 #### `static deviceList(
-    ?DeviceFilter $filter = null,
+    DeviceFilter $filter,
     bool $includeTotalCount = false,
     bool $includeMeta = false,
     bool $includeTopics = false,
@@ -1837,10 +1845,10 @@ The command making the call, checked as a Client checks it.
 - `$limit` - The maximum number of devices to return.
 
 #### `static deviceRegister(
+    string $provider,
+    string $token,
+    string $platform,
     string $id = '',
-    string $provider = '',
-    string $token = '',
-    string $platform = '',
     string $user = '',
     array $meta = [],
     array $topics = [],
@@ -1893,8 +1901,8 @@ The command making the call, checked as a Client checks it.
 - `$limit` - The maximum number of items to return.
 
 #### `static deviceTopicUpdate(
-    string $deviceId = '',
-    string $op = '',
+    string $deviceId,
+    string $op,
     array $topics = [],
     string $user = '',
 ): Command`
@@ -1955,7 +1963,7 @@ The command making the call, checked as a Client checks it.
 - `$labelFilter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
 - `$allUsers` - Works as SubscribeRequest::$allUsers. Centrifugo PRO only.
 
-#### `static getUserStatus(array $users = []): Command`
+#### `static getUserStatus(array $users): Command`
 
 Returns the status of users. Centrifugo PRO only.
 
@@ -1964,7 +1972,7 @@ The command making the call, checked as a Client checks it.
 - `$users` - The list of user IDs to get the status for. Required.
 
 #### `static history(
-    string $channel = '',
+    string $channel,
     int $limit = 0,
     ?StreamPosition $since = null,
     bool $reverse = false,
@@ -1980,7 +1988,7 @@ The command making the call, checked as a Client checks it.
 - `$since` - Returns publications after this stream position.
 - `$reverse` - Iterates in reverse order, from latest to earliest.
 
-#### `static historyRemove(string $channel = ''): Command`
+#### `static historyRemove(string $channel): Command`
 
 Removes publications from the history of a channel.
 The current top stream position is kept, so clients do not get
@@ -1997,8 +2005,8 @@ Returns information about the running Centrifugo nodes.
 The command making the call, checked as a Client checks it.
 
 #### `static invalidateUserTokens(
+    string $user,
     int $expireAt = 0,
-    string $user = '',
     int $issuedBefore = 0,
     string $channel = '',
 ): Command`
@@ -2013,7 +2021,13 @@ The command making the call, checked as a Client checks it.
 - `$issuedBefore` - The Unix time in seconds: tokens issued before it are considered revoked. If not set, the current time is used.
 - `$channel` - Limits the invalidation to subscription tokens for this channel.
 
-#### `static mapClear(string $channel = ''): Command`
+#### `jsonSerialize(): array`
+
+The message of toJson, for a json_encode of your own: payload a JSON
+object. toJson keeps the payload's text exactly - numbers beyond PHP's
+int and float included - where json_encode decodes and encodes it again.
+
+#### `static mapClear(string $channel): Command`
 
 Removes all state and stream data of a map channel.
 
@@ -2022,8 +2036,8 @@ The command making the call, checked as a Client checks it.
 - `$channel` - The name of the map channel. Required.
 
 #### `static mapPublish(
-    string $channel = '',
-    string $key = '',
+    string $channel,
+    string $key,
     mixed $data = null,
     string $b64data = '',
     mixed $streamData = null,
@@ -2056,7 +2070,7 @@ The command making the call, checked as a Client checks it.
 - `$keyMode` - Makes the publish conditional: "if_new" writes only if the key does not exist, "if_exists" only if it exists. Empty always writes.
 
 #### `static mapReadState(
-    string $channel = '',
+    string $channel,
     string $cursor = '',
     int $limit = 0,
     string $key = '',
@@ -2079,7 +2093,7 @@ The command making the call, checked as a Client checks it.
 - `$revisionEpoch` - The epoch of the position from a previous state read. If the epoch changed, the call fails with an unrecoverable position error.
 
 #### `static mapReadStream(
-    string $channel = '',
+    string $channel,
     int $sinceOffset = 0,
     string $sinceEpoch = '',
     int $limit = 0,
@@ -2096,7 +2110,7 @@ The command making the call, checked as a Client checks it.
 - `$limit` - The maximum number of entries: -1 means no limit, 0 returns only the stream position.
 - `$reverse` - Returns entries newest first.
 
-#### `static mapRemove(string $channel = '', string $key = '', string $idempotencyKey = ''): Command`
+#### `static mapRemove(string $channel, string $key, string $idempotencyKey = ''): Command`
 
 Removes a key from a map channel.
 
@@ -2106,7 +2120,7 @@ The command making the call, checked as a Client checks it.
 - `$key` - The key to remove. Required.
 - `$idempotencyKey` - Drops duplicate removals upon retries, as it does for MapPublishRequest: a removal with a key already used in the channel is not applied again, and its result is suppressed with $suppressReason "idempotency". Keys are kept for 5 minutes by default.
 
-#### `static mapStats(string $channel = ''): Command`
+#### `static mapStats(string $channel): Command`
 
 Returns statistics about a map channel.
 
@@ -2114,7 +2128,7 @@ The command making the call, checked as a Client checks it.
 
 - `$channel` - The name of the map channel. Required.
 
-#### `static presence(string $channel = ''): Command`
+#### `static presence(string $channel): Command`
 
 Returns the online presence of a channel: all clients
 currently subscribed to it. Presence must be enabled for the channel.
@@ -2123,7 +2137,7 @@ The command making the call, checked as a Client checks it.
 
 - `$channel` - The name of the channel. Required.
 
-#### `static presenceStats(string $channel = ''): Command`
+#### `static presenceStats(string $channel): Command`
 
 Returns short presence information of a channel: the
 number of clients and of unique users. Presence must be enabled for the
@@ -2134,7 +2148,7 @@ The command making the call, checked as a Client checks it.
 - `$channel` - The name of the channel. Required.
 
 #### `static publish(
-    string $channel = '',
+    string $channel,
     mixed $data = null,
     string $b64data = '',
     bool $skipHistory = false,
@@ -2185,7 +2199,7 @@ The command making the call, checked as a Client checks it.
 - `$labelFilter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
 - `$allUsers` - Works as SubscribeRequest::$allUsers. Centrifugo PRO only.
 
-#### `static revokeToken(int $expireAt = 0, string $uid = ''): Command`
+#### `static revokeToken(string $uid, int $expireAt = 0): Command`
 
 Revokes a token by its unique ID (jti claim of a JWT).
 Clients using the token are disconnected shortly, and can not connect
@@ -2197,8 +2211,8 @@ The command making the call, checked as a Client checks it.
 - `$uid` - The unique ID of the token to revoke (jti claim). Required.
 
 #### `static sendPushNotification(
-    ?PushRecipient $recipient = null,
-    ?PushNotification $notification = null,
+    PushRecipient $recipient,
+    PushNotification $notification,
     string $uid = '',
     int $sendAt = 0,
     bool $optimizeForReliability = false,
@@ -2227,11 +2241,11 @@ The command making the call, checked as a Client checks it.
 - `$useMeta` - Additionally loads device meta while sending, making it available in templating.
 
 #### `static sharedPollPublish(
-    string $channel = '',
-    string $key = '',
+    string $channel,
+    string $key,
+    int $version,
     mixed $data = null,
     string $b64data = '',
-    int $version = 0,
     string $epoch = '',
 ): Command`
 
@@ -2249,7 +2263,7 @@ The command making the call, checked as a Client checks it.
 - `$epoch` - The channel-level publisher epoch. A change resets per-key versions and unsubscribes current subscribers with insufficient state.
 
 #### `static subscribe(
-    string $channel = '',
+    string $channel,
     string $user = '',
     int $expireAt = 0,
     mixed $info = null,
@@ -2288,7 +2302,7 @@ The command making the call, checked as a Client checks it.
 
 The command as one JSON message: {"method": ..., "payload": ...}.
 
-#### `static unblockUser(string $user = ''): Command`
+#### `static unblockUser(string $user): Command`
 
 Unblocks a user. Centrifugo PRO only.
 
@@ -2297,7 +2311,7 @@ The command making the call, checked as a Client checks it.
 - `$user` - The ID of the user to unblock. Required.
 
 #### `static unsubscribe(
-    string $channel = '',
+    string $channel,
     string $user = '',
     string $client = '',
     string $session = '',
@@ -2317,9 +2331,9 @@ The command making the call, checked as a Client checks it.
 - `$allUsers` - Works as SubscribeRequest::$allUsers. Centrifugo PRO only.
 
 #### `static updatePushStatus(
-    string $analyticsUid = '',
-    string $status = '',
-    string $deviceId = '',
+    string $analyticsUid,
+    string $status,
+    string $deviceId,
     string $msgId = '',
 ): Command`
 
@@ -2333,7 +2347,7 @@ The command making the call, checked as a Client checks it.
 - `$deviceId` - The Centrifugo device ID. Required.
 - `$msgId` - The message ID issued by the provider.
 
-#### `static updateUserStatus(array $users = [], string $state = ''): Command`
+#### `static updateUserStatus(array $users, string $state = ''): Command`
 
 Marks users as active and online now, and sets
 their state when one is given. Centrifugo PRO only.
@@ -2360,7 +2374,7 @@ The command making the call, checked as a Client checks it.
 - `$cursor` - The pagination cursor: $nextCursor of the previous page, empty for the first page.
 - `$limit` - The maximum number of items to return.
 
-#### `static userTopicUpdate(string $user = '', string $op = '', array $topics = []): Command`
+#### `static userTopicUpdate(string $user, string $op, array $topics = []): Command`
 
 Changes the topics of a user. The change is also
 applied to the user's registered devices. Centrifugo PRO only.
@@ -2384,13 +2398,14 @@ changes.
     string $user,
     string $channel,
     array $keys,
-    ?DateTimeInterface $expiresAt = null,
+    DateTimeInterface|Expiry $expiresAt,
 ): string`
 
 The signature authorizing $user to track $keys in $channel until
 $expiresAt, as Centrifugo verifies it: "iat:exp:hmac", iat now and exp
-$expiresAt in Unix seconds - 0 when $expiresAt is null, for a signature
-which does not expire. $secret is Centrifugo's
+$expiresAt in Unix seconds. $expiresAt is required, as a token's expiry
+is: a time, or Expiry::Never for a signature which never expires.
+$secret is Centrifugo's
 shared_poll.hmac_secret_key; $user is the ID of the connection's user,
 empty for an anonymous one.
 
@@ -2408,26 +2423,25 @@ Every exception implements `CentException`.
 
 - `ApiException` (a `\RuntimeException`)
   - `BadRequestException`
+  - `ConflictException`
+  - `InternalException`
+  - `NotAvailableException`
+  - `NotFoundException`
+  - `TooManyRequestsException`
+  - `UnknownChannelException`
+  - `UnrecoverablePositionException`
 - `BatchFailedCommandsException` (a `\RuntimeException`)
 - `BatchNotSentException` (a `\LogicException`)
 - `BatchSentException` (a `\LogicException`)
 - `BroadcastFailedChannelsException` (a `\RuntimeException`)
-- `CentException`
 - `ClosedException` (a `\RuntimeException`)
-  - `ConflictException`
 - `DecodeException` (a `\RuntimeException`)
 - `HttpException` (a `\RuntimeException`)
-  - `InternalException`
+  - `UnauthorizedException`
 - `InvalidConfigException` (a `\InvalidArgumentException`)
 - `InvalidRequestException` (a `\InvalidArgumentException`)
 - `NetworkException` (a `\RuntimeException`)
-  - `NotAvailableException`
-  - `NotFoundException`
 - `TimeoutException` (a `\RuntimeException`)
-  - `TooManyRequestsException`
-  - `UnauthorizedException`
-  - `UnknownChannelException`
-  - `UnrecoverablePositionException`
 
 ### `ApiException`
 
@@ -3091,6 +3105,8 @@ Route::post('/centrifugo/connect', function (Request $request) use ($handler) {
 });
 ```
 
+- `$headers` - as frameworks give them - Laravel's and Symfony's $request->headers->all() included
+
 #### `handlePsr(
     Psr\Http\Message\ServerRequestInterface $request,
     Psr\Http\Message\ResponseFactoryInterface&Psr\Http\Message\StreamFactoryInterface $factory,
@@ -3257,7 +3273,7 @@ $handler = new ConnectHandler(function (ConnectRequest $req, HttpRequest $http):
 ```
 
 - `$func` `callable(TRequest, HttpRequest): TResult` - answers the proxy request: it takes the decoded request and the HTTP request - with the headers Centrifugo passed on
-- `$onError` `?callable(HttpRequest, \Throwable): void` - told of every 500 and 400, with the exception
+- `$onError` `?callable(HttpRequest, \Throwable): void` - told of every 500 and 400, with the exception; it must not throw
 
 ### `Disconnect`
 
@@ -3283,7 +3299,7 @@ The map publish proxy: the function decides whether a client may publish a
 key into a map channel, and may change the publication.
 
 - `$func` `callable(TRequest, HttpRequest): TResult` - answers the proxy request: it takes the decoded request and the HTTP request - with the headers Centrifugo passed on
-- `$onError` `?callable(HttpRequest, \Throwable): void` - told of every 500 and 400, with the exception
+- `$onError` `?callable(HttpRequest, \Throwable): void` - told of every 500 and 400, with the exception; it must not throw
 
 ### `MapRemoveHandler`
 
@@ -3299,7 +3315,7 @@ The map remove proxy: the function decides whether a client may remove a key
 from a map channel.
 
 - `$func` `callable(TRequest, HttpRequest): TResult` - answers the proxy request: it takes the decoded request and the HTTP request - with the headers Centrifugo passed on
-- `$onError` `?callable(HttpRequest, \Throwable): void` - told of every 500 and 400, with the exception
+- `$onError` `?callable(HttpRequest, \Throwable): void` - told of every 500 and 400, with the exception; it must not throw
 
 ### `NotifyCacheEmptyHandler`
 
@@ -3318,7 +3334,7 @@ for Centrifugo to recover once more. Any exception fails the request, and the
 client which subscribed is disconnected to reconnect.
 
 - `$func` `callable(TRequest, HttpRequest): TResult` - answers the proxy request: it takes the decoded request and the HTTP request - with the headers Centrifugo passed on
-- `$onError` `?callable(HttpRequest, \Throwable): void` - told of every 500 and 400, with the exception
+- `$onError` `?callable(HttpRequest, \Throwable): void` - told of every 500 and 400, with the exception; it must not throw
 
 ### `NotifyChannelStateHandler`
 
@@ -3335,7 +3351,7 @@ channels becoming occupied or vacated. ProxyError, or any other exception,
 fails the request.
 
 - `$func` `callable(TRequest, HttpRequest): TResult` - answers the proxy request: it takes the decoded request and the HTTP request - with the headers Centrifugo passed on
-- `$onError` `?callable(HttpRequest, \Throwable): void` - told of every 500 and 400, with the exception
+- `$onError` `?callable(HttpRequest, \Throwable): void` - told of every 500 and 400, with the exception; it must not throw
 
 ### `ProxyError`
 
@@ -3392,7 +3408,7 @@ any user. Keep proxy endpoints reachable by Centrifugo only: on an internal
 network, or behind a check of a secret Centrifugo sends as a static header.
 
 - `$func` `callable(TRequest, HttpRequest): TResult` - answers the proxy request: it takes the decoded request and the HTTP request - with the headers Centrifugo passed on
-- `$onError` `?callable(HttpRequest, \Throwable): void` - told of every 500 and 400, with the exception
+- `$onError` `?callable(HttpRequest, \Throwable): void` - told of every 500 and 400, with the exception; it must not throw
 
 ### `PublishHandler`
 
@@ -3405,7 +3421,7 @@ channel, and may change the publication. ProxyError rejects it; Disconnect
 closes the connection.
 
 - `$func` `callable(TRequest, HttpRequest): TResult` - answers the proxy request: it takes the decoded request and the HTTP request - with the headers Centrifugo passed on
-- `$onError` `?callable(HttpRequest, \Throwable): void` - told of every 500 and 400, with the exception
+- `$onError` `?callable(HttpRequest, \Throwable): void` - told of every 500 and 400, with the exception; it must not throw
 
 ### `RefreshHandler`
 
@@ -3419,7 +3435,7 @@ exception fails the request, and Centrifugo keeps the connection for another
 minute before asking again.
 
 - `$func` `callable(TRequest, HttpRequest): TResult` - answers the proxy request: it takes the decoded request and the HTTP request - with the headers Centrifugo passed on
-- `$onError` `?callable(HttpRequest, \Throwable): void` - told of every 500 and 400, with the exception
+- `$onError` `?callable(HttpRequest, \Throwable): void` - told of every 500 and 400, with the exception; it must not throw
 
 ### `RpcHandler`
 
@@ -3431,7 +3447,7 @@ The RPC proxy: the function answers a client's RPC call. ProxyError fails the
 call; Disconnect closes the connection.
 
 - `$func` `callable(TRequest, HttpRequest): TResult` - answers the proxy request: it takes the decoded request and the HTTP request - with the headers Centrifugo passed on
-- `$onError` `?callable(HttpRequest, \Throwable): void` - told of every 500 and 400, with the exception
+- `$onError` `?callable(HttpRequest, \Throwable): void` - told of every 500 and 400, with the exception; it must not throw
 
 ### `SharedPollRefreshHandler`
 
@@ -3448,7 +3464,7 @@ items tracked in a shared poll channel. ProxyError, or any other exception,
 fails the refresh: Centrifugo tries again at the next interval.
 
 - `$func` `callable(TRequest, HttpRequest): TResult` - answers the proxy request: it takes the decoded request and the HTTP request - with the headers Centrifugo passed on
-- `$onError` `?callable(HttpRequest, \Throwable): void` - told of every 500 and 400, with the exception
+- `$onError` `?callable(HttpRequest, \Throwable): void` - told of every 500 and 400, with the exception; it must not throw
 
 ### `SubRefreshHandler`
 
@@ -3466,7 +3482,7 @@ set. Any exception fails the request, and Centrifugo keeps the subscription
 for another minute before asking again.
 
 - `$func` `callable(TRequest, HttpRequest): TResult` - answers the proxy request: it takes the decoded request and the HTTP request - with the headers Centrifugo passed on
-- `$onError` `?callable(HttpRequest, \Throwable): void` - told of every 500 and 400, with the exception
+- `$onError` `?callable(HttpRequest, \Throwable): void` - told of every 500 and 400, with the exception; it must not throw
 
 ### `SubscribeHandler`
 
@@ -3483,7 +3499,7 @@ channel. ProxyError rejects the subscription; Disconnect closes the
 connection.
 
 - `$func` `callable(TRequest, HttpRequest): TResult` - answers the proxy request: it takes the decoded request and the HTTP request - with the headers Centrifugo passed on
-- `$onError` `?callable(HttpRequest, \Throwable): void` - told of every 500 and 400, with the exception
+- `$onError` `?callable(HttpRequest, \Throwable): void` - told of every 500 and 400, with the exception; it must not throw
 
 ## Centrifugal\Phpcent: request and result types
 
@@ -3501,6 +3517,10 @@ ApnsPushNotification is a notification for APNs. Centrifugo PRO only.
 - `$headers` `array<string, string>` - The APNs request headers.
 - `$payload` `mixed` - The APNs payload as JSON. Required.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -3515,6 +3535,10 @@ new BlockUserResult()
 BlockUserResult is the result of a block user call. Empty at the moment.
 Centrifugo PRO only.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -3528,6 +3552,10 @@ new CancelPushResult()
 
 CancelPushResult is the result of a cancel push call. Empty at the
 moment. Centrifugo PRO only.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -3545,6 +3573,10 @@ Centrifugo PRO only.
 
 - `$source` `int` - The source of the channel subscription (for example, subscription token, subscribe proxy or server API).
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -3560,6 +3592,10 @@ ChannelInfo is information about an active channel.
 
 - `$numClients` `int` - The number of connections subscribed to the channel.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -3574,6 +3610,10 @@ new ChannelsResult(array $channels = [])
 ChannelsResult is the result of a channels call.
 
 - `$channels` `array<string, ChannelInfo>` - Maps channel name to information about the channel.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -3597,6 +3637,10 @@ ClientInfo describes a client connection.
 - `$client` `string` - The client ID.
 - `$connInfo` `mixed` - Optional connection info.
 - `$chanInfo` `mixed` - Optional channel info.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -3632,6 +3676,10 @@ Centrifugo PRO only.
 - `$pingPongLatencyMs` `int` - The last measured client ping/pong round-trip latency in milliseconds. Can be -1 if not available.
 - `$labels` `array<string, string>` - The client labels attached to the connection.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -3656,6 +3704,10 @@ Centrifugo PRO only.
 - `$subscriptionTokens` `array<string, SubscriptionTokenInfo>` - Maps channel to information about the subscription token used to subscribe to it.
 - `$meta` `mixed` - The meta information attached to the connection. It is not visible to other clients: Centrifugo never sends it. Meta from a connection token is visible to the user owning the token, though: it must not hold anything that user must not see.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -3673,6 +3725,10 @@ Centrifugo PRO only.
 - `$uid` `string` - The unique token ID (jti claim).
 - `$issuedAt` `int` - The Unix time in seconds when the token was issued.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -3689,6 +3745,10 @@ Centrifugo PRO only.
 
 - `$connections` `array<string, ConnectionInfo>` - Maps client ID to information about the connection.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -3702,6 +3762,10 @@ new DeleteUserStatusResult()
 
 DeleteUserStatusResult is the result of a delete user status call. Empty
 at the moment. Centrifugo PRO only.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -3742,6 +3806,10 @@ Device is a device registered for push notifications. Centrifugo PRO only.
 - `$locale` `string` - The device locale.
 - `$webpushKeys` `string` - The Web Push subscription keys JSON ({p256dh, auth}). Only set if $includeWebpushKeys was requested.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -3767,6 +3835,10 @@ DeviceFilter selects devices. Centrifugo PRO only.
 - `$providers` `list<string>` - Selects devices by token provider.
 - `$platforms` `list<string>` - Selects devices by platform.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -3785,6 +3857,10 @@ Centrifugo PRO only.
 - `$nextCursor` `string` - The cursor of the next page. Empty if there is no next page.
 - `$totalCount` `int` - The total count for the filter, if $includeTotalCount was set.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -3800,6 +3876,10 @@ DeviceLocaleUpdate sets the locale of devices. Centrifugo PRO only.
 
 - `$locale` `string` - The locale to set. Required.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -3814,6 +3894,10 @@ new DeviceMetaUpdate(array $meta = [])
 DeviceMetaUpdate sets the meta of devices. Centrifugo PRO only.
 
 - `$meta` `array<string, string>` - The meta to set. Required.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -3831,6 +3915,10 @@ Centrifugo PRO only.
 
 - `$id` `string` - The ID of the registered or updated device.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -3844,6 +3932,10 @@ new DeviceRemoveResult()
 
 DeviceRemoveResult is the result of a device remove call. Empty at the
 moment. Centrifugo PRO only.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -3859,6 +3951,10 @@ new DeviceTimezoneUpdate(string $timezone = '')
 DeviceTimezoneUpdate sets the timezone of devices. Centrifugo PRO only.
 
 - `$timezone` `string` - The IANA time zone to set. Required.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -3876,6 +3972,10 @@ DeviceTopic is a topic subscription of a device. Centrifugo PRO only.
 - `$id` `string` - The ID of the device topic.
 - `$topic` `string` - The topic.
 - `$device` `Device|null` - The device. Only set if $includeDevice was requested.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -3904,6 +4004,10 @@ DeviceTopicFilter selects device topic subscriptions. Centrifugo PRO only.
 - `$topics` `list<string>` - Selects by topic.
 - `$topicPrefix` `string` - Selects by topic prefix.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -3922,6 +4026,10 @@ Centrifugo PRO only.
 - `$nextCursor` `string` - The cursor of the next page. Empty if there is no next page.
 - `$totalCount` `int` - The total count for the filter, if $includeTotalCount was set.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -3935,6 +4043,10 @@ new DeviceTopicUpdateResult()
 
 DeviceTopicUpdateResult is the result of a device topic update call.
 Empty at the moment. Centrifugo PRO only.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -3952,6 +4064,10 @@ DeviceTopicsUpdate changes the topics of devices. Centrifugo PRO only.
 - `$op` `string` - The operation: add, remove or set. Required.
 - `$topics` `list<string>` - The topics for the operation.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -3965,6 +4081,10 @@ new DeviceUpdateResult()
 
 DeviceUpdateResult is the result of a device update call. Empty at the
 moment. Centrifugo PRO only.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -3980,6 +4100,10 @@ new DeviceUserUpdate(string $user = '')
 DeviceUserUpdate sets the user of devices. Centrifugo PRO only.
 
 - `$user` `string` - The user ID to set. Required.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -3997,6 +4121,10 @@ Disconnect describes the code and reason clients are disconnected with.
 - `$code` `int` - The disconnect code.
 - `$reason` `string` - The disconnect reason.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -4009,6 +4137,10 @@ new DisconnectResult()
 ```
 
 DisconnectResult is the result of a disconnect call. Empty at the moment.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -4024,6 +4156,10 @@ new FcmPushNotification(mixed $message = null)
 FcmPushNotification is a notification for FCM. Centrifugo PRO only.
 
 - `$message` `mixed` - The FCM Message object as JSON. Required.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -4057,6 +4193,10 @@ Centrifugo OSS parses it but ignores it.
 - `$vals` `list<string>` - The values to compare with, for "in" and "nin".
 - `$nodes` `list<FilterNode>` - The child nodes of a logical operation.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -4073,6 +4213,10 @@ Centrifugo PRO only.
 
 - `$statuses` `list<UserStatus>` - The statuses of the requested users, in the same order.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -4086,6 +4230,10 @@ new HistoryRemoveResult()
 
 HistoryRemoveResult is the result of a history remove call. Empty at the
 moment.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -4104,6 +4252,10 @@ HistoryResult is the result of a history call.
 - `$epoch` `string` - The epoch of the current stream.
 - `$offset` `int` - The top offset of the history stream.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -4118,6 +4270,10 @@ new HmsPushNotification(mixed $message = null)
 HmsPushNotification is a notification for HMS. Centrifugo PRO only.
 
 - `$message` `mixed` - The HMS Message object as JSON. Required.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -4134,6 +4290,10 @@ InfoResult is the result of an info call.
 
 - `$nodes` `list<NodeResult>` - Information about all nodes of the cluster.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -4148,6 +4308,10 @@ new InvalidateUserTokensResult()
 InvalidateUserTokensResult is the result of an invalidate user tokens
 call. Empty at the moment. Centrifugo PRO only.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -4160,6 +4324,10 @@ new MapClearResult()
 ```
 
 MapClearResult is the result of a map clear call. Empty at the moment.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -4190,6 +4358,10 @@ MapEntry is an entry of a map channel state or stream.
 - `$removed` `bool` - True for a removal event.
 - `$time` `int` - The time of the publication as Unix milliseconds, if known.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -4212,6 +4384,10 @@ MapPublishResult is the result of a map publish call.
 - `$epoch` `string` - The epoch of the channel stream.
 - `$suppressed` `bool` - True if the publish was not applied, see $suppressReason.
 - `$suppressReason` `string` - Explains why the publish was suppressed, for example "idempotency", "version", "key_exists" or "key_not_found".
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -4236,6 +4412,10 @@ MapReadStateResult is the result of a map read state call.
 - `$epoch` `string` - The epoch of the channel stream position.
 - `$cursor` `string` - The cursor of the next page. Empty if there are no more entries.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -4252,6 +4432,10 @@ MapReadStreamResult is the result of a map read stream call.
 - `$entries` `list<MapEntry>` - The stream entries.
 - `$offset` `int` - The top offset of the channel stream.
 - `$epoch` `string` - The epoch of the channel stream.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -4276,6 +4460,10 @@ MapRemoveResult is the result of a map remove call.
 - `$suppressed` `bool` - True if the removal was not applied, see $suppressReason.
 - `$suppressReason` `string` - Explains why the removal was suppressed, for example "idempotency" or "key_not_found".
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -4290,6 +4478,10 @@ new MapStatsResult(int $numKeys = 0)
 MapStatsResult is the result of a map stats call.
 
 - `$numKeys` `int` - The number of entries in the channel state.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -4306,6 +4498,10 @@ Metrics are aggregated metrics of a node.
 
 - `$interval` `float` - The metrics aggregation interval in seconds.
 - `$items` `array<string, float>` - Maps metric name to value.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -4342,6 +4538,10 @@ NodeResult is information about a Centrifugo node.
 - `$process` `Process|null` - CPU and memory usage of the node process. Centrifugo PRO only.
 - `$numSubs` `int` - The number of subscriptions on the node.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -4356,6 +4556,10 @@ new PresenceResult(array $presence = [])
 PresenceResult is the result of a presence call.
 
 - `$presence` `array<string, ClientInfo>` - Maps client ID to information about the client.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -4373,6 +4577,10 @@ PresenceStatsResult is the result of a presence stats call.
 - `$numClients` `int` - The total number of clients in the channel.
 - `$numUsers` `int` - The number of unique users in the channel.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -4388,6 +4596,10 @@ Process is resource usage of a node process. Centrifugo PRO only.
 
 - `$cpu` `float` - The CPU usage of the process in percent.
 - `$rss` `int` - The resident set size of the process in bytes.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -4407,6 +4619,10 @@ Publication is a publication in a channel history.
 - `$offset` `int` - The offset of the publication in the history stream.
 - `$tags` `array<string, string>` - The publication tags.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -4422,6 +4638,10 @@ PublishResult is the result of a successful publish.
 
 - `$offset` `int` - The offset of the publication in the channel history stream.
 - `$epoch` `string` - The epoch of the channel history stream.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -4443,6 +4663,10 @@ Centrifugo PRO only.
 - `$rateLimit` `PushRateLimitStrategy|null` - Sets rate limit policies.
 - `$timeLimit` `PushTimeLimitStrategy|null` - Sets a time limit policy based on the device timezone.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -4458,6 +4682,10 @@ PushLocalization holds translations for one language/locale.
 Centrifugo PRO only.
 
 - `$translations` `array<string, string>` - Maps variable name to value for the language/locale.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -4485,6 +4713,10 @@ Centrifugo PRO only.
 - `$webpush` `WebPushPushNotification|null` - The notification for Web Push.
 - `$expireAt` `int` - The Unix time in seconds when Centrifugo stops trying to send the notification. Not related to the providers' TTL fields.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -4501,6 +4733,10 @@ PushRateLimitStrategy rate limits pushes per device. Centrifugo PRO only.
 - `$key` `string` - An optional key for the rate limit policy. Supports variables (device.id and device.user).
 - `$policies` `list<RateLimitPolicy>` - The rate limit policies to apply.
 - `$dropIfRateLimited` `bool` - Drops a rate limited push instead of queuing it for later.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -4536,6 +4772,10 @@ of its fields. Centrifugo PRO only.
 - `$apnsTokens` `list<string>` - Sends to a list of APNs native tokens.
 - `$webpushTokens` `list<string>` - Sends to a list of raw Web Push subscriptions, each a PushSubscription JSON string.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -4558,6 +4798,10 @@ time. Centrifugo PRO only.
 - `$sendBeforeTime` `string` - The local time, as HH:MM:SS, before which the push must be sent. Required.
 - `$noTzSendNow` `bool` - Sends the push immediately if the device timezone is not set. By default such pushes are dropped.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -4574,6 +4818,10 @@ RateLimitPolicy allows rate pushes per $intervalMs. Centrifugo PRO only.
 - `$rate` `int` - The allowed number of pushes per interval. Required.
 - `$intervalMs` `int` - The interval in milliseconds. Required.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -4586,6 +4834,10 @@ new RefreshResult()
 ```
 
 RefreshResult is the result of a refresh call. Empty at the moment.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -4600,6 +4852,10 @@ new RevokeTokenResult()
 
 RevokeTokenResult is the result of a revoke token call. Empty at the
 moment. Centrifugo PRO only.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -4617,6 +4873,10 @@ call. Centrifugo PRO only.
 
 - `$uid` `string` - The unique identifier of the send request (not a provider message ID). Matches the request uid if it was set.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -4630,6 +4890,10 @@ new SharedPollPublishResult()
 
 SharedPollPublishResult is the result of a shared poll publish call.
 Empty at the moment.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -4646,6 +4910,10 @@ StreamPosition is a position in a channel stream.
 
 - `$offset` `int` - The offset in the stream.
 - `$epoch` `string` - The stream epoch.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -4673,6 +4941,10 @@ subscription. Unset fields keep the value from the channel configuration.
 - `$forcePositioning` `bool|null` - Overrides the $forcePositioning channel option.
 - `$forcePushJoinLeave` `bool|null` - Overrides the $forcePushJoinLeave channel option.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -4685,6 +4957,10 @@ new SubscribeResult()
 ```
 
 SubscribeResult is the result of a subscribe call. Empty at the moment.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -4703,6 +4979,10 @@ Centrifugo PRO only.
 - `$uid` `string` - The unique token ID (jti claim).
 - `$issuedAt` `int` - The Unix time in seconds when the token was issued.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -4716,6 +4996,10 @@ new UnblockUserResult()
 
 UnblockUserResult is the result of an unblock user call. Empty at the
 moment. Centrifugo PRO only.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -4731,6 +5015,10 @@ new UnsubscribeResult()
 UnsubscribeResult is the result of an unsubscribe call. Empty at the
 moment.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -4745,6 +5033,10 @@ new UpdatePushStatusResult()
 UpdatePushStatusResult is the result of an update push status call.
 Empty at the moment. Centrifugo PRO only.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -4758,6 +5050,10 @@ new UpdateUserStatusResult()
 
 UpdateUserStatusResult is the result of an update user status call. Empty
 at the moment. Centrifugo PRO only.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -4777,6 +5073,10 @@ UserStatus is the status of a user. Centrifugo PRO only.
 - `$online` `int` - The last online time as Unix seconds, updated by Centrifugo while the user is connected. Not set if unknown.
 - `$state` `string` - The custom state set with UpdateUserStatusRequest::$state, if any.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -4794,6 +5094,10 @@ UserTopic is a topic subscription of a user. Centrifugo PRO only.
 - `$user` `string` - The user ID.
 - `$topic` `string` - The topic.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -4810,6 +5114,10 @@ UserTopicFilter selects user topic subscriptions. Centrifugo PRO only.
 - `$users` `list<string>` - Selects by user.
 - `$topics` `list<string>` - Selects by topic.
 - `$topicPrefix` `string` - Selects by topic prefix.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -4829,6 +5137,10 @@ Centrifugo PRO only.
 - `$nextCursor` `string` - The cursor of the next page. Empty if there is no next page.
 - `$totalCount` `int` - The total count for the filter, if $includeTotalCount was set.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -4842,6 +5154,10 @@ new UserTopicUpdateResult()
 
 UserTopicUpdateResult is the result of a user topic update call. Empty at
 the moment. Centrifugo PRO only.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -4859,6 +5175,10 @@ Centrifugo PRO only.
 
 - `$headers` `array<string, string>` - Web Push HTTP headers. Recognized keys: TTL (seconds, default 4 weeks), Urgency (very-low, low, normal, high) and Topic.
 - `$payload` `mixed` - The JSON payload delivered to the browser service worker. Required.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -4884,6 +5204,10 @@ ChannelEvent is a change of a channel's state.
 - `$channel` `string` - The channel it happened in.
 - `$type` `string` - "occupied" when the channel got its first subscriber, "vacated" when it lost its last one. More types may come; the field is a string, not an enum, for JSON interoperability.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -4902,6 +5226,10 @@ operation and matches the channel. Centrifugo PRO only.
 - `$channels` `list<string>` - The channels, or channel patterns, it applies to.
 - `$allow` `list<string>` - The operations it grants: "sub" (subscribe), "pub" (publish), "hst" (history) and "prs" (presence).
 - `$match` `string` - How channels are matched: empty for exact names, "wildcard" or "regex".
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -4935,6 +5263,10 @@ ConnectRequest is sent when a client connects.
 - `$name` `string` - The client's name, if it sent one.
 - `$version` `string` - The client's version, if it sent one.
 - `$channels` `list<string>` - The server-side channels the client asks to be subscribed to. The backend checks its permissions and returns the allowed ones in ConnectResult::$channels or ConnectResult::$subs.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -4973,6 +5305,10 @@ ConnectResult accepts the connection.
 - `$caps` `list<ChannelsCapability>` - Capabilities granting the connection operations in channels. Centrifugo PRO only.
 - `$labels` `array<string, string>` - PRO only — client labels attached to the centrifuge.Client by Centrifugo PRO. Parsed by OSS but not used (OSS does not populate centrifuge.ConnectReply.Labels).
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -5001,6 +5337,10 @@ logical node combines its nodes: it sets op and nodes only.
 - `$val` `string` - The value most comparisons compare the tag with.
 - `$vals` `list<string>` - The values "in" and "nin" compare the tag with.
 - `$nodes` `list<FilterNode>` - The operands of a logical node.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -5038,6 +5378,10 @@ MapPublishRequest is sent when a client publishes a key into a map channel.
 - `$b64data` `string` - Data in base64, sent instead of data in binary encoding mode.
 - `$meta` `mixed` - The connection's meta, when the proxy has include_connection_meta.
 - `$labels` `array<string, string>` - PRO only — connection labels attached to the originating centrifuge.Client. Centrifugo PRO always populates this from Client.Labels() (no opt-in toggle).
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -5079,6 +5423,10 @@ unset keep what the client sent, or the defaults.
 - `$version` `int` - The key's version: Centrifugo drops a publication older than the key's latest.
 - `$versionEpoch` `string` - Scopes version, for versions which may start over.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -5112,6 +5460,10 @@ MapRemoveRequest is sent when a client removes a key from a map channel.
 - `$meta` `mixed` - The connection's meta, when the proxy has include_connection_meta.
 - `$labels` `array<string, string>` - PRO only — connection labels attached to the originating centrifuge.Client. Centrifugo PRO always populates this from Client.Labels() (no opt-in toggle).
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -5130,6 +5482,10 @@ keep what the client sent, or the defaults.
 - `$tags` `array<string, string>` - Attached to the removal publication. When unset, the removed entry's own tags are.
 - `$idempotencyKey` `string` - Makes the removal idempotent within the broker's idempotency window.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -5147,6 +5503,10 @@ PRO only.
 
 - `$channel` `string` - The channel whose cache is empty.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -5161,6 +5521,10 @@ new NotifyCacheEmptyResult(bool $populated = false)
 NotifyCacheEmptyResult is the NotifyCacheEmptyResult message of the Centrifugo proxy protocol.
 
 - `$populated` `bool` - Tells Centrifugo that the backend published into the channel, so that it tries to recover the state once more.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -5178,6 +5542,10 @@ only, in preview.
 
 - `$events` `list<ChannelEvent>` - The events which happened, in channels with presence.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -5190,6 +5558,10 @@ new NotifyChannelStateResult()
 ```
 
 NotifyChannelStateResult is the NotifyChannelStateResult message of the Centrifugo proxy protocol.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -5226,6 +5598,10 @@ PublishRequest is sent when a client publishes into a channel.
 - `$meta` `mixed` - The connection's meta, when the proxy has include_connection_meta.
 - `$labels` `array<string, string>` - PRO only — connection labels attached to the originating centrifuge.Client. Centrifugo PRO always populates this from Client.Labels() (no opt-in toggle).
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -5257,6 +5633,10 @@ client sent, or the defaults.
 - `$delta` `bool` - Enables delta compression for the publication.
 - `$version` `int` - The publication's version, for channels whose publications each carry the whole state: Centrifugo drops one older than the latest.
 - `$versionEpoch` `string` - Scopes version, for versions which may start over - when they come from a system which can lose its state, say.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -5293,6 +5673,10 @@ RPCRequest is sent when a client makes an RPC call.
 - `$meta` `mixed` - The connection's meta, when the proxy has include_connection_meta.
 - `$labels` `array<string, string>` - PRO only — connection labels attached to the originating centrifuge.Client. Centrifugo PRO always populates this from Client.Labels() (no opt-in toggle).
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -5308,6 +5692,10 @@ RPCResult is the call's result.
 
 - `$data` `mixed` - The result sent to the client: any JSON.
 - `$b64data` `string` - Data in base64, for binary data.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -5338,6 +5726,10 @@ RefreshRequest is sent when a connection is about to expire.
 - `$meta` `mixed` - The connection's meta, when the proxy has include_connection_meta.
 - `$labels` `array<string, string>` - PRO only — connection labels attached to the originating centrifuge.Client. Centrifugo PRO always populates this from Client.Labels() (no opt-in toggle).
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -5365,6 +5757,10 @@ RefreshResult extends the connection, or ends it.
 - `$meta` `mixed` - Replaces the connection's meta, as JSON.
 - `$caps` `list<ChannelsCapability>` - Replace the connection's capabilities. Centrifugo PRO only.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -5380,6 +5776,10 @@ SharedPollRefreshItem is an item to refresh.
 
 - `$key` `string` - The item's key.
 - `$version` `int` - The latest version of the item Centrifugo has, in versioned mode: zero when it has none. Not set in versionless mode.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -5398,6 +5798,10 @@ shared poll channel.
 - `$channel` `string` - The shared poll channel.
 - `$items` `list<SharedPollRefreshItem>` - The tracked items to refresh.
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -5414,6 +5818,10 @@ is unchanged.
 
 - `$items` `list<SharedPollRefreshResultItem>` - The items' current data.
 - `$epoch` `string` - Identifies the publisher's version space: when it differs from the channel's, Centrifugo drops the versions and data it keeps and resubscribes the channel's subscribers. Generate one per process start, and send the same one with direct publishes. Empty means versions are never reset.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -5439,6 +5847,10 @@ SharedPollRefreshResultItem is an item's current data.
 - `$version` `int` - The item's version: required in versioned mode, optional in versionless mode. It must grow when the item changes.
 - `$removed` `bool` - Removes the item: subscribers are told so, and it is no longer tracked.
 - `$prevData` `mixed` - The item's previous data, the base for delta compression when the namespace uses it, so that Centrifugo need not keep it.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -5471,6 +5883,10 @@ SubRefreshRequest is sent when a subscription is about to expire.
 - `$meta` `mixed` - The connection's meta, when the proxy has include_connection_meta.
 - `$labels` `array<string, string>` - PRO only — connection labels attached to the originating centrifuge.Client. Centrifugo PRO always populates this from Client.Labels() (no opt-in toggle).
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -5495,6 +5911,10 @@ SubRefreshResult extends the subscription, or ends it.
 - `$info` `mixed` - Replaces the channel-specific information about the connection, as JSON.
 - `$b64info` `string` - Info in base64, for binary info.
 - `$serverTagsFilter` `FilterNode|null` - When set, replaces the server-side tags filter of the subscription (Centrifugo PRO). When not set the filter is kept as it is.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -5521,6 +5941,10 @@ subscription. An unset field keeps the namespace's value.
 - `$forceRecovery` `bool|null` - Overrides the namespace's $forceRecovery option.
 - `$forcePositioning` `bool|null` - Overrides the namespace's $forcePositioning option.
 - `$forcePushJoinLeave` `bool|null` - Overrides the namespace's $forcePushJoinLeave option.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -5553,6 +5977,10 @@ ConnectResult::$subs.
 - `$override` `SubscribeOptionOverride|null` - Overrides channel options of the namespace for this subscription.
 - `$serverTagsFilter` `FilterNode|null` - Makes the subscription receive only publications whose tags match it. Centrifugo PRO only.
 - `$cacheRecover` `bool` - When set, makes Centrifugo initiate cache recovery for the server-side subscription without requiring the client to provide a recover flag/position itself. This is the server-side equivalent of subscribing with an empty `since` on the client. Mostly useful for unidirectional clients which do not know channel names. Requires recovery to be enabled for the channel and only applies in cache recovery mode, where it delivers the latest publication on (re)subscribe.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 
@@ -5591,6 +6019,10 @@ SubscribeRequest is sent when a client subscribes to a channel.
 - `$b64data` `string` - Data in base64, sent instead of data in binary encoding mode.
 - `$labels` `array<string, string>` - PRO only — connection labels attached to the originating centrifuge.Client. Centrifugo PRO always populates this from Client.Labels() (no opt-in toggle).
 
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -5621,6 +6053,10 @@ SubscribeResult accepts the subscription.
 - `$override` `SubscribeOptionOverride|null` - Overrides channel options of the namespace for this subscription.
 - `$allow` `list<string>` - Capabilities granted in the channel for this subscription: "sub", "pub", "hst" and "prs". Centrifugo PRO only.
 - `$serverTagsFilter` `FilterNode|null` - Makes the subscription receive only publications whose tags match it. Centrifugo PRO only.
+
+##### `jsonSerialize(): RawJson`
+
+The message as toJson gives it, for a json_encode of your own.
 
 ##### `toJson(string $path = ''): string`
 

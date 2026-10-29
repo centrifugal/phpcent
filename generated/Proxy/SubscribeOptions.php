@@ -9,6 +9,7 @@ namespace Centrifugal\Phpcent\Proxy;
 use Centrifugal\Phpcent\Internal\Decode;
 use Centrifugal\Phpcent\Internal\Encode;
 use Centrifugal\Phpcent\Message;
+use Centrifugal\Phpcent\RawJson;
 
 /**
  * SubscribeOptions are the options of a server-side subscription returned in
@@ -82,6 +83,12 @@ final class SubscribeOptions implements Message
         }
 
         return '{' . implode(',', $p) . '}';
+    }
+
+    /** The message as toJson gives it, for a json_encode of your own. */
+    public function jsonSerialize(): RawJson
+    {
+        return new RawJson($this->toJson());
     }
 
     /** @internal */

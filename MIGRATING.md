@@ -3,8 +3,9 @@
 phpcent 7 is a rewrite, to the
 [Centrifugo server SDK specification](https://github.com/centrifugal/gocent/blob/master/spec.md).
 It needs PHP 8.3 or newer, and lives in the `Centrifugal\Phpcent` namespace
-instead of `phpcent` - so both can be installed while you move code over, from
-two packages.
+instead of `phpcent`. Both are the `centrifugal/phpcent` package, so an
+application moves over at once; one which needs time can stay on
+`"centrifugal/phpcent": "^6.0"`, which keeps working.
 
 What changes:
 
@@ -55,7 +56,7 @@ Decide, for each broadcast and batch, which you want:
 try {
     $client->broadcast(channels: $channels, data: $data);
 } catch (BroadcastFailedChannelsException $e) {
-    foreach ($e->result->failed() as $ch) {
+    foreach ($e->result->failed as $ch) {
         $logger->warning("broadcast to {$ch->channel} failed: {$ch->error->getMessage()}");
     }
 }

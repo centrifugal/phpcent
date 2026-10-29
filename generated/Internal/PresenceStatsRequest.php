@@ -8,6 +8,7 @@ namespace Centrifugal\Phpcent\Internal;
 
 use Centrifugal\Phpcent\Message;
 use Centrifugal\Phpcent\PresenceStatsResult;
+use Centrifugal\Phpcent\RawJson;
 
 /**
  * PresenceStatsRequest returns short presence information of a channel: the
@@ -53,6 +54,12 @@ final class PresenceStatsRequest implements Message, Request
         }
 
         return '{' . implode(',', $p) . '}';
+    }
+
+    /** The message as toJson gives it, for a json_encode of your own. */
+    public function jsonSerialize(): RawJson
+    {
+        return new RawJson($this->toJson());
     }
 
     /** @internal */

@@ -157,9 +157,53 @@ final class ClientTest extends TestCase
             }
             /** @var class-string<Request<mixed>> $class */
             $class = 'Centrifugal\\Phpcent\\Internal\\' . ucfirst($name) . 'Request';
-            $args = $name === 'publish' ? ['channel' => 'ch', 'data' => 1] : [];
+            $args = $name === 'publish' ? ['channel' => 'ch', 'data' => 1] : self::requiredArgs($m);
             yield $name => [$name, $class, $args];
         }
+    }
+
+    /**
+     * Zero values of a method's required arguments.
+     *
+     * @return array<string, mixed>
+     */
+    private static function requiredArgs(\ReflectionMethod $m): array
+    {
+        $args = [];
+        foreach ($m->getParameters() as $p) {
+            if ($p->isOptional()) {
+                continue;
+            }
+            $type = $p->getType();
+            self::assertInstanceOf(\ReflectionNamedType::class, $type);
+            $args[$p->getName()] = match ($type->getName()) {
+                'string' => '',
+                'int' => 0,
+                'bool' => false,
+                'array' => [],
+                default => new ($type->getName())(),
+            };
+        }
+
+        return $args;
+    }
+
+    public function testRequiredFieldsAreRequiredArguments(): void
+    {
+        $c = FakeCentrifugo::client(new FakeCentrifugo());
+        try {
+            // @phpstan-ignore arguments.count
+            $c->history();
+            self::fail('history without a channel');
+        } catch (\ArgumentCountError $e) {
+            self::assertStringContainsString('Too few arguments to function Centrifugal\\Phpcent\\Client::history()', $e->getMessage());
+        }
+        // "Required unless ..." stays optional: publish takes data or b64data.
+        $publish = new \ReflectionMethod(Client::class, 'publish');
+        self::assertSame(['channel'], array_map(
+            static fn(\ReflectionParameter $p): string => $p->getName(),
+            array_values(array_filter($publish->getParameters(), static fn(\ReflectionParameter $p): bool => !$p->isOptional())),
+        ));
     }
 
     /**
@@ -208,7 +252,7 @@ final class ClientTest extends TestCase
     public function testClientBatchAndCommandTakeTheSameArguments(): void
     {
         $params = static fn(\ReflectionMethod $m): array => array_map(
-            static fn(\ReflectionParameter $p): string => $p->getType() . ' $' . $p->getName() . ' = ' . var_export($p->getDefaultValue(), true),
+            static fn(\ReflectionParameter $p): string => $p->getType() . ' $' . $p->getName() . ($p->isDefaultValueAvailable() ? ' = ' . var_export($p->getDefaultValue(), true) : ''),
             $m->getParameters(),
         );
         $client = new \ReflectionClass(Client::class);
@@ -390,6 +434,33 @@ final class ClientTest extends TestCase
         FakeCentrifugo::client($fake)->info();
     }
 
+    public function testPsr18TimeoutsAndCertificateErrors(): void
+    {
+        $error = static fn(string $message): \Closure => static fn(): \Throwable => new class ($message) extends \RuntimeException implements NetworkExceptionInterface {
+            public function getRequest(): RequestInterface
+            {
+                return (new Psr17Factory())->createRequest('POST', 'http://x');
+            }
+        };
+        // Guzzle's and Symfony's wording of their own timeouts.
+        foreach (['cURL error 28: Operation timed out after 500 milliseconds', 'Idle timeout reached for "http://x".'] as $message) {
+            try {
+                FakeCentrifugo::client(new FakeCentrifugo($error($message)))->info();
+                self::fail('no error');
+            } catch (TimeoutException $e) {
+                self::assertTrue(Retry::retryable($e));
+                self::assertStringContainsString($message, $e->getMessage());
+            }
+        }
+        try {
+            FakeCentrifugo::client(new FakeCentrifugo($error('cURL error 60: SSL certificate problem: unable to get local issuer certificate')))->info();
+            self::fail('no error');
+        } catch (NetworkException $e) {
+            self::assertTrue($e->certificate);
+            self::assertFalse(Retry::retryable($e));
+        }
+    }
+
     public function testNetworkError(): void
     {
         $fake = new FakeCentrifugo(static fn(): \Throwable => new class ('refused') extends \RuntimeException implements NetworkExceptionInterface {
@@ -411,14 +482,21 @@ final class ClientTest extends TestCase
     {
         $fake = new FakeCentrifugo();
         try {
-            FakeCentrifugo::client($fake)->info(timeout: 0.0);
+            FakeCentrifugo::client($fake)->info(timeout: 1e-9);
             self::fail('no error');
         } catch (TimeoutException $e) {
             self::assertTrue(Retry::retryable($e));
         }
         self::assertSame([], $fake->requests);
-        $this->expectException(InvalidRequestException::class);
-        FakeCentrifugo::client($fake)->info(timeout: -1.0);
+        // 0 does not mean "no timeout", as in curl: it is refused, as a negative one is.
+        foreach ([0.0, -1.0] as $timeout) {
+            try {
+                FakeCentrifugo::client($fake)->info(timeout: $timeout);
+                self::fail("timeout {$timeout} taken");
+            } catch (InvalidRequestException $e) {
+                self::assertStringContainsString('positive number of seconds', $e->getMessage());
+            }
+        }
     }
 
     public function testInvalidRequestsAreNotSent(): void
@@ -426,9 +504,9 @@ final class ClientTest extends TestCase
         $fake = new FakeCentrifugo();
         $c = FakeCentrifugo::client($fake);
         foreach ([
-            ['publish', ['data' => 1], 'invalid publish request: channel is required'],
+            ['publish', ['channel' => '', 'data' => 1], 'invalid publish request: channel is required'],
             ['publish', ['channel' => 'a'], 'invalid publish request: data or b64data is required'],
-            ['broadcast', ['data' => 1], 'invalid broadcast request: channels is required'],
+            ['broadcast', ['channels' => [], 'data' => 1], 'invalid broadcast request: channels is required'],
             ['broadcast', ['channels' => ['a']], 'data or b64data is required'],
             ['broadcast', ['channels' => ['a', ''], 'data' => 1], 'channels[1] is empty'],
             ['publish', ['channel' => 'a', 'data' => \INF], 'invalid publish request: data cannot be encoded'],
@@ -461,7 +539,7 @@ final class ClientTest extends TestCase
         $fake = self::broadcastReply([['result' => ['offset' => 1]], ['result' => ['offset' => 2]]]);
         $res = FakeCentrifugo::client($fake)->broadcast(channels: ['a', 'b'], data: 1, idempotencyKey: 'k');
         self::assertTrue($res->replied);
-        self::assertSame([], $res->failed());
+        self::assertSame([], $res->failed);
         self::assertSame(['a', 'b'], array_map(static fn($c) => $c->channel, $res->channels));
         self::assertSame(2, $res->channels[1]->result?->offset);
         self::assertSame('k', $res->idempotencyKey);
@@ -477,7 +555,7 @@ final class ClientTest extends TestCase
         } catch (BroadcastFailedChannelsException $e) {
             self::assertNotInstanceOf(ApiException::class, $e);
             self::assertTrue($e->result->replied);
-            self::assertSame(['b', 'c'], array_map(static fn($c) => $c->channel, $e->result->failed()));
+            self::assertSame(['b', 'c'], array_map(static fn($c) => $c->channel, $e->result->failed));
             self::assertSame(['b', 'c'], array_map(static fn($c) => $c->channel, $e->failed));
             self::assertSame(3, $e->total);
             self::assertInstanceOf(UnknownChannelException::class, $e->failed[0]->error);
@@ -571,7 +649,10 @@ final class ClientTest extends TestCase
         try {
             FakeCentrifugo::client($fake)->broadcastWithRetry(channels: ['a'], data: 1, maxAttempts: 3, onAttemptError: static fn(): float => 0.0);
             self::fail('no error');
-        } catch (HttpException) {
+        } catch (HttpException $e) {
+            // The key the attempts carried, for a retry which does not publish twice.
+            $sent = array_unique(array_map(static fn(array $r): string => json_decode($r['body'])->idempotency_key, $fake->requests));
+            self::assertSame([$e->idempotencyKey], array_values($sent));
         }
         self::assertCount(3, $fake->requests);
     }

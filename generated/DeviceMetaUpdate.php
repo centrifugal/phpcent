@@ -35,6 +35,12 @@ final class DeviceMetaUpdate implements Message
         return '{' . implode(',', $p) . '}';
     }
 
+    /** The message as toJson gives it, for a json_encode of your own. */
+    public function jsonSerialize(): RawJson
+    {
+        return new RawJson($this->toJson());
+    }
+
     /** @internal */
     public static function fromWire(mixed $v, string $path): static
     {

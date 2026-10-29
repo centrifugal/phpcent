@@ -8,6 +8,7 @@ namespace Centrifugal\Phpcent\Proxy;
 
 use Centrifugal\Phpcent\Internal\Decode;
 use Centrifugal\Phpcent\Message;
+use Centrifugal\Phpcent\RawJson;
 
 /**
  * SubscribeOptionOverride overrides channel options of the namespace for one
@@ -55,6 +56,12 @@ final class SubscribeOptionOverride implements Message
         }
 
         return '{' . implode(',', $p) . '}';
+    }
+
+    /** The message as toJson gives it, for a json_encode of your own. */
+    public function jsonSerialize(): RawJson
+    {
+        return new RawJson($this->toJson());
     }
 
     /** @internal */

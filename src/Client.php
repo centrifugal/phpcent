@@ -28,7 +28,7 @@ use Psr\Http\Message\StreamFactoryInterface;
 /**
  * Calls Centrifugo's HTTP server API. Create it once and reuse it:
  *
- *     $client = new Client('http://localhost:8000/api', apiKey: getenv('CENTRIFUGO_API_KEY'));
+ *     $client = new Client('http://localhost:8000/api', apiKey: (string) getenv('CENTRIFUGO_API_KEY'));
  *     $client->publish(channel: 'news', data: ['text' => 'hello']);
  *
  * There is a method per API method, taking the fields of its request as named
@@ -80,7 +80,8 @@ final class Client
      *     instead of curl: Guzzle, Symfony HttpClient, a fake in tests. It is
      *     never changed: credentials and headers go on each request. Its own
      *     timeouts and redirect policy apply - PSR-18 has no way to give a
-     *     request a deadline.
+     *     request a deadline: set them on it. Its timeouts throw
+     *     TimeoutException too.
      * @param (RequestFactoryInterface&StreamFactoryInterface)|null $httpFactory
      *     the PSR-17 factories for httpClient's requests; not needed when
      *     httpClient implements them itself, as Symfony's Psr18Client does
@@ -89,12 +90,15 @@ final class Client
      *     like. Not the options phpcent sets itself.
      * @param float $requestTimeout seconds bounding a call without a timeout of
      *     its own, 10 by default. curl bounds the whole request by it -
-     *     connecting, sending, reading the reply.
+     *     connecting, sending, reading the reply. With httpClient, the
+     *     client's own timeouts bound the request instead.
      * @param array<string, string> $headers extra headers for every request, for
      *     a proxy in front of Centrifugo. Not X-API-Key, Authorization or
      *     Content-Type. A User-Agent replaces phpcent's.
      * @param ?callable(RequestInfo): void $onRequest called after every HTTP
-     *     request with a RequestInfo, for metrics; the call waits for it
+     *     request with a RequestInfo, for metrics; the call waits for it. It
+     *     must not throw: what it throws goes to the caller in place of the
+     *     call's outcome
      *
      * @throws InvalidConfigException naming the option and the fix
      */
@@ -448,8 +452,8 @@ final class Client
     {
         if ($timeout === null) {
             $timeout = $this->requestTimeout;
-        } elseif (!is_finite($timeout) || $timeout < 0) {
-            throw new InvalidRequestException('timeout must be a non-negative number of seconds');
+        } elseif (!is_finite($timeout) || $timeout <= 0) {
+            throw new InvalidRequestException('timeout must be a positive number of seconds: null for requestTimeout');
         }
 
         return self::now() + $timeout;
@@ -473,7 +477,14 @@ final class Client
     private static function outcome(BroadcastResult $res, bool $replied, ?\Throwable $last): BroadcastResult|\Throwable
     {
         if (!$replied) {
-            return $last ?? new \LogicException('phpcent: broadcastWithRetry: no reply and no error');
+            if ($last === null) {
+                return new \LogicException('phpcent: broadcastWithRetry: no reply and no error');
+            }
+            if (property_exists($last, 'idempotencyKey')) {
+                $last->idempotencyKey = $res->idempotencyKey;
+            }
+
+            return $last;
         }
         try {
             return $res->check();

@@ -8,6 +8,7 @@ namespace Centrifugal\Phpcent\Proxy;
 
 use Centrifugal\Phpcent\Internal\Decode;
 use Centrifugal\Phpcent\Message;
+use Centrifugal\Phpcent\RawJson;
 
 /**
  * NotifyChannelStateResult is the NotifyChannelStateResult message of the Centrifugo proxy protocol.
@@ -23,6 +24,12 @@ final class NotifyChannelStateResult implements Message
     public function toJson(string $path = ''): string
     {
         return '{}';
+    }
+
+    /** The message as toJson gives it, for a json_encode of your own. */
+    public function jsonSerialize(): RawJson
+    {
+        return new RawJson($this->toJson());
     }
 
     /** @internal */

@@ -8,6 +8,7 @@ namespace Centrifugal\Phpcent\Internal;
 
 use Centrifugal\Phpcent\FilterNode;
 use Centrifugal\Phpcent\Message;
+use Centrifugal\Phpcent\RawJson;
 use Centrifugal\Phpcent\UnsubscribeResult;
 
 /**
@@ -81,6 +82,12 @@ final class UnsubscribeRequest implements Message, Request
         }
 
         return '{' . implode(',', $p) . '}';
+    }
+
+    /** The message as toJson gives it, for a json_encode of your own. */
+    public function jsonSerialize(): RawJson
+    {
+        return new RawJson($this->toJson());
     }
 
     /** @internal */

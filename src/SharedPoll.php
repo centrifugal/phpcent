@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Centrifugal\Phpcent;
 
+use Centrifugal\Phpcent\Exception\InvalidRequestException;
+use Centrifugal\Phpcent\Token\Expiry;
+
 /**
  * Signatures for shared poll subscriptions.
  *
@@ -16,8 +19,9 @@ final class SharedPoll
     /**
      * The signature authorizing $user to track $keys in $channel until
      * $expiresAt, as Centrifugo verifies it: "iat:exp:hmac", iat now and exp
-     * $expiresAt in Unix seconds - 0 when $expiresAt is null, for a signature
-     * which does not expire. $secret is Centrifugo's
+     * $expiresAt in Unix seconds. $expiresAt is required, as a token's expiry
+     * is: a time, or Expiry::Never for a signature which never expires.
+     * $secret is Centrifugo's
      * shared_poll.hmac_secret_key; $user is the ID of the connection's user,
      * empty for an anonymous one.
      *
@@ -28,8 +32,10 @@ final class SharedPoll
      *     SharedPoll::sign($secret, user: '42', channel: 'poll:prices', keys: ['AAPL'], expiresAt: $exp);
      *
      * @param list<string> $keys
+     *
+     * @throws InvalidRequestException for an empty secret
      */
-    public static function sign(#[\SensitiveParameter] string $secret, string $user, string $channel, array $keys, ?\DateTimeInterface $expiresAt = null): string
+    public static function sign(#[\SensitiveParameter] string $secret, string $user, string $channel, array $keys, \DateTimeInterface|Expiry $expiresAt): string
     {
         return self::signAt($secret, $user, $channel, $keys, $expiresAt, time());
     }
@@ -41,12 +47,12 @@ final class SharedPoll
      *
      * @param list<string> $keys
      */
-    public static function signAt(#[\SensitiveParameter] string $secret, string $user, string $channel, array $keys, ?\DateTimeInterface $expiresAt, int $now): string
+    public static function signAt(#[\SensitiveParameter] string $secret, string $user, string $channel, array $keys, \DateTimeInterface|Expiry $expiresAt, int $now): string
     {
         if ($secret === '') {
-            throw new \InvalidArgumentException('sharedpoll: empty secret');
+            throw new InvalidRequestException('sharedpoll: empty secret');
         }
-        $exp = $expiresAt !== null ? (string) $expiresAt->getTimestamp() : '0';
+        $exp = $expiresAt instanceof \DateTimeInterface ? (string) $expiresAt->getTimestamp() : '0';
         $iat = (string) $now;
         $keysHash = hash('sha256', implode("\0", $keys));
         // NUL-separated, so that a colon in a user or channel cannot move

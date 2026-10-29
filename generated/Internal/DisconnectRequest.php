@@ -10,6 +10,7 @@ use Centrifugal\Phpcent\Disconnect;
 use Centrifugal\Phpcent\DisconnectResult;
 use Centrifugal\Phpcent\FilterNode;
 use Centrifugal\Phpcent\Message;
+use Centrifugal\Phpcent\RawJson;
 
 /**
  * DisconnectRequest disconnects a user's connections.
@@ -88,6 +89,12 @@ final class DisconnectRequest implements Message, Request
         }
 
         return '{' . implode(',', $p) . '}';
+    }
+
+    /** The message as toJson gives it, for a json_encode of your own. */
+    public function jsonSerialize(): RawJson
+    {
+        return new RawJson($this->toJson());
     }
 
     /** @internal */

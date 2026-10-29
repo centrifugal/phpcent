@@ -22,6 +22,27 @@ final class Pending
     public function __construct(private readonly \Closure $get) {}
 
     /**
+     * A Pending of no batch, whose result() returns $result or throws $error:
+     * for test doubles of code which reads a batch's outcomes.
+     *
+     * @template R
+     *
+     * @param R $result
+     *
+     * @return self<R>
+     */
+    public static function resolved(mixed $result = null, ?\Throwable $error = null): self
+    {
+        return new self(static function () use ($result, $error): mixed {
+            if ($error !== null) {
+                throw $error;
+            }
+
+            return $result;
+        });
+    }
+
+    /**
      * The command's result, or its error thrown: an ApiException for this
      * command, the error which failed the whole batch, or
      * BatchNotSentException. A broadcast throws

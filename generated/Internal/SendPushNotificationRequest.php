@@ -11,6 +11,7 @@ use Centrifugal\Phpcent\PushLimitStrategy;
 use Centrifugal\Phpcent\PushLocalization;
 use Centrifugal\Phpcent\PushNotification;
 use Centrifugal\Phpcent\PushRecipient;
+use Centrifugal\Phpcent\RawJson;
 use Centrifugal\Phpcent\SendPushNotificationResult;
 
 /**
@@ -113,6 +114,12 @@ final class SendPushNotificationRequest implements Message, Request
         }
 
         return '{' . implode(',', $p) . '}';
+    }
+
+    /** The message as toJson gives it, for a json_encode of your own. */
+    public function jsonSerialize(): RawJson
+    {
+        return new RawJson($this->toJson());
     }
 
     /** @internal */

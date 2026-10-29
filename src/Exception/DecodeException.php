@@ -9,4 +9,7 @@ namespace Centrifugal\Phpcent\Exception;
  * which does not point at Centrifugo's API, so that something else - a proxy,
  * a web page - answers instead.
  */
-final class DecodeException extends \RuntimeException implements CentException {}
+final class DecodeException extends \RuntimeException implements CentException
+{
+    use IdempotencyKey;
+}

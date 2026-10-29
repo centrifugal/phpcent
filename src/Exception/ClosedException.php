@@ -7,4 +7,7 @@ namespace Centrifugal\Phpcent\Exception;
 /**
  * A call made after the client was closed.
  */
-final class ClosedException extends \RuntimeException implements CentException {}
+final class ClosedException extends \RuntimeException implements CentException
+{
+    use IdempotencyKey;
+}

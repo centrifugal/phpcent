@@ -14,7 +14,9 @@ use Centrifugal\Phpcent\Internal\Validate;
  *
  * Consumers take it as its method and payload apart - the outbox table's
  * method and payload columns, a message attribute - or as the JSON message
- * {"method": ..., "payload": ...} of toJson (Kafka, NATS JetStream).
+ * {"method": ..., "payload": ...} of toJson (Kafka, NATS JetStream). A
+ * json_encode of the command - by a queue or an ORM, say - gives that message
+ * too, with payload as a JSON object, not as a string.
  *
  * Within a partition a consumer keeps commands in order: a channel's commands
  * keep their order only when every writer derives their partition from the
@@ -28,8 +30,11 @@ use Centrifugal\Phpcent\Internal\Validate;
  *     $cmd = Command::publish(channel: 'news', data: ['text' => 'hi']);
  *     $pdo->prepare('INSERT INTO centrifugo_outbox (method, payload, partition) VALUES (?, ?, 0)')
  *         ->execute([$cmd->method, $cmd->payload]);
+ *
+ * The outbox table's payload column is jsonb, and $cmd->payload goes into it
+ * as it is: JSON text, which PostgreSQL stores as the object.
  */
-final class Command
+final class Command implements \JsonSerializable
 {
     use CommandMethods;
 
@@ -52,5 +57,17 @@ final class Command
     public function toJson(): string
     {
         return '{"method":' . json_encode($this->method, \JSON_THROW_ON_ERROR) . ',"payload":' . $this->payload . '}';
+    }
+
+    /**
+     * The message of toJson, for a json_encode of your own: payload a JSON
+     * object. toJson keeps the payload's text exactly - numbers beyond PHP's
+     * int and float included - where json_encode decodes and encodes it again.
+     *
+     * @return array{method: string, payload: RawJson}
+     */
+    public function jsonSerialize(): array
+    {
+        return ['method' => $this->method, 'payload' => new RawJson($this->payload)];
     }
 }

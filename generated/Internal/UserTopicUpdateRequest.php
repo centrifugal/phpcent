@@ -24,7 +24,8 @@ final class UserTopicUpdateRequest implements Message, Request
     public const string API_METHOD = 'user_topic_update';
 
     /**
-     * @param string $user The user ID. Required.
+     * @param string $user The user ID. Required. "" updates the global binding, which every
+     *     device - anonymous ones included - gets on its next $deviceRegister.
      * @param string $op The operation: add, remove or set. Required.
      * @param list<string> $topics The topics for the operation.
      */

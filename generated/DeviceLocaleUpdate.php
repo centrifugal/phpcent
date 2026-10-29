@@ -15,7 +15,7 @@ use Centrifugal\Phpcent\Internal\Encode;
 final class DeviceLocaleUpdate implements Message
 {
     /**
-     * @param string $locale The locale to set. Required.
+     * @param string $locale The locale to set. Required. "" clears it.
      */
     public function __construct(
         public string $locale = '',

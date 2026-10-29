@@ -15,7 +15,7 @@ use Centrifugal\Phpcent\Internal\Encode;
 final class DeviceTimezoneUpdate implements Message
 {
     /**
-     * @param string $timezone The IANA time zone to set. Required.
+     * @param string $timezone The IANA time zone to set. Required. "" clears it.
      */
     public function __construct(
         public string $timezone = '',

@@ -552,6 +552,7 @@ function fieldParams(Command $c): array
             $docs[] = '    ' . $t;
         }
         if (required($f)) {
+            $GLOBALS['requiredFields']["{$c->request->name}.{$f->name}"] = true;
             // Required first: an optional parameter before a required one is
             // deprecated. Named arguments make the order no part of the API.
             $required[] = ltrim($type, '?') . " \${$name}";
@@ -811,12 +812,53 @@ function removeTree(string $dir): void
     rmdir($dir);
 }
 
+/**
+ * Fails when the fields made required arguments differ from REQUIRED_FILE;
+ * with $accept, records them there instead. A proto comment gaining
+ * "Required." is a breaking change of the methods taking the field: it is a
+ * decision, not a side effect of a sync.
+ */
+function checkRequired(bool $accept): bool
+{
+    $want = array_keys($GLOBALS['requiredFields']);
+    sort($want);
+    if ($accept) {
+        file_put_contents(REQUIRED_FILE, implode('', array_map(static fn(string $r): string => "{$r}\n", $want)));
+
+        return true;
+    }
+    $have = is_file(REQUIRED_FILE) ? preg_split('/\s+/', trim((string) file_get_contents(REQUIRED_FILE)), -1, \PREG_SPLIT_NO_EMPTY) : [];
+    $added = array_values(array_diff($want, $have));
+    $removed = array_values(array_diff($have, $want));
+    if ($added === [] && $removed === []) {
+        return true;
+    }
+    $msg = 'the fields the protos mark Required. changed:';
+    if ($added !== []) {
+        $msg .= "\n  newly required (breaking: calls without them fail): " . implode(', ', $added);
+    }
+    if ($removed !== []) {
+        $msg .= "\n  no longer required: " . implode(', ', $removed);
+    }
+    fwrite(STDERR, $msg . "\nReview them, then run php gen/generate.php --accept-required to record them in gen/required_fields.txt\n");
+
+    return false;
+}
+
+const REQUIRED_FILE = ROOT . '/gen/required_fields.txt';
+$GLOBALS['requiredFields'] = [];
+
 function main(array $argv): int
 {
     $check = \in_array('--check', $argv, true);
     $tmp = sys_get_temp_dir() . '/phpcent-gen-' . bin2hex(random_bytes(6));
     try {
-        writeFormatted(generate(), $tmp);
+        $files = generate();
+        // Before writing: nothing is generated from unreviewed required fields.
+        if (!checkRequired(\in_array('--accept-required', $argv, true))) {
+            return 1;
+        }
+        writeFormatted($files, $tmp);
         $fresh = readTree($tmp);
         $target = ROOT . '/generated';
         if ($check) {

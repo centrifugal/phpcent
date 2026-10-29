@@ -210,7 +210,7 @@ Deletes the status of users. Centrifugo PRO only.
 - `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `deviceList(
-    DeviceFilter $filter,
+    ?DeviceFilter $filter = null,
     bool $includeTotalCount = false,
     bool $includeMeta = false,
     bool $includeTopics = false,
@@ -223,7 +223,7 @@ Deletes the status of users. Centrifugo PRO only.
 Returns a paginated list of registered devices.
 Centrifugo PRO only.
 
-- `$filter` - Selects the devices to list. Required.
+- `$filter` - Selects the devices to list: all of them when unset.
 - `$includeTotalCount` - Includes the total count for the filter in the result.
 - `$includeMeta` - Includes meta of each device.
 - `$includeTopics` - Includes topics of each device.
@@ -765,7 +765,7 @@ subscriptions. Centrifugo PRO only.
 Changes the topics of a user. The change is also
 applied to the user's registered devices. Centrifugo PRO only.
 
-- `$user` - The user ID. Required.
+- `$user` - The user ID. Required. "" updates the global binding, which every device - anonymous ones included - gets on its next $deviceRegister.
 - `$op` - The operation: add, remove or set. Required.
 - `$topics` - The topics for the operation.
 - `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
@@ -870,7 +870,7 @@ batch is sent.
 - `$users` - The list of user IDs to delete the status for. Required.
 
 #### `deviceList(
-    DeviceFilter $filter,
+    ?DeviceFilter $filter = null,
     bool $includeTotalCount = false,
     bool $includeMeta = false,
     bool $includeTopics = false,
@@ -885,7 +885,7 @@ Centrifugo PRO only.
 Adds the command to the batch: its Pending holds the result once the
 batch is sent.
 
-- `$filter` - Selects the devices to list. Required.
+- `$filter` - Selects the devices to list: all of them when unset.
 - `$includeTotalCount` - Includes the total count for the filter in the result.
 - `$includeMeta` - Includes meta of each device.
 - `$includeTopics` - Includes topics of each device.
@@ -1459,7 +1459,7 @@ applied to the user's registered devices. Centrifugo PRO only.
 Adds the command to the batch: its Pending holds the result once the
 batch is sent.
 
-- `$user` - The user ID. Required.
+- `$user` - The user ID. Required. "" updates the global binding, which every device - anonymous ones included - gets on its next $deviceRegister.
 - `$op` - The operation: add, remove or set. Required.
 - `$topics` - The topics for the operation.
 
@@ -1822,7 +1822,7 @@ The command making the call, checked as a Client checks it.
 - `$users` - The list of user IDs to delete the status for. Required.
 
 #### `static deviceList(
-    DeviceFilter $filter,
+    ?DeviceFilter $filter = null,
     bool $includeTotalCount = false,
     bool $includeMeta = false,
     bool $includeTopics = false,
@@ -1836,7 +1836,7 @@ Centrifugo PRO only.
 
 The command making the call, checked as a Client checks it.
 
-- `$filter` - Selects the devices to list. Required.
+- `$filter` - Selects the devices to list: all of them when unset.
 - `$includeTotalCount` - Includes the total count for the filter in the result.
 - `$includeMeta` - Includes meta of each device.
 - `$includeTopics` - Includes topics of each device.
@@ -2381,7 +2381,7 @@ applied to the user's registered devices. Centrifugo PRO only.
 
 The command making the call, checked as a Client checks it.
 
-- `$user` - The user ID. Required.
+- `$user` - The user ID. Required. "" updates the global binding, which every device - anonymous ones included - gets on its next $deviceRegister.
 - `$op` - The operation: add, remove or set. Required.
 - `$topics` - The topics for the operation.
 
@@ -3874,7 +3874,7 @@ new DeviceLocaleUpdate(string $locale = '')
 
 DeviceLocaleUpdate sets the locale of devices. Centrifugo PRO only.
 
-- `$locale` `string` - The locale to set. Required.
+- `$locale` `string` - The locale to set. Required. "" clears it.
 
 ##### `jsonSerialize(): RawJson`
 
@@ -3893,7 +3893,7 @@ new DeviceMetaUpdate(array $meta = [])
 
 DeviceMetaUpdate sets the meta of devices. Centrifugo PRO only.
 
-- `$meta` `array<string, string>` - The meta to set. Required.
+- `$meta` `array<string, string>` - The meta to set. Required. An empty map clears it.
 
 ##### `jsonSerialize(): RawJson`
 
@@ -3950,7 +3950,7 @@ new DeviceTimezoneUpdate(string $timezone = '')
 
 DeviceTimezoneUpdate sets the timezone of devices. Centrifugo PRO only.
 
-- `$timezone` `string` - The IANA time zone to set. Required.
+- `$timezone` `string` - The IANA time zone to set. Required. "" clears it.
 
 ##### `jsonSerialize(): RawJson`
 
@@ -4099,7 +4099,7 @@ new DeviceUserUpdate(string $user = '')
 
 DeviceUserUpdate sets the user of devices. Centrifugo PRO only.
 
-- `$user` `string` - The user ID to set. Required.
+- `$user` `string` - The user ID to set. Required. "" detaches the devices from their user.
 
 ##### `jsonSerialize(): RawJson`
 

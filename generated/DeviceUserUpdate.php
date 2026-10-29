@@ -15,7 +15,8 @@ use Centrifugal\Phpcent\Internal\Encode;
 final class DeviceUserUpdate implements Message
 {
     /**
-     * @param string $user The user ID to set. Required.
+     * @param string $user The user ID to set. Required. "" detaches the devices from their
+     *     user.
      */
     public function __construct(
         public string $user = '',

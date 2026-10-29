@@ -11,6 +11,7 @@ misuse. Read this before changing code.
 | Path | What |
 |---|---|
 | `proto/api.proto`, `proto/proxy.proto` | Copies of Centrifugo's protos, from a released tag (`CENTRIFUGO_REF=v6.10.2 composer sync-proto`) |
+| `gen/required_fields.txt` | The fields the protos mark "Required.", made required named arguments. Generation fails when the protos' list differs: a newly required field breaks every call without it, so review the change - fix the proto upstream if Centrifugo accepts the field absent - then `php gen/generate.php --accept-required` |
 | `gen/` | The generator: `Proto.php` parses the protos, `generate.php` writes `generated/`, `api_docs.php` writes `API.md` |
 | `generated/` | Generated - never edited: the result and nested message types; `ClientMethods`, `BatchMethods`, `CommandMethods`, the methods taking each request's fields as named arguments; `Internal/` the request classes they build; `Proxy/` types |
 | `API.md` | The API reference, generated from the docblocks by `composer docs` - never edited |

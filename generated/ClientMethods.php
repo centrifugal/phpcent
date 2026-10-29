@@ -867,7 +867,7 @@ trait ClientMethods
      * Returns a paginated list of registered devices.
      * Centrifugo PRO only.
      *
-     * @param DeviceFilter $filter Selects the devices to list. Required.
+     * @param DeviceFilter|null $filter Selects the devices to list: all of them when unset.
      * @param bool $includeTotalCount Includes the total count for the filter in the
      *     result.
      * @param bool $includeMeta Includes meta of each device.
@@ -883,7 +883,7 @@ trait ClientMethods
      * @throws CentException
      */
     public function deviceList(
-        DeviceFilter $filter,
+        ?DeviceFilter $filter = null,
         bool $includeTotalCount = false,
         bool $includeMeta = false,
         bool $includeTopics = false,
@@ -1001,7 +1001,8 @@ trait ClientMethods
      * Changes the topics of a user. The change is also
      * applied to the user's registered devices. Centrifugo PRO only.
      *
-     * @param string $user The user ID. Required.
+     * @param string $user The user ID. Required. "" updates the global binding, which every
+     *     device - anonymous ones included - gets on its next $deviceRegister.
      * @param string $op The operation: add, remove or set. Required.
      * @param list<string> $topics The topics for the operation.
      * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an

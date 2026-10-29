@@ -25,7 +25,7 @@ final class DeviceListRequest implements Message, Request
     public const string API_METHOD = 'device_list';
 
     /**
-     * @param DeviceFilter|null $filter Selects the devices to list. Required.
+     * @param DeviceFilter|null $filter Selects the devices to list: all of them when unset.
      * @param bool $includeTotalCount Includes the total count for the filter in the
      *     result.
      * @param bool $includeMeta Includes meta of each device.

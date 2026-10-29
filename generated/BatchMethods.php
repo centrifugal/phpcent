@@ -756,7 +756,7 @@ trait BatchMethods
      * Adds the command to the batch: its Pending holds the result once the
      * batch is sent.
      *
-     * @param DeviceFilter $filter Selects the devices to list. Required.
+     * @param DeviceFilter|null $filter Selects the devices to list: all of them when unset.
      * @param bool $includeTotalCount Includes the total count for the filter in the
      *     result.
      * @param bool $includeMeta Includes meta of each device.
@@ -770,7 +770,7 @@ trait BatchMethods
      * @return Pending<DeviceListResult>
      */
     public function deviceList(
-        DeviceFilter $filter,
+        ?DeviceFilter $filter = null,
         bool $includeTotalCount = false,
         bool $includeMeta = false,
         bool $includeTopics = false,
@@ -890,7 +890,8 @@ trait BatchMethods
      * Adds the command to the batch: its Pending holds the result once the
      * batch is sent.
      *
-     * @param string $user The user ID. Required.
+     * @param string $user The user ID. Required. "" updates the global binding, which every
+     *     device - anonymous ones included - gets on its next $deviceRegister.
      * @param string $op The operation: add, remove or set. Required.
      * @param list<string> $topics The topics for the operation.
      *

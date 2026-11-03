@@ -9,12 +9,17 @@ use Centrifugal\Phpcent\Exception\TimeoutException;
 use Psr\Http\Client\ClientExceptionInterface;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
+use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamFactoryInterface;
 
 /**
- * A PSR-18 client the application passed: its own timeouts, redirect policy and
- * connection handling apply - PSR-18 has no way to give a request a deadline.
- * The client is never changed: credentials and headers go on each request.
+ * A PSR-18 client the application passed: its redirect policy and connection
+ * handling apply. PSR-18 has no way to give a request a deadline, so Guzzle
+ * and Symfony's Psr18Client get the call's through their own API - Guzzle's
+ * `timeout` request option, Symfony's `max_duration` - and any other client
+ * has only its own timeouts. The client is never changed: credentials and
+ * headers go on each request.
  *
  * PSR-18 has no timeout or certificate exceptions either: the client's
  * exception is a TimeoutException when the call's time ran out or its
@@ -46,15 +51,11 @@ final class Psr18Transport implements Transport
         }
         $start = hrtime(true);
         try {
-            $resp = $this->client->sendRequest($req);
+            $resp = $this->send($req, $timeout);
         } catch (ClientExceptionInterface $e) {
-            $why = "{$method}: " . $e::class . ': ' . $e->getMessage();
-            $text = self::messages($e);
-            if ((hrtime(true) - $start) / 1e9 >= $timeout || preg_match(self::TIMEOUT, $text) === 1) {
-                throw new TimeoutException("{$method}: timed out: " . $e::class . ': ' . $e->getMessage(), 0, $e);
-            }
+            self::timedOut($e, $method, $start, $timeout);
 
-            throw new NetworkException($why, preg_match(self::CERTIFICATE, $text) === 1, $e);
+            throw new NetworkException("{$method}: " . $e::class . ': ' . $e->getMessage(), preg_match(self::CERTIFICATE, self::messages($e)) === 1, $e);
         }
         $status = $resp->getStatusCode();
         $respHeaders = [];
@@ -80,6 +81,10 @@ final class Psr18Transport implements Transport
                 }
             }
         } catch (\RuntimeException $e) {
+            // Symfony's client reads the body as it is asked for: its
+            // max_duration ends here.
+            self::timedOut($e, $method, $start, $timeout);
+
             throw new NetworkException("{$method}: reading the reply: {$e->getMessage()}", false, $e);
         } finally {
             $stream->close();
@@ -89,6 +94,38 @@ final class Psr18Transport implements Transport
     }
 
     public function close(): void {}
+
+    /**
+     * Sends $req within $timeout seconds, where the client lets a request have
+     * a deadline: Guzzle's send() with the options its sendRequest() sets
+     * itself, Symfony's client with max_duration. A class not installed makes
+     * instanceof false: neither library is a dependency.
+     */
+    private function send(RequestInterface $req, float $timeout): ResponseInterface
+    {
+        // Both read 0 as no limit.
+        $timeout = max($timeout, 0.001);
+        if ($this->client instanceof \GuzzleHttp\ClientInterface) {
+            return $this->client->send($req, [
+                'timeout' => $timeout,
+                'http_errors' => false,
+                'allow_redirects' => false,
+            ]);
+        }
+        if ($this->client instanceof \Symfony\Component\HttpClient\Psr18Client) {
+            return $this->client->withOptions(['max_duration' => $timeout])->sendRequest($req);
+        }
+
+        return $this->client->sendRequest($req);
+    }
+
+    /** Throws a TimeoutException when $e is one: the call's time ran out, or its message says it timed out. */
+    private static function timedOut(\Throwable $e, string $method, int|float $start, float $timeout): void
+    {
+        if ((hrtime(true) - $start) / 1e9 >= $timeout || preg_match(self::TIMEOUT, self::messages($e)) === 1) {
+            throw new TimeoutException("{$method}: timed out: " . $e::class . ': ' . $e->getMessage(), 0, $e);
+        }
+    }
 
     /** The messages of $e and the exceptions it wraps. */
     private static function messages(\Throwable $e): string

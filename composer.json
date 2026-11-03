@@ -33,10 +33,12 @@
     },
     "require-dev": {
         "friendsofphp/php-cs-fixer": "^3.64",
+        "guzzlehttp/guzzle": "^7.9",
         "nyholm/psr7": "^1.8",
         "phpstan/phpstan": "^2.1",
         "phpstan/phpstan-strict-rules": "^2.0",
-        "phpunit/phpunit": "^12.0"
+        "phpunit/phpunit": "^12.0",
+        "symfony/http-client": "^7.3"
     },
     "suggest": {
         "ext-curl": "The default HTTP transport; not needed with a PSR-18 client of your own",

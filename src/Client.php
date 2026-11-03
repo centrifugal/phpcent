@@ -78,10 +78,11 @@ final class Client
      *     together with apiKey.
      * @param ?ClientInterface $httpClient a PSR-18 client sending the requests,
      *     instead of curl: Guzzle, Symfony HttpClient, a fake in tests. It is
-     *     never changed: credentials and headers go on each request. Its own
-     *     timeouts and redirect policy apply - PSR-18 has no way to give a
-     *     request a deadline: set them on it. Its timeouts throw
-     *     TimeoutException too.
+     *     never changed: credentials and headers go on each request, and its
+     *     redirect policy applies. PSR-18 has no way to give a request a
+     *     deadline: Guzzle and Symfony's Psr18Client get the call's through
+     *     their own API; any other client has its own timeouts - set them on
+     *     it. Its timeouts throw TimeoutException too.
      * @param (RequestFactoryInterface&StreamFactoryInterface)|null $httpFactory
      *     the PSR-17 factories for httpClient's requests; not needed when
      *     httpClient implements them itself, as Symfony's Psr18Client does
@@ -90,8 +91,9 @@ final class Client
      *     like. Not the options phpcent sets itself.
      * @param float $requestTimeout seconds bounding a call without a timeout of
      *     its own, 10 by default. curl bounds the whole request by it -
-     *     connecting, sending, reading the reply. With httpClient, the
-     *     client's own timeouts bound the request instead.
+     *     connecting, sending, reading the reply - and so do Guzzle and
+     *     Symfony's client. Another httpClient's own timeouts bound the
+     *     request instead.
      * @param array<string, string> $headers extra headers for every request, for
      *     a proxy in front of Centrifugo. Not X-API-Key, Authorization or
      *     Content-Type. A User-Agent replaces phpcent's.

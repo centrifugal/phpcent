@@ -392,12 +392,14 @@ $client = new Client($endpoint, apiKey: $key, httpClient: new \Symfony\Component
 ```
 
 It is used as it is, and never changed: credentials and headers go on each
-request. PSR-18 has no way to give a request a deadline, so with your own
-client its timeouts apply, not phpcent's - set them on the client - and so
-does its redirect policy.
+request, and its redirect policy applies. PSR-18 has no way to give a request
+a deadline, so phpcent gives Guzzle and Symfony's `Psr18Client` the call's
+through their own API - Guzzle's `timeout` request option, Symfony's
+`max_duration` - and the whole request stops at it, as with curl. With any
+other client its own timeouts apply, not phpcent's: set them on the client.
 
 Tracing comes from the HTTP client: OpenTelemetry's curl instrumentation, or
-an instrumented PSR-18 client with its timeouts set. `onRequest` is told of
+an instrumented PSR-18 client. `onRequest` is told of
 every request - method, commands and how many failed, duration, status, error
 - for metrics without a dependency of phpcent's. It must not throw.
 

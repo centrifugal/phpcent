@@ -44,9 +44,10 @@ passes; if you find yourself about to break one, stop and say so instead.
    gives the same exception as a 200 reply.
 4. **One deadline per call.** Its `timeout`, or `requestTimeout`, bounds the
    whole call: curl's `CURLOPT_TIMEOUT_MS` covers connecting, sending and the
-   reply. A PSR-18 client the caller passed has its own timeouts - PSR-18
-   cannot give a request a deadline - which the docs say. Any timeout throws
-   `TimeoutException`.
+   reply. PSR-18 cannot give a request a deadline: Guzzle and Symfony's
+   `Psr18Client` get it through their own API (`Psr18Transport::send`), and
+   any other client the caller passed has its own timeouts, which the docs
+   say. Any timeout throws `TimeoutException`.
 5. **A payload is carried exactly.** Replies are decoded as objects
    (`json_decode($json, false)`), never associative arrays, so that a payload
    sent back unchanged is the same JSON value - `{}` and `{"0":"a"}`

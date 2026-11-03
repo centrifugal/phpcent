@@ -208,6 +208,7 @@ final class ClientTest extends TestCase
         self::assertSame([], $fake->requests);
     }
 
+
     // Every method.
 
     /** @return iterable<string, array{string, class-string<Request<mixed>>, array<string, mixed>}> */
@@ -727,6 +728,31 @@ final class ClientTest extends TestCase
         $keys = array_map(static fn(array $r): mixed => $r['json']->idempotency_key ?? null, $fake->requests);
         self::assertSame($keys[0], $keys[1]);
         self::assertSame(['c'], $fake->requests[1]['json']->channels);
+    }
+
+    /**
+     * A broadcast which failed as a whole in an attempt of broadcastWithRetry
+     * has every channel failed with that error (spec 7.1).
+     */
+    public function testFailedAsWholeHasEveryChannelFailed(): void
+    {
+        $fake = new FakeCentrifugo(static fn(): Response => FakeCentrifugo::json(503, ''));
+        $seen = null;
+        try {
+            FakeCentrifugo::client($fake)->broadcastWithRetry(channels: ['a', 'b'], data: 1, maxAttempts: 2, onAttemptError: static function (BroadcastAttempt $a) use (&$seen): float {
+                $seen = $a;
+
+                return 0.0;
+            });
+            self::fail('no error');
+        } catch (HttpException) {
+        }
+        self::assertInstanceOf(BroadcastAttempt::class, $seen);
+        self::assertSame(['a', 'b'], array_map(static fn($c): string => $c->channel, $seen->result->failed));
+        foreach ($seen->result->failed as $ch) {
+            self::assertSame($seen->error, $ch->error);
+        }
+        self::assertFalse($seen->result->replied);
     }
 
     public function testBroadcastWithRetryStops(): void

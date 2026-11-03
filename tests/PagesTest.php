@@ -282,6 +282,21 @@ final class PagesTest extends TestCase
         self::assertSame([], $fake->requests);
     }
 
+    public function testZeroPageTimeoutRefusedAtTheCall(): void
+    {
+        $fake = new FakeCentrifugo();
+        $c = FakeCentrifugo::client($fake);
+        foreach ([0.0, 0, -1.0, \NAN] as $t) {
+            try {
+                $c->mapReadStateAll(channel: 'm', pageTimeout: $t);
+                self::fail("pageTimeout {$t} taken");
+            } catch (InvalidRequestException $e) {
+                self::assertStringContainsString('pageTimeout must be a positive number of seconds', $e->getMessage());
+            }
+        }
+        self::assertSame([], $fake->requests);
+    }
+
     public function testCursorRequestCheckedAtTheCall(): void
     {
         $fake = new FakeCentrifugo();

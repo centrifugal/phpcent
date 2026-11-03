@@ -27,6 +27,14 @@ use Centrifugal\Phpcent\UserTopicListResult;
  */
 final class Pages
 {
+    /** Refuses a pageTimeout which is not a positive number of seconds, at the call. */
+    public static function checkPageTimeout(?float $pageTimeout): void
+    {
+        if ($pageTimeout !== null && (!is_finite($pageTimeout) || $pageTimeout <= 0)) {
+            throw new InvalidRequestException('pageTimeout must be a positive number of seconds: null for requestTimeout');
+        }
+    }
+
     /**
      * History by since: each page after the first from the last publication's
      * offset and the result's epoch, until a page shorter than limit.

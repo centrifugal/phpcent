@@ -773,6 +773,9 @@ const PAGED = [
 ];
 
 const PAGED_DOC = <<<'DOC'
+    The iteration lasts as long as the loop: $pageTimeout bounds each page's
+    request, replacing requestTimeout for it - requestTimeout when null.
+
     It returns at once; leaving the loop early reads no further page. An
     exception of a page's call ends the iteration, where it was, after the
     items before it. The request is checked when the method is called: an
@@ -780,7 +783,7 @@ const PAGED_DOC = <<<'DOC'
     DOC;
 
 // Parameter names the methods take besides a request's fields.
-const OWN_PARAMS = ['timeout', 'maxAttempts', 'attemptTimeout', 'onAttemptError'];
+const OWN_PARAMS = ['timeout', 'pageTimeout', 'maxAttempts', 'attemptTimeout', 'onAttemptError'];
 
 const BROADCAST_DOC = <<<'DOC'
     Channels succeed or fail on their own. It returns when every channel got
@@ -958,11 +961,12 @@ function emitClientMethods(array $cmds): string
                 throw new \RuntimeException("api.proto: {$c->result} has no repeated {$itemsField}");
             }
             $doc = [...lines($pagedDoc), '', ...lines(PAGED_DOC), '', ...$fieldDocs,
-                '@param ?float $timeout Seconds bounding each page\'s call, replacing',
-                '    requestTimeout for it: requestTimeout when null.',
+                '@param ?float $pageTimeout Seconds bounding each page\'s request,',
+                '    replacing requestTimeout for it: requestTimeout when null. Zero',
+                '    or less throws InvalidRequestException at the call.',
                 '', "@return \\Generator<int, {$item}>", '', '@throws CentException'];
-            $page = "fn({$c->request->name} \$r): {$c->result} => \$this->invoke(\$r, \$timeout)";
-            $out .= method($doc, "public function {$name}All", [...$params, '?float $timeout = null'], '\Generator', "return {$pages}({$request}, {$page});");
+            $page = "fn({$c->request->name} \$r): {$c->result} => \$this->invoke(\$r, \$pageTimeout)";
+            $out .= method($doc, "public function {$name}All", [...$params, '?float $pageTimeout = null'], '\Generator', "Pages::checkPageTimeout(\$pageTimeout);\n\n        return {$pages}({$request}, {$page});");
         }
         if ($c->method === 'broadcast') {
             $doc = [...lines(BROADCAST_RETRY_DOC), '', ...$fieldDocs,

@@ -97,6 +97,29 @@ final class CurlTest extends TestCase
     }
 
     /**
+     * pageTimeout bounds each page of an iterator, replacing requestTimeout
+     * for it, longer or shorter; without it each page gets requestTimeout
+     * (spec 0.3, 3.8). The page arrives after 0.6 s, empty: the last.
+     */
+    public function testPageTimeout(): void
+    {
+        $short = self::client('sleep', 0.2);
+        self::assertSame([], iterator_to_array($short->historyAll(channel: 'c', limit: 10, pageTimeout: 15.0)), 'a longer pageTimeout');
+        try {
+            iterator_to_array($short->historyAll(channel: 'c', limit: 10));
+            self::fail('requestTimeout did not bound the page');
+        } catch (TimeoutException) {
+        }
+        $start = microtime(true);
+        try {
+            iterator_to_array(self::client('sleep', 10.0)->deviceListAll(pageTimeout: 0.2));
+            self::fail('a shorter pageTimeout did not end the page');
+        } catch (TimeoutException) {
+        }
+        self::assertLessThan(0.55, microtime(true) - $start);
+    }
+
+    /**
      * attemptTimeout is each attempt's own timeout, replacing requestTimeout;
      * the call's timeout still ends an attempt sooner (spec 0.3, 7.3).
      */

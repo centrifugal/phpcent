@@ -241,13 +241,16 @@ Centrifugo PRO only.
     bool $includeWebpushKeys = false,
     string $cursor = '',
     int $limit = 0,
-    ?float $timeout = null,
+    ?float $pageTimeout = null,
 ): Generator`
 
 Every device the filter selects, read a page at a time - $limit per
 page, or Centrifugo's default - when the iteration reaches it, each
 page after the first at the next cursor of the one before. Devices
 registered or removed while listing may or may not be seen.
+
+The iteration lasts as long as the loop: $pageTimeout bounds each page's
+request, replacing requestTimeout for it - requestTimeout when null.
 
 It returns at once; leaving the loop early reads no further page. An
 exception of a page's call ends the iteration, where it was, after the
@@ -261,7 +264,7 @@ invalid one throws InvalidRequestException before anything is sent.
 - `$includeWebpushKeys` - Includes $webpushKeys of each device (webpush only).
 - `$cursor` - The pagination cursor: $nextCursor of the previous page, empty for the first page.
 - `$limit` - The maximum number of devices to return.
-- `$timeout` - Seconds bounding each page's call, replacing requestTimeout for it: requestTimeout when null.
+- `$pageTimeout` - Seconds bounding each page's request, replacing requestTimeout for it: requestTimeout when null. Zero or less throws InvalidRequestException at the call.
 
 #### `deviceRegister(
     string $provider,
@@ -324,13 +327,16 @@ subscriptions. Centrifugo PRO only.
     bool $includeDevice = false,
     string $cursor = '',
     int $limit = 0,
-    ?float $timeout = null,
+    ?float $pageTimeout = null,
 ): Generator`
 
 Every device topic the filter selects, read a page at a time - $limit
 per page, or Centrifugo's default - when the iteration reaches it, each
 page after the first at the next cursor of the one before. Topics
 changed while listing may or may not be seen.
+
+The iteration lasts as long as the loop: $pageTimeout bounds each page's
+request, replacing requestTimeout for it - requestTimeout when null.
 
 It returns at once; leaving the loop early reads no further page. An
 exception of a page's call ends the iteration, where it was, after the
@@ -342,7 +348,7 @@ invalid one throws InvalidRequestException before anything is sent.
 - `$includeDevice` - Includes the Device of each item.
 - `$cursor` - The pagination cursor: $nextCursor of the previous page, empty for the first page.
 - `$limit` - The maximum number of items to return.
-- `$timeout` - Seconds bounding each page's call, replacing requestTimeout for it: requestTimeout when null.
+- `$pageTimeout` - Seconds bounding each page's request, replacing requestTimeout for it: requestTimeout when null. Zero or less throws InvalidRequestException at the call.
 
 #### `deviceTopicUpdate(
     string $deviceId,
@@ -436,7 +442,7 @@ History must be enabled for the channel.
     int $limit = 0,
     ?StreamPosition $since = null,
     bool $reverse = false,
-    ?float $timeout = null,
+    ?float $pageTimeout = null,
 ): Generator`
 
 Every publication from since on, as a HistoryItem - the publication,
@@ -460,6 +466,9 @@ A since whose epoch is no longer the stream's throws
 UnrecoverablePositionException: the stream was reset, and reading from
 its start is the only recovery.
 
+The iteration lasts as long as the loop: $pageTimeout bounds each page's
+request, replacing requestTimeout for it - requestTimeout when null.
+
 It returns at once; leaving the loop early reads no further page. An
 exception of a page's call ends the iteration, where it was, after the
 items before it. The request is checked when the method is called: an
@@ -469,7 +478,7 @@ invalid one throws InvalidRequestException before anything is sent.
 - `$limit` - The maximum number of publications to return; -1 returns all the channel keeps. If not set, only the current stream position is returned, without publications.
 - `$since` - Returns publications after this stream position.
 - `$reverse` - Iterates in reverse order, from latest to earliest.
-- `$timeout` - Seconds bounding each page's call, replacing requestTimeout for it: requestTimeout when null.
+- `$pageTimeout` - Seconds bounding each page's request, replacing requestTimeout for it: requestTimeout when null. Zero or less throws InvalidRequestException at the call.
 
 #### `historyRemove(string $channel, ?float $timeout = null): HistoryRemoveResult`
 
@@ -575,7 +584,7 @@ optional pagination.
     bool $asc = false,
     int $revisionOffset = 0,
     string $revisionEpoch = '',
-    ?float $timeout = null,
+    ?float $pageTimeout = null,
 ): Generator`
 
 Every entry of the map's state, as a MapStateItem - the entry, and the
@@ -589,6 +598,9 @@ that the map's stream reset between pages throws
 UnrecoverablePositionException instead of mixing two states: reading
 again from the first page is the recovery.
 
+The iteration lasts as long as the loop: $pageTimeout bounds each page's
+request, replacing requestTimeout for it - requestTimeout when null.
+
 It returns at once; leaving the loop early reads no further page. An
 exception of a page's call ends the iteration, where it was, after the
 items before it. The request is checked when the method is called: an
@@ -601,7 +613,7 @@ invalid one throws InvalidRequestException before anything is sent.
 - `$asc` - Sorts ordered state by score ascending instead of descending. Ignored for unordered channels.
 - `$revisionOffset` - The offset of the position from a previous state read, used with $revisionEpoch.
 - `$revisionEpoch` - The epoch of the position from a previous state read. If the epoch changed, the call fails with an unrecoverable position error.
-- `$timeout` - Seconds bounding each page's call, replacing requestTimeout for it: requestTimeout when null.
+- `$pageTimeout` - Seconds bounding each page's request, replacing requestTimeout for it: requestTimeout when null. Zero or less throws InvalidRequestException at the call.
 
 #### `mapReadStream(
     string $channel,
@@ -893,13 +905,16 @@ subscriptions. Centrifugo PRO only.
     bool $includeTotalCount = false,
     string $cursor = '',
     int $limit = 0,
-    ?float $timeout = null,
+    ?float $pageTimeout = null,
 ): Generator`
 
 Every user topic the filter selects, read a page at a time - $limit per
 page, or Centrifugo's default - when the iteration reaches it, each
 page after the first at the next cursor of the one before. Topics
 changed while listing may or may not be seen.
+
+The iteration lasts as long as the loop: $pageTimeout bounds each page's
+request, replacing requestTimeout for it - requestTimeout when null.
 
 It returns at once; leaving the loop early reads no further page. An
 exception of a page's call ends the iteration, where it was, after the
@@ -910,7 +925,7 @@ invalid one throws InvalidRequestException before anything is sent.
 - `$includeTotalCount` - Includes the total count for the filter in the result.
 - `$cursor` - The pagination cursor: $nextCursor of the previous page, empty for the first page.
 - `$limit` - The maximum number of items to return.
-- `$timeout` - Seconds bounding each page's call, replacing requestTimeout for it: requestTimeout when null.
+- `$pageTimeout` - Seconds bounding each page's request, replacing requestTimeout for it: requestTimeout when null. Zero or less throws InvalidRequestException at the call.
 
 #### `userTopicUpdate(
     string $user,

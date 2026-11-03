@@ -83,6 +83,10 @@ with `position()` - and `mapReadStateAll` yields `MapStateItem`s - the entry,
 and the `state` position it was read at, which `mapReadStream` follows the
 state from. The other iterators yield their items as they are.
 
+An iteration lasts as long as your loop, so the iterators take no `timeout`:
+`pageTimeout` bounds each page's request instead, replacing `requestTimeout`
+for it, as `attemptTimeout` does for an attempt of `broadcastWithRetry`.
+
 A position whose epoch is no longer the stream's throws
 `UnrecoverablePositionException`: the stream was reset, and reading from its
 start is the only recovery. `mapReadStateAll` reads every page after the

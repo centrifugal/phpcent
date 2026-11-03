@@ -308,8 +308,11 @@ final class ClientTest extends TestCase
                 continue;
             }
             if (str_ends_with($m->getName(), 'All')) {
-                // A paged method's iterator takes the method's arguments.
-                self::assertSame($params($client->getMethod(substr($m->getName(), 0, -3))), $params($m), $m->getName());
+                // A paged method's iterator takes the method's arguments, but
+                // pageTimeout for timeout: an iteration lasts as long as the loop.
+                $method = $params($client->getMethod(substr($m->getName(), 0, -3)));
+                self::assertSame('?float $timeout = NULL', array_pop($method));
+                self::assertSame([...$method, '?float $pageTimeout = NULL'], $params($m), $m->getName());
                 continue;
             }
             $fields = $params($m);

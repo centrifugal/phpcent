@@ -524,6 +524,9 @@ trait ClientMethods
      * UnrecoverablePositionException: the stream was reset, and reading from
      * its start is the only recovery.
      *
+     * The iteration lasts as long as the loop: $pageTimeout bounds each page's
+     * request, replacing requestTimeout for it - requestTimeout when null.
+     *
      * It returns at once; leaving the loop early reads no further page. An
      * exception of a page's call ends the iteration, where it was, after the
      * items before it. The request is checked when the method is called: an
@@ -535,8 +538,9 @@ trait ClientMethods
      *     returned, without publications.
      * @param StreamPosition|null $since Returns publications after this stream position.
      * @param bool $reverse Iterates in reverse order, from latest to earliest.
-     * @param ?float $timeout Seconds bounding each page's call, replacing
-     *     requestTimeout for it: requestTimeout when null.
+     * @param ?float $pageTimeout Seconds bounding each page's request,
+     *     replacing requestTimeout for it: requestTimeout when null. Zero
+     *     or less throws InvalidRequestException at the call.
      *
      * @return \Generator<int, HistoryItem>
      *
@@ -547,14 +551,16 @@ trait ClientMethods
         int $limit = 0,
         ?StreamPosition $since = null,
         bool $reverse = false,
-        ?float $timeout = null,
+        ?float $pageTimeout = null,
     ): \Generator {
+        Pages::checkPageTimeout($pageTimeout);
+
         return Pages::history(new HistoryRequest(
             channel: $channel,
             limit: $limit,
             since: $since,
             reverse: $reverse,
-        ), fn(HistoryRequest $r): HistoryResult => $this->invoke($r, $timeout));
+        ), fn(HistoryRequest $r): HistoryResult => $this->invoke($r, $pageTimeout));
     }
 
     /**
@@ -993,6 +999,9 @@ trait ClientMethods
      * page after the first at the next cursor of the one before. Devices
      * registered or removed while listing may or may not be seen.
      *
+     * The iteration lasts as long as the loop: $pageTimeout bounds each page's
+     * request, replacing requestTimeout for it - requestTimeout when null.
+     *
      * It returns at once; leaving the loop early reads no further page. An
      * exception of a page's call ends the iteration, where it was, after the
      * items before it. The request is checked when the method is called: an
@@ -1008,8 +1017,9 @@ trait ClientMethods
      * @param string $cursor The pagination cursor: $nextCursor of the previous page,
      *     empty for the first page.
      * @param int $limit The maximum number of devices to return.
-     * @param ?float $timeout Seconds bounding each page's call, replacing
-     *     requestTimeout for it: requestTimeout when null.
+     * @param ?float $pageTimeout Seconds bounding each page's request,
+     *     replacing requestTimeout for it: requestTimeout when null. Zero
+     *     or less throws InvalidRequestException at the call.
      *
      * @return \Generator<int, Device>
      *
@@ -1023,8 +1033,10 @@ trait ClientMethods
         bool $includeWebpushKeys = false,
         string $cursor = '',
         int $limit = 0,
-        ?float $timeout = null,
+        ?float $pageTimeout = null,
     ): \Generator {
+        Pages::checkPageTimeout($pageTimeout);
+
         return Pages::deviceList(new DeviceListRequest(
             filter: $filter,
             includeTotalCount: $includeTotalCount,
@@ -1033,7 +1045,7 @@ trait ClientMethods
             includeWebpushKeys: $includeWebpushKeys,
             cursor: $cursor,
             limit: $limit,
-        ), fn(DeviceListRequest $r): DeviceListResult => $this->invoke($r, $timeout));
+        ), fn(DeviceListRequest $r): DeviceListResult => $this->invoke($r, $pageTimeout));
     }
 
     /**
@@ -1076,6 +1088,9 @@ trait ClientMethods
      * page after the first at the next cursor of the one before. Topics
      * changed while listing may or may not be seen.
      *
+     * The iteration lasts as long as the loop: $pageTimeout bounds each page's
+     * request, replacing requestTimeout for it - requestTimeout when null.
+     *
      * It returns at once; leaving the loop early reads no further page. An
      * exception of a page's call ends the iteration, where it was, after the
      * items before it. The request is checked when the method is called: an
@@ -1088,8 +1103,9 @@ trait ClientMethods
      * @param string $cursor The pagination cursor: $nextCursor of the previous page,
      *     empty for the first page.
      * @param int $limit The maximum number of items to return.
-     * @param ?float $timeout Seconds bounding each page's call, replacing
-     *     requestTimeout for it: requestTimeout when null.
+     * @param ?float $pageTimeout Seconds bounding each page's request,
+     *     replacing requestTimeout for it: requestTimeout when null. Zero
+     *     or less throws InvalidRequestException at the call.
      *
      * @return \Generator<int, DeviceTopic>
      *
@@ -1101,15 +1117,17 @@ trait ClientMethods
         bool $includeDevice = false,
         string $cursor = '',
         int $limit = 0,
-        ?float $timeout = null,
+        ?float $pageTimeout = null,
     ): \Generator {
+        Pages::checkPageTimeout($pageTimeout);
+
         return Pages::deviceTopicList(new DeviceTopicListRequest(
             filter: $filter,
             includeTotalCount: $includeTotalCount,
             includeDevice: $includeDevice,
             cursor: $cursor,
             limit: $limit,
-        ), fn(DeviceTopicListRequest $r): DeviceTopicListResult => $this->invoke($r, $timeout));
+        ), fn(DeviceTopicListRequest $r): DeviceTopicListResult => $this->invoke($r, $pageTimeout));
     }
 
     /**
@@ -1182,6 +1200,9 @@ trait ClientMethods
      * page after the first at the next cursor of the one before. Topics
      * changed while listing may or may not be seen.
      *
+     * The iteration lasts as long as the loop: $pageTimeout bounds each page's
+     * request, replacing requestTimeout for it - requestTimeout when null.
+     *
      * It returns at once; leaving the loop early reads no further page. An
      * exception of a page's call ends the iteration, where it was, after the
      * items before it. The request is checked when the method is called: an
@@ -1193,8 +1214,9 @@ trait ClientMethods
      * @param string $cursor The pagination cursor: $nextCursor of the previous page,
      *     empty for the first page.
      * @param int $limit The maximum number of items to return.
-     * @param ?float $timeout Seconds bounding each page's call, replacing
-     *     requestTimeout for it: requestTimeout when null.
+     * @param ?float $pageTimeout Seconds bounding each page's request,
+     *     replacing requestTimeout for it: requestTimeout when null. Zero
+     *     or less throws InvalidRequestException at the call.
      *
      * @return \Generator<int, UserTopic>
      *
@@ -1205,14 +1227,16 @@ trait ClientMethods
         bool $includeTotalCount = false,
         string $cursor = '',
         int $limit = 0,
-        ?float $timeout = null,
+        ?float $pageTimeout = null,
     ): \Generator {
+        Pages::checkPageTimeout($pageTimeout);
+
         return Pages::userTopicList(new UserTopicListRequest(
             filter: $filter,
             includeTotalCount: $includeTotalCount,
             cursor: $cursor,
             limit: $limit,
-        ), fn(UserTopicListRequest $r): UserTopicListResult => $this->invoke($r, $timeout));
+        ), fn(UserTopicListRequest $r): UserTopicListResult => $this->invoke($r, $pageTimeout));
     }
 
     /**
@@ -1506,6 +1530,9 @@ trait ClientMethods
      * UnrecoverablePositionException instead of mixing two states: reading
      * again from the first page is the recovery.
      *
+     * The iteration lasts as long as the loop: $pageTimeout bounds each page's
+     * request, replacing requestTimeout for it - requestTimeout when null.
+     *
      * It returns at once; leaving the loop early reads no further page. An
      * exception of a page's call ends the iteration, where it was, after the
      * items before it. The request is checked when the method is called: an
@@ -1526,8 +1553,9 @@ trait ClientMethods
      * @param string $revisionEpoch The epoch of the position from a previous state
      *     read. If the epoch changed, the call fails with an unrecoverable
      *     position error.
-     * @param ?float $timeout Seconds bounding each page's call, replacing
-     *     requestTimeout for it: requestTimeout when null.
+     * @param ?float $pageTimeout Seconds bounding each page's request,
+     *     replacing requestTimeout for it: requestTimeout when null. Zero
+     *     or less throws InvalidRequestException at the call.
      *
      * @return \Generator<int, MapStateItem>
      *
@@ -1541,8 +1569,10 @@ trait ClientMethods
         bool $asc = false,
         int $revisionOffset = 0,
         string $revisionEpoch = '',
-        ?float $timeout = null,
+        ?float $pageTimeout = null,
     ): \Generator {
+        Pages::checkPageTimeout($pageTimeout);
+
         return Pages::mapReadState(new MapReadStateRequest(
             channel: $channel,
             cursor: $cursor,
@@ -1551,7 +1581,7 @@ trait ClientMethods
             asc: $asc,
             revisionOffset: $revisionOffset,
             revisionEpoch: $revisionEpoch,
-        ), fn(MapReadStateRequest $r): MapReadStateResult => $this->invoke($r, $timeout));
+        ), fn(MapReadStateRequest $r): MapReadStateResult => $this->invoke($r, $pageTimeout));
     }
 
     /**

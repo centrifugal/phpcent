@@ -1743,6 +1743,14 @@ $pdo->prepare('INSERT INTO centrifugo_outbox (method, payload, partition) VALUES
 The outbox table's payload column is jsonb, and $cmd->payload goes into it
 as it is: JSON text, which PostgreSQL stores as the object.
 
+Where the method goes apart from the payload - the outbox table's method
+column, a message header or attribute - Centrifugo reads the payload as the
+request itself: write $cmd->payload as it is. A JSON string holding it - a
+json_encode($cmd->payload), say - is a bad request there, dropped with only
+Centrifugo's log saying so. Only a message which is a whole command,
+{"method": ..., "payload": ...}, may hold its payload as a string, for CDC
+pipelines.
+
 #### `static blockUser(string $user, int $expireAt = 0): Command`
 
 Blocks a user: the user is disconnected and can not
@@ -3395,6 +3403,14 @@ Answering: the function returns a result to accept the request, or throws:
 A ProxyError or Disconnect as the previous exception of another counts too.
 The refresh and sub refresh proxies end a connection or subscription through
 their result's expired, not an exception.
+
+A handler answers with exactly one of result, error and disconnect: a
+function returning anything but its result fails with 500 too. Centrifugo
+would take a response with none of them as accepting a subscribe, publish,
+RPC, map publish or map remove as sent; as refusing a connect, unless
+anonymous connections are allowed; and as a refresh or sub refresh which
+expired. An empty result is a result: new SubscribeResult() accepts the
+subscription.
 
 Payloads - data, info, meta - arrive as json_decode gives them, objects as
 stdClass, and a result takes them back as they are, or as RawJson. A proxy

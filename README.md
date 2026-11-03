@@ -456,8 +456,13 @@ $subscribeHandler = new SubscribeHandler(function (SubscribeRequest $req, HttpRe
 Return a result to accept the request, throw `ProxyError` to reject it with an
 error the client receives, or `Disconnect` to close the client's connection;
 any other exception fails the request, and goes to `onError` to be logged -
-`onError` itself must not throw. Error codes are in [400, 1999], disconnect
-codes in [4000, 4999], and a disconnect reason is at most 32 bytes. Payloads
+`onError` itself must not throw - and so does a function returning anything
+but its result: Centrifugo would take a response with none of result, error
+and disconnect as accepting a subscribe, publish, RPC, map publish or map
+remove as sent, as refusing a connect unless anonymous connections are
+allowed, and as a refresh or sub refresh which expired. Error codes are in
+[400, 1999], disconnect codes in [4000, 4999], and a disconnect reason is at
+most 32 bytes. Payloads
 arrive as `stdClass`, and go back exactly. Keep proxy endpoints
 reachable by Centrifugo only: whoever can call them can claim to be any user.
 
@@ -584,6 +589,12 @@ $cmd = Command::publish(channel: 'news', data: ['text' => 'hi']);
 $pdo->prepare('INSERT INTO centrifugo_outbox (method, payload, partition) VALUES (?, ?, 0)')
     ->execute([$cmd->method, $cmd->payload]);
 ```
+
+Write `payload` as it is: where the method goes apart from it - the outbox
+table's `method` column, a message header or attribute - Centrifugo reads it as
+the request itself, and a JSON string of it is a bad request, dropped with only
+Centrifugo's log saying so. Only a message which is a whole command may hold
+its payload as a string, for CDC pipelines.
 
 A consumer keeps commands in order only within a partition: to keep a
 channel's commands in order, derive their partition from the channel the same

@@ -35,6 +35,14 @@ use Centrifugal\Phpcent\Message;
  * The refresh and sub refresh proxies end a connection or subscription through
  * their result's expired, not an exception.
  *
+ * A handler answers with exactly one of result, error and disconnect: a
+ * function returning anything but its result fails with 500 too. Centrifugo
+ * would take a response with none of them as accepting a subscribe, publish,
+ * RPC, map publish or map remove as sent; as refusing a connect, unless
+ * anonymous connections are allowed; and as a refresh or sub refresh which
+ * expired. An empty result is a result: new SubscribeResult() accepts the
+ * subscription.
+ *
  * Payloads - data, info, meta - arrive as json_decode gives them, objects as
  * stdClass, and a result takes them back as they are, or as RawJson. A proxy
  * with binary_encoding enabled sends them base64-encoded in the b64 fields,

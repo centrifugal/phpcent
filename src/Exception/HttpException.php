@@ -28,9 +28,10 @@ class HttpException extends \RuntimeException implements CentException
     ) {
         $message = "unexpected HTTP status {$statusCode}";
         if ($statusCode >= 300 && $statusCode < 400) {
-            // Centrifugo's API never redirects: something in front of it does,
-            // which phpcent does not follow.
-            $message .= ' (a redirect, which phpcent does not follow: check apiEndpoint, http or https say)';
+            // Centrifugo's API never redirects a call: its router redirects a
+            // path not in canonical form - a doubled slash, say - and a proxy
+            // in front of it may redirect http to https. phpcent follows none.
+            $message .= ' (a redirect, which phpcent does not follow - Centrifugo\'s API never redirects a call: check apiEndpoint\'s scheme, http or https, and its path)';
         } elseif ($statusCode === 404 && $proMethod !== '') {
             $message .= " ({$proMethod} is a Centrifugo PRO method: if other methods work, the server is Centrifugo OSS)";
         } elseif ($statusCode === 404) {

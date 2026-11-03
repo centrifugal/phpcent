@@ -33,6 +33,14 @@ use Centrifugal\Phpcent\Internal\Validate;
  *
  * The outbox table's payload column is jsonb, and $cmd->payload goes into it
  * as it is: JSON text, which PostgreSQL stores as the object.
+ *
+ * Where the method goes apart from the payload - the outbox table's method
+ * column, a message header or attribute - Centrifugo reads the payload as the
+ * request itself: write $cmd->payload as it is. A JSON string holding it - a
+ * json_encode($cmd->payload), say - is a bad request there, dropped with only
+ * Centrifugo's log saying so. Only a message which is a whole command,
+ * {"method": ..., "payload": ...}, may hold its payload as a string, for CDC
+ * pipelines.
  */
 final class Command implements \JsonSerializable
 {

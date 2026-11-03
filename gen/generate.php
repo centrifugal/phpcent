@@ -17,6 +17,7 @@ declare(strict_types=1);
 namespace Centrifugal\Phpcent\Gen;
 
 require_once __DIR__ . '/Proto.php';
+require_once __DIR__ . '/Rules.php';
 
 const ROOT = __DIR__ . '/..';
 
@@ -25,8 +26,11 @@ const ROOT = __DIR__ . '/..';
 const OMITTED_COMMANDS = ['rpc'];
 
 // Messages written by hand (BroadcastResult: a result per channel; Error: an
-// exception), only used on the wire (the batch envelope), or wrappers which
-// become nullable scalars.
+// exception), only used on the wire (the batch envelope), or the presence
+// wrappers of a scalar, which become nullable scalars: absent leaves the
+// server's setting alone, which false or 0 cannot say. Rules::isWrapper finds
+// the presence wrappers in the comments; checkWrappers fails when a *Value one
+// is missing here.
 const HANDWRITTEN = ['Error', 'BroadcastResult'];
 const WIRE_ONLY = ['Command', 'Reply', 'BatchRequest', 'BatchResponse'];
 const WRAPPERS = ['BoolValue' => 'bool', 'Int32Value' => 'int'];
@@ -184,7 +188,15 @@ function encoder(ProtoField $f): array
         return ["if ({$n} !== 0.0) {", "    \$p[] = {$key} . Encode::float({$n}, {$path});", '}'];
     }
 
-    // A nested message, left out when nothing in it is set.
+    global $schema;
+    if ($schema instanceof Proto && Rules::isWrapper($schema->byName[$t] ?? null)) {
+        // A presence wrapper: sent whenever set, even empty - {} detaches the
+        // devices from their user, or clears the setting.
+        return ["if ({$n} !== null) {", "    \$p[] = {$key} . {$n}->toJson({$path} . '.');", '}'];
+    }
+
+    // A nested message, left out when nothing in it is set: Centrifugo reads
+    // some by whether they are there.
     $var = '$' . camel($f->name) . 'Json';
 
     return [
@@ -729,12 +741,33 @@ function proxyMessages(Proto $s): array
     return array_values(array_filter($s->messages, static fn(ProtoMessage $m): bool => isset($used[$m->name]) && !isset($skip[$m->name])));
 }
 
+/**
+ * The presence wrappers of a scalar the comments show are those WRAPPERS
+ * maps to a PHP type, and the other wrappers hold a scalar or a map.
+ */
+function checkWrappers(Proto $s, string $name): void
+{
+    foreach ($s->messages as $m) {
+        if (!Rules::isWrapper($m)) {
+            if (isset(WRAPPERS[$m->name])) {
+                throw new \RuntimeException("{$name}: {$m->name} is no longer a presence wrapper: remove it from WRAPPERS");
+            }
+            continue;
+        }
+        $f = $m->fields[0];
+        if (str_ends_with($m->name, 'Value') && $f->name === 'value' && !isset(WRAPPERS[$m->name])) {
+            throw new \RuntimeException("{$name}: {$m->name} is a presence wrapper of {$f->type}: add it to WRAPPERS, with its Encode and Decode");
+        }
+    }
+}
+
 /** @return array<string, string> generated file path => code */
 function generate(): array
 {
     $files = [];
     global $schema;
     $api = $schema = Proto::parse((string) file_get_contents(ROOT . '/proto/api.proto'), 'api.proto');
+    checkWrappers($api, 'api.proto');
     $cmds = commands($api);
     $skip = skipped($api);
     $byRequest = [];
@@ -753,6 +786,7 @@ function generate(): array
     $files['Internal/Methods.php'] = emitMethods($cmds);
 
     $proxy = $schema = Proto::parse((string) file_get_contents(ROOT . '/proto/proxy.proto'), 'proxy.proto');
+    checkWrappers($proxy, 'proxy.proto');
     foreach (proxyMessages($proxy) as $m) {
         $files["Proxy/{$m->name}.php"] = emitMessage($m, 'Centrifugal\\Phpcent\\Proxy', 'proxy.proto', 'proxy protocol', null);
     }

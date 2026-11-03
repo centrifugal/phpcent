@@ -73,20 +73,20 @@ final class DeviceUpdateRequest implements Message, Request
         if ($this->users !== []) {
             $p[] = '"users":' . Encode::stringList($this->users, $path . 'users');
         }
-        if ($this->userUpdate !== null && ($userUpdateJson = $this->userUpdate->toJson($path . 'user_update' . '.')) !== '{}') {
-            $p[] = '"user_update":' . $userUpdateJson;
+        if ($this->userUpdate !== null) {
+            $p[] = '"user_update":' . $this->userUpdate->toJson($path . 'user_update' . '.');
         }
-        if ($this->metaUpdate !== null && ($metaUpdateJson = $this->metaUpdate->toJson($path . 'meta_update' . '.')) !== '{}') {
-            $p[] = '"meta_update":' . $metaUpdateJson;
+        if ($this->metaUpdate !== null) {
+            $p[] = '"meta_update":' . $this->metaUpdate->toJson($path . 'meta_update' . '.');
         }
         if ($this->topicsUpdate !== null && ($topicsUpdateJson = $this->topicsUpdate->toJson($path . 'topics_update' . '.')) !== '{}') {
             $p[] = '"topics_update":' . $topicsUpdateJson;
         }
-        if ($this->timezoneUpdate !== null && ($timezoneUpdateJson = $this->timezoneUpdate->toJson($path . 'timezone_update' . '.')) !== '{}') {
-            $p[] = '"timezone_update":' . $timezoneUpdateJson;
+        if ($this->timezoneUpdate !== null) {
+            $p[] = '"timezone_update":' . $this->timezoneUpdate->toJson($path . 'timezone_update' . '.');
         }
-        if ($this->localeUpdate !== null && ($localeUpdateJson = $this->localeUpdate->toJson($path . 'locale_update' . '.')) !== '{}') {
-            $p[] = '"locale_update":' . $localeUpdateJson;
+        if ($this->localeUpdate !== null) {
+            $p[] = '"locale_update":' . $this->localeUpdate->toJson($path . 'locale_update' . '.');
         }
 
         return '{' . implode(',', $p) . '}';

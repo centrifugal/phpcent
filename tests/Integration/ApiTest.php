@@ -165,10 +165,13 @@ final class ApiTest extends IntegrationTestCase
         }
         // What came after the first publication, three to a page.
         $ns = [];
-        foreach ($c->historyAll(channel: $ch, limit: 3, since: $first->position()) as $pub) {
-            $ns[] = $pub->data->n;
+        $last = null;
+        foreach ($c->historyAll(channel: $ch, limit: 3, since: $first->position()) as $item) {
+            $ns[] = $item->publication->data->n;
+            $last = $item->position();
         }
         self::assertSame(range(1, 7), $ns);
+        self::assertEquals(new StreamPosition(offset: 8, epoch: $first->epoch), $last);
         // A position whose epoch is no longer the stream's.
         $this->expectException(UnrecoverablePositionException::class);
         iterator_to_array($c->historyAll(channel: $ch, limit: 3, since: new StreamPosition(offset: 1, epoch: 'gone')));
@@ -186,9 +189,14 @@ final class ApiTest extends IntegrationTestCase
         }
         // Every page after the first carries the first one's revision, which
         // Centrifugo accepts with a cursor.
-        $keys = array_map(static fn($e): string => $e->key, iterator_to_array($c->mapReadStateAll(channel: $ch, limit: 2)));
+        $items = iterator_to_array($c->mapReadStateAll(channel: $ch, limit: 2));
+        $keys = array_map(static fn($i): string => $i->entry->key, $items);
         sort($keys);
         self::assertSame($want, $keys);
+        // Every entry at the state's position, which the stream goes on from.
+        self::assertSame(5, $items[0]->state->offset);
+        self::assertSame($pos->epoch, $items[4]->state->epoch);
+        self::assertSame([], $c->mapReadStream(channel: $ch, sinceOffset: $items[0]->state->offset, sinceEpoch: $items[0]->state->epoch)->entries);
         // A revision from another epoch fails: the state was reset since.
         $this->expectException(UnrecoverablePositionException::class);
         iterator_to_array($c->mapReadStateAll(channel: $ch, limit: 2, revisionOffset: 1, revisionEpoch: 'gone'));

@@ -7,9 +7,11 @@ namespace Centrifugal\Phpcent\Internal;
 use Centrifugal\Phpcent\DeviceListResult;
 use Centrifugal\Phpcent\DeviceTopicListResult;
 use Centrifugal\Phpcent\Exception\InvalidRequestException;
+use Centrifugal\Phpcent\HistoryItem;
 use Centrifugal\Phpcent\HistoryResult;
 use Centrifugal\Phpcent\MapEntry;
 use Centrifugal\Phpcent\MapReadStateResult;
+use Centrifugal\Phpcent\MapStateItem;
 use Centrifugal\Phpcent\Publication;
 use Centrifugal\Phpcent\StreamPosition;
 use Centrifugal\Phpcent\UserTopicListResult;
@@ -31,7 +33,7 @@ final class Pages
      *
      * @param \Closure(HistoryRequest): HistoryResult $call
      *
-     * @return \Generator<int, Publication>
+     * @return \Generator<int, HistoryItem>
      */
     public static function history(HistoryRequest $first, \Closure $call): \Generator
     {
@@ -50,14 +52,14 @@ final class Pages
     /**
      * @param \Closure(HistoryRequest): HistoryResult $call
      *
-     * @return \Generator<int, Publication>
+     * @return \Generator<int, HistoryItem>
      */
     private static function historyPages(HistoryRequest $req, \Closure $call): \Generator
     {
         while (true) {
             $page = $call($req);
             foreach ($page->publications as $pub) {
-                yield $pub;
+                yield new HistoryItem($pub, $page->epoch);
             }
             $last = end($page->publications);
             if ($last === false || \count($page->publications) < $req->limit) {
@@ -143,16 +145,26 @@ final class Pages
      *
      * @param \Closure(MapReadStateRequest): MapReadStateResult $call
      *
-     * @return \Generator<int, MapEntry>
+     * Each entry comes with the state's position: the revision every page is
+     * read at.
+     *
+     * @return \Generator<int, MapStateItem>
      */
     public static function mapReadState(MapReadStateRequest $first, \Closure $call): \Generator
     {
         Validate::encode($first);
+        $asked = $first->revisionOffset !== 0 || $first->revisionEpoch !== ''
+            ? new StreamPosition(offset: $first->revisionOffset, epoch: $first->revisionEpoch)
+            : null;
 
         return self::cursor(
             $first,
             $call,
-            static fn(MapReadStateResult $r): array => [$r->entries, $r->cursor],
+            static function (MapReadStateResult $r, MapReadStateResult $firstPage) use ($asked): array {
+                $state = $asked ?? $firstPage->position();
+
+                return [array_map(static fn(MapEntry $e): MapStateItem => new MapStateItem($e, $state), $r->entries), $r->cursor];
+            },
             static function (MapReadStateRequest $req, string $cursor, MapReadStateResult $firstPage): MapReadStateRequest {
                 $req = clone $req;
                 $req->cursor = $cursor;
@@ -176,7 +188,8 @@ final class Pages
      *
      * @param TRequest $req
      * @param \Closure(TRequest): TResult $call
-     * @param \Closure(TResult): array{list<TItem>, string} $items the page's items and next cursor
+     * @param \Closure(TResult, TResult): array{list<TItem>, string} $items the
+     *     page's items and next cursor, given the page and the first one
      * @param \Closure(TRequest, string, TResult): TRequest $next the request for
      *     the page at a cursor, given the first page
      *
@@ -188,7 +201,7 @@ final class Pages
         while (true) {
             $page = $call($req);
             $first ??= $page;
-            [$list, $cursor] = $items($page);
+            [$list, $cursor] = $items($page, $first);
             foreach ($list as $item) {
                 yield $item;
             }

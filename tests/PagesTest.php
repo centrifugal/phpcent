@@ -7,11 +7,13 @@ namespace Centrifugal\Phpcent\Tests;
 use Centrifugal\Phpcent\DeviceFilter;
 use Centrifugal\Phpcent\Exception\InvalidRequestException;
 use Centrifugal\Phpcent\Exception\UnrecoverablePositionException;
+use Centrifugal\Phpcent\HistoryItem;
 use Centrifugal\Phpcent\HistoryResult;
 use Centrifugal\Phpcent\MapPublishResult;
 use Centrifugal\Phpcent\MapReadStateResult;
 use Centrifugal\Phpcent\MapReadStreamResult;
 use Centrifugal\Phpcent\MapRemoveResult;
+use Centrifugal\Phpcent\MapStateItem;
 use Centrifugal\Phpcent\PublishResult;
 use Centrifugal\Phpcent\StreamPosition;
 use Centrifugal\Phpcent\Tests\Support\FakeCentrifugo;
@@ -62,6 +64,11 @@ final class PagesTest extends TestCase
         yield 'mapReadStateAll' => ['mapReadStateAll', 'map_read_state', 'entries', 'cursor', 'key'];
     }
 
+    private static function id(object $item, string $field): mixed
+    {
+        return $item instanceof MapStateItem ? $item->entry->{$field} : $item->{$field};
+    }
+
     /** @return array<string, mixed> */
     private static function args(string $name): array
     {
@@ -76,7 +83,7 @@ final class PagesTest extends TestCase
             $fake = self::cursorFake($method, $itemsField, $nextField, $n);
             $ids = [];
             foreach (FakeCentrifugo::client($fake)->{$name}(...self::args($name)) as $item) {
-                $ids[] = $item->{$idField};
+                $ids[] = self::id($item, $idField);
             }
             self::assertSame(array_map(static fn(int $i): string => "i{$i}", $n === 0 ? [] : range(0, $n - 1)), $ids, "{$name}: {$n} items");
             self::assertCount($requests, $fake->requests, "{$name}: {$n} items");
@@ -96,7 +103,7 @@ final class PagesTest extends TestCase
         // Nothing is read before the iteration starts.
         self::assertSame([], $fake->requests);
         foreach ($it as $i => $item) {
-            self::assertSame("i{$i}", $item->{$idField});
+            self::assertSame("i{$i}", self::id($item, $idField));
             if ($i === self::PAGE) {
                 break; // the first item of the second page
             }
@@ -111,7 +118,7 @@ final class PagesTest extends TestCase
         $seen = 0;
         try {
             foreach (FakeCentrifugo::client($fake)->{$name}(...self::args($name)) as $item) {
-                self::assertSame("i{$seen}", $item->{$idField});
+                self::assertSame("i{$seen}", self::id($item, $idField));
                 $seen++;
             }
             self::fail('no exception');
@@ -146,7 +153,7 @@ final class PagesTest extends TestCase
         });
         $keys = [];
         foreach (FakeCentrifugo::client($fake)->mapReadStateAll(channel: 'm', limit: 1) as $e) {
-            $keys[] = $e->key;
+            $keys[] = $e->entry->key;
         }
         self::assertSame(['k0', 'k1', 'k2'], $keys);
         self::assertSame('{"channel":"m","limit":1}', $fake->requests[0]['body']);
@@ -170,7 +177,7 @@ final class PagesTest extends TestCase
         $this->expectException(UnrecoverablePositionException::class);
         try {
             foreach (FakeCentrifugo::client($fake)->mapReadStateAll(channel: 'm') as $e) {
-                $keys[] = $e->key;
+                $keys[] = $e->entry->key;
             }
         } finally {
             self::assertSame(['a'], $keys);
@@ -208,7 +215,7 @@ final class PagesTest extends TestCase
             $fake = self::historyFake($n);
             $offsets = [];
             foreach (FakeCentrifugo::client($fake)->historyAll(channel: 'ch', limit: self::PAGE) as $pub) {
-                $offsets[] = $pub->offset;
+                $offsets[] = $pub->publication->offset;
             }
             self::assertSame($n === 0 ? [] : range(1, $n), $offsets, "{$n} publications");
             self::assertCount($requests, $fake->requests, "{$n} publications");
@@ -224,7 +231,7 @@ final class PagesTest extends TestCase
     {
         $fake = self::historyFake(5);
         $it = FakeCentrifugo::client($fake)->historyAll(channel: 'ch', limit: 10, since: new StreamPosition(offset: 3, epoch: 'e'));
-        self::assertSame([4, 5], array_map(static fn($p): int => $p->offset, iterator_to_array($it)));
+        self::assertSame([4, 5], array_map(static fn(HistoryItem $p): int => $p->publication->offset, iterator_to_array($it)));
         self::assertSame('{"channel":"ch","limit":10,"since":{"offset":3,"epoch":"e"}}', $fake->last()['body']);
     }
 
@@ -232,7 +239,7 @@ final class PagesTest extends TestCase
     {
         $fake = self::historyFake(10);
         foreach (FakeCentrifugo::client($fake)->historyAll(channel: 'ch', limit: self::PAGE) as $pub) {
-            if ($pub->offset === 2) {
+            if ($pub->publication->offset === 2) {
                 break;
             }
         }
@@ -299,6 +306,28 @@ final class PagesTest extends TestCase
         self::assertEquals($want, (new MapRemoveResult(offset: 42, epoch: 'ep'))->position());
         // Not part of a result's JSON.
         self::assertSame('{"offset":42,"epoch":"ep"}', json_encode(new PublishResult(offset: 42, epoch: 'ep')));
+    }
+
+    public function testItemsCarryTheirPositions(): void
+    {
+        // History: each publication's offset, in its page's epoch.
+        $fake = self::historyFake(4);
+        $positions = array_map(static fn(HistoryItem $i): StreamPosition => $i->position(), iterator_to_array(FakeCentrifugo::client($fake)->historyAll(channel: 'ch', limit: self::PAGE)));
+        self::assertEquals(array_map(static fn(int $o): StreamPosition => new StreamPosition(offset: $o, epoch: 'e'), range(1, 4)), $positions);
+
+        // A map's state: the first page's position on every entry, later
+        // pages read at it, even when a later page reports another.
+        $fake = new FakeCentrifugo(static function (string $m, mixed $json): array {
+            \assert($json instanceof \stdClass);
+            $from = (int) ($json->cursor ?? 0);
+
+            return ['entries' => [['key' => "k{$from}"]], 'cursor' => $from < 1 ? '1' : '', 'offset' => 10 + $from, 'epoch' => 'e'];
+        });
+        $states = array_map(static fn(MapStateItem $i): StreamPosition => $i->state, iterator_to_array(FakeCentrifugo::client($fake)->mapReadStateAll(channel: 'm')));
+        self::assertEquals([new StreamPosition(offset: 10, epoch: 'e'), new StreamPosition(offset: 10, epoch: 'e')], $states);
+        // Or the revision the call asked for.
+        $states = array_map(static fn(MapStateItem $i): StreamPosition => $i->state, iterator_to_array(FakeCentrifugo::client($fake)->mapReadStateAll(channel: 'm', revisionOffset: 5, revisionEpoch: 'mine')));
+        self::assertEquals([new StreamPosition(offset: 5, epoch: 'mine'), new StreamPosition(offset: 5, epoch: 'mine')], $states);
     }
 
     public function testWhatCameAfterAPublication(): void

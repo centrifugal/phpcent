@@ -72,10 +72,16 @@ cannot read in `reverse`. The results of `publish`, `history`,
 ```php
 $pub = $client->publish(channel: 'news', data: $data);
 // Later: everything published after it, 100 to a page.
-foreach ($client->historyAll(channel: 'news', limit: 100, since: $pub->position()) as $p) {
-    handle($p->data);
+foreach ($client->historyAll(channel: 'news', limit: 100, since: $pub->position()) as $item) {
+    handle($item->publication->data);
+    $last = $item->position();   // to resume from later
 }
 ```
+
+`historyAll` yields `HistoryItem`s - the publication, and its stream's epoch,
+with `position()` - and `mapReadStateAll` yields `MapStateItem`s - the entry,
+and the `state` position it was read at, which `mapReadStream` follows the
+state from. The other iterators yield their items as they are.
 
 A position whose epoch is no longer the stream's throws
 `UnrecoverablePositionException`: the stream was reset, and reading from its

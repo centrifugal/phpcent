@@ -494,17 +494,19 @@ trait ClientMethods
     }
 
     /**
-     * Every publication from since on - the first page as the request asks,
-     * each after it from the last publication of the one before - read a
-     * page of $limit at a time when the iteration reaches it. It stops at a
+     * Every publication from since on, as a HistoryItem - the publication,
+     * and its stream's epoch, with position() - the first page as the
+     * request asks, each after it from the last publication of the one
+     * before, read a page of $limit at a time when the iteration reaches it. It stops at a
      * page shorter than $limit, so a full last page costs one more request,
      * which comes back empty. $limit must be 1 or more, and $reverse false:
      * the call throws InvalidRequestException otherwise, before anything is
      * sent. To read what came after a publication:
      *
      *     $pub = $client->publish(channel: 'news', data: $data);
-     *     foreach ($client->historyAll(channel: 'news', limit: 100, since: $pub->position()) as $p) {
-     *         handle($p);
+     *     foreach ($client->historyAll(channel: 'news', limit: 100, since: $pub->position()) as $item) {
+     *         handle($item->publication->data);
+     *         $last = $item->position();   // to resume from later
      *     }
      *
      * A since whose epoch is no longer the stream's throws
@@ -524,7 +526,7 @@ trait ClientMethods
      * @param bool $reverse Iterates in reverse order, from latest to earliest.
      * @param ?float $timeout Seconds bounding each page's call: requestTimeout when null.
      *
-     * @return \Generator<int, Publication>
+     * @return \Generator<int, HistoryItem>
      *
      * @throws CentException
      */
@@ -1452,7 +1454,9 @@ trait ClientMethods
     }
 
     /**
-     * Every entry of the map's state, read a page at a time - $limit per
+     * Every entry of the map's state, as a MapStateItem - the entry, and the
+     * state's position, which mapReadStream follows the state from - read a
+     * page at a time - $limit per
      * page, or Centrifugo's default - when the iteration reaches it, each
      * page after the first at the cursor of the one before. Every page after
      * the first is read at the first one's revision - its offset and epoch
@@ -1483,7 +1487,7 @@ trait ClientMethods
      *     position error.
      * @param ?float $timeout Seconds bounding each page's call: requestTimeout when null.
      *
-     * @return \Generator<int, MapEntry>
+     * @return \Generator<int, MapStateItem>
      *
      * @throws CentException
      */

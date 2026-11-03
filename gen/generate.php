@@ -720,18 +720,20 @@ function emitMessage(ProtoMessage $m, string $namespace, string $proto, string $
 // returning a Generator of the items of every page - Pages, by hand, holds the
 // loops - and the docs of its paging.
 const PAGED = [
-    'history' => ['Pages::history', 'publications', <<<'DOC'
-        Every publication from since on - the first page as the request asks,
-        each after it from the last publication of the one before - read a
-        page of $limit at a time when the iteration reaches it. It stops at a
+    'history' => ['Pages::history', 'HistoryItem', <<<'DOC'
+        Every publication from since on, as a HistoryItem - the publication,
+        and its stream's epoch, with position() - the first page as the
+        request asks, each after it from the last publication of the one
+        before, read a page of $limit at a time when the iteration reaches it. It stops at a
         page shorter than $limit, so a full last page costs one more request,
         which comes back empty. $limit must be 1 or more, and $reverse false:
         the call throws InvalidRequestException otherwise, before anything is
         sent. To read what came after a publication:
 
             $pub = $client->publish(channel: 'news', data: $data);
-            foreach ($client->historyAll(channel: 'news', limit: 100, since: $pub->position()) as $p) {
-                handle($p);
+            foreach ($client->historyAll(channel: 'news', limit: 100, since: $pub->position()) as $item) {
+                handle($item->publication->data);
+                $last = $item->position();   // to resume from later
             }
 
         A since whose epoch is no longer the stream's throws
@@ -756,8 +758,10 @@ const PAGED = [
         page after the first at the next cursor of the one before. Topics
         changed while listing may or may not be seen.
         DOC],
-    'map_read_state' => ['Pages::mapReadState', 'entries', <<<'DOC'
-        Every entry of the map's state, read a page at a time - $limit per
+    'map_read_state' => ['Pages::mapReadState', 'MapStateItem', <<<'DOC'
+        Every entry of the map's state, as a MapStateItem - the entry, and the
+        state's position, which mapReadStream follows the state from - read a
+        page at a time - $limit per
         page, or Centrifugo's default - when the iteration reaches it, each
         page after the first at the cursor of the one before. Every page after
         the first is read at the first one's revision - its offset and epoch
@@ -942,6 +946,11 @@ function emitClientMethods(array $cmds): string
                 if ($f->name === $itemsField && $f->repeated) {
                     $item = $f->type;
                 }
+            }
+            // history and map_read_state yield their items with a position:
+            // a class of phpcent's, named in PAGED.
+            if (is_file(ROOT . "/src/{$itemsField}.php")) {
+                $item = $itemsField;
             }
             if ($item === null) {
                 throw new \RuntimeException("api.proto: {$c->result} has no repeated {$itemsField}");

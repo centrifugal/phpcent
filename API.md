@@ -438,9 +438,10 @@ History must be enabled for the channel.
     ?float $timeout = null,
 ): Generator`
 
-Every publication from since on - the first page as the request asks,
-each after it from the last publication of the one before - read a
-page of $limit at a time when the iteration reaches it. It stops at a
+Every publication from since on, as a HistoryItem - the publication,
+and its stream's epoch, with position() - the first page as the
+request asks, each after it from the last publication of the one
+before, read a page of $limit at a time when the iteration reaches it. It stops at a
 page shorter than $limit, so a full last page costs one more request,
 which comes back empty. $limit must be 1 or more, and $reverse false:
 the call throws InvalidRequestException otherwise, before anything is
@@ -448,8 +449,9 @@ sent. To read what came after a publication:
 
 ```php
 $pub = $client->publish(channel: 'news', data: $data);
-foreach ($client->historyAll(channel: 'news', limit: 100, since: $pub->position()) as $p) {
-    handle($p);
+foreach ($client->historyAll(channel: 'news', limit: 100, since: $pub->position()) as $item) {
+    handle($item->publication->data);
+    $last = $item->position();   // to resume from later
 }
 ```
 
@@ -575,7 +577,9 @@ optional pagination.
     ?float $timeout = null,
 ): Generator`
 
-Every entry of the map's state, read a page at a time - $limit per
+Every entry of the map's state, as a MapStateItem - the entry, and the
+state's position, which mapReadStream follows the state from - read a
+page at a time - $limit per
 page, or Centrifugo's default - when the iteration reaches it, each
 page after the first at the cursor of the one before. Every page after
 the first is read at the first one's revision - its offset and epoch
@@ -2576,6 +2580,43 @@ arguments, so that a user and a channel cannot be swapped:
 ```php
 SharedPoll::sign($secret, user: '42', channel: 'poll:prices', keys: ['AAPL'], expiresAt: $exp);
 ```
+
+### `HistoryItem`
+
+```php
+new HistoryItem(Publication $publication, string $epoch)
+```
+
+A publication read by Client::historyAll, with the epoch of the stream it
+was read from: its position() is where to resume reading, or a client's
+recoverSince, with no fields copied by hand.
+
+```php
+foreach ($client->historyAll(channel: 'news', limit: 100) as $item) {
+    handle($item->publication->data);
+    $last = $item->position();   // to resume from later
+}
+```
+
+- `$publication` `Publication` - the publication
+- `$epoch` `string` - the epoch of the channel's stream it is in
+
+#### `position(): StreamPosition`
+
+Where the publication is in the channel's stream.
+
+### `MapStateItem`
+
+```php
+new MapStateItem(MapEntry $entry, StreamPosition $state)
+```
+
+An entry read by Client::mapReadStateAll, with the position of the state it
+was read at: following the state with mapReadStream from $state - as its
+sinceOffset and sinceEpoch - gets every change made since.
+
+- `$entry` `MapEntry` - the entry
+- `$state` `StreamPosition` - the position of the map's state the entry was read at: the first page's, every later page being read at it - or the revision the call asked for
 
 ## Centrifugal\Phpcent\Exception
 

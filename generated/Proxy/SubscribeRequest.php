@@ -20,9 +20,11 @@ final class SubscribeRequest implements Message
      * @param string $client The unique ID Centrifugo gave the connection.
      * @param string $transport The connection's transport.
      * @param string $protocol The client protocol. One of: json, protobuf.
+     *     Constants: Protocol::JSON, Protocol::PROTOBUF.
      * @param string $encoding Binary when the proxy has binary_encoding enabled, so that
      *     payloads come in the b64 fields, and json otherwise.
      *     One of: json, binary.
+     *     Constants: Encoding::JSON, Encoding::BINARY.
      * @param string $user The connection's user ID.
      * @param string $channel The channel the client subscribes to.
      * @param string $token The subscription token the client sent for the channel, if any.

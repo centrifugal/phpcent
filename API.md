@@ -249,9 +249,9 @@ Registers a device for push notifications, or
 updates a registered one. Centrifugo PRO only.
 
 - `$id` - The device ID. Omit it on first registration: Centrifugo generates one and returns it. Pass the stored value to update the device.
-- `$provider` - The provider of the device token. Required. One of: fcm, hms, apns, webpush.
+- `$provider` - The provider of the device token. Required. One of: fcm, hms, apns, webpush. Constants: Provider::FCM, Provider::HMS, Provider::APNS, Provider::WEBPUSH.
 - `$token` - The push token of the device. For webpush, it is the browser PushSubscription serialized as a JSON string. Required.
-- `$platform` - The device platform. Required. One of: ios, android, web.
+- `$platform` - The device platform. Required. One of: ios, android, web. Constants: Platform::IOS, Platform::ANDROID, Platform::WEB.
 - `$user` - The user associated with the device.
 - `$meta` - Additional custom metadata of the device.
 - `$topics` - The full list of the device's topic subscriptions, replacing the previous one. The user's topics are attached automatically.
@@ -300,7 +300,7 @@ list is what decides who gets a push sent to a topic.
 Centrifugo PRO only.
 
 - `$deviceId` - The ID of the device. Required.
-- `$op` - The operation. Required. One of: add, remove, set.
+- `$op` - The operation. Required. One of: add, remove, set. Constants: Op::ADD, Op::REMOVE, Op::SET.
 - `$topics` - The topics for the operation.
 - `$user` - An optional ownership guard: the update is applied only if the device currently belongs to this user. Otherwise the call fails with a conflict error (or not found if there is no such device).
 - `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
@@ -444,7 +444,7 @@ Publishes or updates a key in a map channel.
 - `$version` - A per-key version: publications with a version not higher than the key's current one are suppressed.
 - `$versionEpoch` - Scopes version. A different epoch resets version comparison.
 - `$score` - Currently not used by the server API.
-- `$keyMode` - Makes the publish conditional: if_new writes only if the key does not exist, if_exists only if it exists. Empty always writes. One of: if_new, if_exists.
+- `$keyMode` - Makes the publish conditional: if_new writes only if the key does not exist, if_exists only if it exists. Empty always writes. One of: if_new, if_exists. Constants: KeyMode::IF_NEW, KeyMode::IF_EXISTS.
 - `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `mapReadState(
@@ -724,7 +724,7 @@ Saves the delivery or interaction status of a
 push notification to analytics. Experimental. Centrifugo PRO only.
 
 - `$analyticsUid` - The $analyticsUid of the push notification (as in SendPushNotificationRequest). Required.
-- `$status` - The status of the push notification. Required. One of: delivered, interacted.
+- `$status` - The status of the push notification. Required. One of: delivered, interacted. Constants: Status::DELIVERED, Status::INTERACTED.
 - `$deviceId` - The Centrifugo device ID. Required.
 - `$msgId` - The message ID issued by the provider.
 - `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
@@ -766,7 +766,7 @@ Changes the topics of a user. The change is also
 applied to the user's registered devices. Centrifugo PRO only.
 
 - `$user` - The user ID. Required. "" updates the global binding, which every device - anonymous ones included - gets on its next $deviceRegister.
-- `$op` - The operation. Required. One of: add, remove, set.
+- `$op` - The operation. Required. One of: add, remove, set. Constants: Op::ADD, Op::REMOVE, Op::SET.
 - `$topics` - The topics for the operation.
 - `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
@@ -912,9 +912,9 @@ Adds the command to the batch: its Pending holds the result once the
 batch is sent.
 
 - `$id` - The device ID. Omit it on first registration: Centrifugo generates one and returns it. Pass the stored value to update the device.
-- `$provider` - The provider of the device token. Required. One of: fcm, hms, apns, webpush.
+- `$provider` - The provider of the device token. Required. One of: fcm, hms, apns, webpush. Constants: Provider::FCM, Provider::HMS, Provider::APNS, Provider::WEBPUSH.
 - `$token` - The push token of the device. For webpush, it is the browser PushSubscription serialized as a JSON string. Required.
-- `$platform` - The device platform. Required. One of: ios, android, web.
+- `$platform` - The device platform. Required. One of: ios, android, web. Constants: Platform::IOS, Platform::ANDROID, Platform::WEB.
 - `$user` - The user associated with the device.
 - `$meta` - Additional custom metadata of the device.
 - `$topics` - The full list of the device's topic subscriptions, replacing the previous one. The user's topics are attached automatically.
@@ -962,7 +962,7 @@ Adds the command to the batch: its Pending holds the result once the
 batch is sent.
 
 - `$deviceId` - The ID of the device. Required.
-- `$op` - The operation. Required. One of: add, remove, set.
+- `$op` - The operation. Required. One of: add, remove, set. Constants: Op::ADD, Op::REMOVE, Op::SET.
 - `$topics` - The topics for the operation.
 - `$user` - An optional ownership guard: the update is applied only if the device currently belongs to this user. Otherwise the call fails with a conflict error (or not found if there is no such device).
 
@@ -1118,7 +1118,7 @@ batch is sent.
 - `$version` - A per-key version: publications with a version not higher than the key's current one are suppressed.
 - `$versionEpoch` - Scopes version. A different epoch resets version comparison.
 - `$score` - Currently not used by the server API.
-- `$keyMode` - Makes the publish conditional: if_new writes only if the key does not exist, if_exists only if it exists. Empty always writes. One of: if_new, if_exists.
+- `$keyMode` - Makes the publish conditional: if_new writes only if the key does not exist, if_exists only if it exists. Empty always writes. One of: if_new, if_exists. Constants: KeyMode::IF_NEW, KeyMode::IF_EXISTS.
 
 #### `mapReadState(
     string $channel,
@@ -1418,7 +1418,7 @@ Adds the command to the batch: its Pending holds the result once the
 batch is sent.
 
 - `$analyticsUid` - The $analyticsUid of the push notification (as in SendPushNotificationRequest). Required.
-- `$status` - The status of the push notification. Required. One of: delivered, interacted.
+- `$status` - The status of the push notification. Required. One of: delivered, interacted. Constants: Status::DELIVERED, Status::INTERACTED.
 - `$deviceId` - The Centrifugo device ID. Required.
 - `$msgId` - The message ID issued by the provider.
 
@@ -1460,7 +1460,7 @@ Adds the command to the batch: its Pending holds the result once the
 batch is sent.
 
 - `$user` - The user ID. Required. "" updates the global binding, which every device - anonymous ones included - gets on its next $deviceRegister.
-- `$op` - The operation. Required. One of: add, remove, set.
+- `$op` - The operation. Required. One of: add, remove, set. Constants: Op::ADD, Op::REMOVE, Op::SET.
 - `$topics` - The topics for the operation.
 
 ### `Pending`
@@ -1870,9 +1870,9 @@ updates a registered one. Centrifugo PRO only.
 The command making the call, checked as a Client checks it.
 
 - `$id` - The device ID. Omit it on first registration: Centrifugo generates one and returns it. Pass the stored value to update the device.
-- `$provider` - The provider of the device token. Required. One of: fcm, hms, apns, webpush.
+- `$provider` - The provider of the device token. Required. One of: fcm, hms, apns, webpush. Constants: Provider::FCM, Provider::HMS, Provider::APNS, Provider::WEBPUSH.
 - `$token` - The push token of the device. For webpush, it is the browser PushSubscription serialized as a JSON string. Required.
-- `$platform` - The device platform. Required. One of: ios, android, web.
+- `$platform` - The device platform. Required. One of: ios, android, web. Constants: Platform::IOS, Platform::ANDROID, Platform::WEB.
 - `$user` - The user associated with the device.
 - `$meta` - Additional custom metadata of the device.
 - `$topics` - The full list of the device's topic subscriptions, replacing the previous one. The user's topics are attached automatically.
@@ -1922,7 +1922,7 @@ Centrifugo PRO only.
 The command making the call, checked as a Client checks it.
 
 - `$deviceId` - The ID of the device. Required.
-- `$op` - The operation. Required. One of: add, remove, set.
+- `$op` - The operation. Required. One of: add, remove, set. Constants: Op::ADD, Op::REMOVE, Op::SET.
 - `$topics` - The topics for the operation.
 - `$user` - An optional ownership guard: the update is applied only if the device currently belongs to this user. Otherwise the call fails with a conflict error (or not found if there is no such device).
 
@@ -2075,7 +2075,7 @@ The command making the call, checked as a Client checks it.
 - `$version` - A per-key version: publications with a version not higher than the key's current one are suppressed.
 - `$versionEpoch` - Scopes version. A different epoch resets version comparison.
 - `$score` - Currently not used by the server API.
-- `$keyMode` - Makes the publish conditional: if_new writes only if the key does not exist, if_exists only if it exists. Empty always writes. One of: if_new, if_exists.
+- `$keyMode` - Makes the publish conditional: if_new writes only if the key does not exist, if_exists only if it exists. Empty always writes. One of: if_new, if_exists. Constants: KeyMode::IF_NEW, KeyMode::IF_EXISTS.
 
 #### `static mapReadState(
     string $channel,
@@ -2351,7 +2351,7 @@ push notification to analytics. Experimental. Centrifugo PRO only.
 The command making the call, checked as a Client checks it.
 
 - `$analyticsUid` - The $analyticsUid of the push notification (as in SendPushNotificationRequest). Required.
-- `$status` - The status of the push notification. Required. One of: delivered, interacted.
+- `$status` - The status of the push notification. Required. One of: delivered, interacted. Constants: Status::DELIVERED, Status::INTERACTED.
 - `$deviceId` - The Centrifugo device ID. Required.
 - `$msgId` - The message ID issued by the provider.
 
@@ -2390,7 +2390,7 @@ applied to the user's registered devices. Centrifugo PRO only.
 The command making the call, checked as a Client checks it.
 
 - `$user` - The user ID. Required. "" updates the global binding, which every device - anonymous ones included - gets on its next $deviceRegister.
-- `$op` - The operation. Required. One of: add, remove, set.
+- `$op` - The operation. Required. One of: add, remove, set. Constants: Op::ADD, Op::REMOVE, Op::SET.
 - `$topics` - The topics for the operation.
 
 ### `SharedPoll`
@@ -3520,7 +3520,7 @@ connection.
 ## Centrifugal\Phpcent: request and result types
 
 <details>
-<summary>76 types</summary>
+<summary>83 types</summary>
 
 #### `ApnsPushNotification`
 
@@ -3662,6 +3662,13 @@ The message as toJson gives it, for a json_encode of your own.
 
 The message as Centrifugo reads it: JSON, fields at their zero value
 left out. $path prefixes the field names in error messages.
+
+#### `Cmp`
+
+The values of the cmp field of FilterNode, as its comment lists them.
+
+The field is a string: a value Centrifugo accepts which these do not
+name is still a valid one.
 
 #### `ConnectionInfo`
 
@@ -4077,7 +4084,7 @@ new DeviceTopicsUpdate(string $op, array $topics = [])
 
 DeviceTopicsUpdate changes the topics of devices. Centrifugo PRO only.
 
-- `$op` `string` - The operation. Required. One of: add, remove, set.
+- `$op` `string` - The operation. Required. One of: add, remove, set. Constants: Op::ADD, Op::REMOVE, Op::SET.
 - `$topics` `list<string>` - The topics for the operation.
 
 ##### `jsonSerialize(): RawJson`
@@ -4202,9 +4209,9 @@ vals) or a logical operation (op) over child nodes.
 Centrifugo PRO only: defined here for protocol-surface consistency,
 Centrifugo OSS parses it but ignores it.
 
-- `$op` `string` - The logical operation of a non-leaf node. Empty for a leaf node. One of: and, or, not.
+- `$op` `string` - The logical operation of a non-leaf node. Empty for a leaf node. One of: and, or, not. Constants: FilterNodeOp::AND, FilterNodeOp::OR, FilterNodeOp::NOT.
 - `$key` `string` - The label key a leaf node compares.
-- `$cmp` `string` - The comparison of a leaf node. One of: eq, neq, in, nin, ex, nex, sw, ew, ct, gt, gte, lt, lte.
+- `$cmp` `string` - The comparison of a leaf node. One of: eq, neq, in, nin, ex, nex, sw, ew, ct, gt, gte, lt, lte. Constants: Cmp::EQ, Cmp::NEQ, Cmp::IN, Cmp::NIN, Cmp::EX, Cmp::NEX, Cmp::SW, Cmp::EW, Cmp::CT, Cmp::GT, Cmp::GTE, Cmp::LT, Cmp::LTE.
 - `$val` `string` - The value to compare with, for single-value comparisons.
 - `$vals` `list<string>` - The values to compare with, for "in" and "nin".
 - `$nodes` `list<FilterNode>` - The child nodes of a logical operation.
@@ -4217,6 +4224,13 @@ The message as toJson gives it, for a json_encode of your own.
 
 The message as Centrifugo reads it: JSON, fields at their zero value
 left out. $path prefixes the field names in error messages.
+
+#### `FilterNodeOp`
+
+The values of the op field of FilterNode, as its comment lists them.
+
+The field is a string: a value Centrifugo accepts which these do not
+name is still a valid one.
 
 #### `GetUserStatusResult`
 
@@ -4332,6 +4346,14 @@ The message as toJson gives it, for a json_encode of your own.
 
 The message as Centrifugo reads it: JSON, fields at their zero value
 left out. $path prefixes the field names in error messages.
+
+#### `KeyMode`
+
+The values of the key_mode field of MapPublishRequest, as its comment lists
+them.
+
+The field is a string: a value Centrifugo accepts which these do not
+name is still a valid one.
 
 #### `MapClearResult`
 
@@ -4563,6 +4585,22 @@ The message as toJson gives it, for a json_encode of your own.
 The message as Centrifugo reads it: JSON, fields at their zero value
 left out. $path prefixes the field names in error messages.
 
+#### `Op`
+
+The values of the op field of DeviceTopicsUpdate, DeviceTopicUpdateRequest
+and UserTopicUpdateRequest, as its comment lists them.
+
+The field is a string: a value Centrifugo accepts which these do not
+name is still a valid one.
+
+#### `Platform`
+
+The values of the platform field of DeviceRegisterRequest, as its comment
+lists them.
+
+The field is a string: a value Centrifugo accepts which these do not
+name is still a valid one.
+
 #### `PresenceResult`
 
 ```php
@@ -4621,6 +4659,14 @@ The message as toJson gives it, for a json_encode of your own.
 
 The message as Centrifugo reads it: JSON, fields at their zero value
 left out. $path prefixes the field names in error messages.
+
+#### `Provider`
+
+The values of the provider field of DeviceRegisterRequest, as its comment
+lists them.
+
+The field is a string: a value Centrifugo accepts which these do not
+name is still a valid one.
 
 #### `Publication`
 
@@ -4912,6 +4958,14 @@ The message as toJson gives it, for a json_encode of your own.
 The message as Centrifugo reads it: JSON, fields at their zero value
 left out. $path prefixes the field names in error messages.
 
+#### `Status`
+
+The values of the status field of UpdatePushStatusRequest, as its comment
+lists them.
+
+The field is a string: a value Centrifugo accepts which these do not
+name is still a valid one.
+
 #### `StreamPosition`
 
 ```php
@@ -5202,7 +5256,15 @@ left out. $path prefixes the field names in error messages.
 ## Centrifugal\Phpcent\Proxy: request and result types
 
 <details>
-<summary>29 types</summary>
+<summary>37 types</summary>
+
+#### `Allow`
+
+The values of the allow field of ChannelsCapability and SubscribeResult, as
+its comment lists them.
+
+The field is a string: a value Centrifugo accepts which these do not
+name is still a valid one.
 
 #### `ChannelEvent`
 
@@ -5214,7 +5276,7 @@ ChannelEvent is a change of a channel's state.
 
 - `$timeMs` `int` - When it happened, in Unix milliseconds.
 - `$channel` `string` - The channel it happened in.
-- `$type` `string` - Occupied when the channel got its first subscriber, vacated when it lost its last one. More types may come; the field is a string, not an enum, for JSON interoperability. One of: occupied, vacated.
+- `$type` `string` - Occupied when the channel got its first subscriber, vacated when it lost its last one. More types may come; the field is a string, not an enum, for JSON interoperability. One of: occupied, vacated. Constants: Type::OCCUPIED, Type::VACATED.
 
 ##### `jsonSerialize(): RawJson`
 
@@ -5236,8 +5298,8 @@ operation in a channel when any of its capabilities both allows the
 operation and matches the channel. Centrifugo PRO only.
 
 - `$channels` `list<string>` - The channels, or channel patterns, it applies to.
-- `$allow` `list<string>` - The operations it grants: sub is subscribe, pub publish, hst history, prs presence. One of: sub, pub, hst, prs.
-- `$match` `string` - How channels are matched: empty for exact names. One of: wildcard, regex.
+- `$allow` `list<string>` - The operations it grants: sub is subscribe, pub publish, hst history, prs presence. One of: sub, pub, hst, prs. Constants: Allow::SUB, Allow::PUB, Allow::HST, Allow::PRS.
+- `$match` `string` - How channels are matched: empty for exact names. One of: wildcard, regex. Constants: ChannelsCapabilityMatch::WILDCARD, ChannelsCapabilityMatch::REGEX.
 
 ##### `jsonSerialize(): RawJson`
 
@@ -5247,6 +5309,21 @@ The message as toJson gives it, for a json_encode of your own.
 
 The message as Centrifugo reads it: JSON, fields at their zero value
 left out. $path prefixes the field names in error messages.
+
+#### `ChannelsCapabilityMatch`
+
+The values of the match field of ChannelsCapability, as its comment lists
+them.
+
+The field is a string: a value Centrifugo accepts which these do not
+name is still a valid one.
+
+#### `Cmp`
+
+The values of the cmp field of FilterNode, as its comment lists them.
+
+The field is a string: a value Centrifugo accepts which these do not
+name is still a valid one.
 
 #### `ConnectRequest`
 
@@ -5268,8 +5345,8 @@ ConnectRequest is sent when a client connects.
 
 - `$client` `string` - The unique ID Centrifugo gave the connection.
 - `$transport` `string` - The connection's transport: "websocket", "sse", "uni_sse" and the like.
-- `$protocol` `string` - The client protocol. One of: json, protobuf.
-- `$encoding` `string` - Binary when the proxy has binary_encoding enabled, so that payloads come in the b64 fields, and json otherwise. One of: json, binary.
+- `$protocol` `string` - The client protocol. One of: json, protobuf. Constants: Protocol::JSON, Protocol::PROTOBUF.
+- `$encoding` `string` - Binary when the proxy has binary_encoding enabled, so that payloads come in the b64 fields, and json otherwise. One of: json, binary. Constants: Encoding::JSON, Encoding::BINARY.
 - `$data` `mixed` - The custom data the client sent with its connect command, if any.
 - `$b64data` `string` - Data in base64, sent instead of data in binary encoding mode.
 - `$name` `string` - The client's name, if it sent one.
@@ -5328,6 +5405,15 @@ The message as toJson gives it, for a json_encode of your own.
 The message as Centrifugo reads it: JSON, fields at their zero value
 left out. $path prefixes the field names in error messages.
 
+#### `Encoding`
+
+The values of the encoding field of ConnectRequest, RefreshRequest,
+SubscribeRequest, PublishRequest, MapPublishRequest, MapRemoveRequest,
+RPCRequest and SubRefreshRequest, as its comment lists them.
+
+The field is a string: a value Centrifugo accepts which these do not
+name is still a valid one.
+
 #### `FilterNode`
 
 ```php
@@ -5345,9 +5431,9 @@ FilterNode is a node of a publication tags filter expression. A leaf node
 compares one tag: it sets key, cmp and val or vals, and leaves op empty. A
 logical node combines its nodes: it sets op and nodes only.
 
-- `$op` `string` - The logical operation. Empty for a leaf node. One of: and, or, not.
+- `$op` `string` - The logical operation. Empty for a leaf node. One of: and, or, not. Constants: Op::AND, Op::OR, Op::NOT.
 - `$key` `string` - The tag a leaf node compares.
-- `$cmp` `string` - The comparison of a leaf node: ex is exists, nex does not exist, sw starts with, ew ends with, ct contains. One of: eq, neq, in, nin, ex, nex, sw, ew, ct, gt, gte, lt, lte.
+- `$cmp` `string` - The comparison of a leaf node: ex is exists, nex does not exist, sw starts with, ew ends with, ct contains. One of: eq, neq, in, nin, ex, nex, sw, ew, ct, gt, gte, lt, lte. Constants: Cmp::EQ, Cmp::NEQ, Cmp::IN, Cmp::NIN, Cmp::EX, Cmp::NEX, Cmp::SW, Cmp::EW, Cmp::CT, Cmp::GT, Cmp::GTE, Cmp::LT, Cmp::LTE.
 - `$val` `string` - The value most comparisons compare the tag with.
 - `$vals` `list<string>` - The values "in" and "nin" compare the tag with.
 - `$nodes` `list<FilterNode>` - The operands of a logical node.
@@ -5360,6 +5446,14 @@ The message as toJson gives it, for a json_encode of your own.
 
 The message as Centrifugo reads it: JSON, fields at their zero value
 left out. $path prefixes the field names in error messages.
+
+#### `KeyMode`
+
+The values of the key_mode field of MapPublishResult, as its comment lists
+them.
+
+The field is a string: a value Centrifugo accepts which these do not
+name is still a valid one.
 
 #### `MapPublishRequest`
 
@@ -5383,8 +5477,8 @@ MapPublishRequest is sent when a client publishes a key into a map channel.
 
 - `$client` `string` - The unique ID Centrifugo gave the connection.
 - `$transport` `string` - The connection's transport.
-- `$protocol` `string` - The client protocol. One of: json, protobuf.
-- `$encoding` `string` - Binary when the proxy has binary_encoding enabled, so that payloads come in the b64 fields, and json otherwise. One of: json, binary.
+- `$protocol` `string` - The client protocol. One of: json, protobuf. Constants: Protocol::JSON, Protocol::PROTOBUF.
+- `$encoding` `string` - Binary when the proxy has binary_encoding enabled, so that payloads come in the b64 fields, and json otherwise. One of: json, binary. Constants: Encoding::JSON, Encoding::BINARY.
 - `$user` `string` - The connection's user ID.
 - `$channel` `string` - The map channel the client publishes into.
 - `$key` `string` - The key the client publishes, empty if it sent none.
@@ -5429,7 +5523,7 @@ unset keep what the client sent, or the defaults.
 - `$b64data` `string` - Data in base64, for binary data.
 - `$tags` `array<string, string>` - Attached to the publication: clients cannot send tags, so this is where server-side tag filters get their tags from.
 - `$score` `int` - Not used by Centrifugo yet.
-- `$keyMode` `string` - Makes the publication conditional: if_new publishes only a key which does not exist yet, if_exists only one which does. One of: if_new, if_exists.
+- `$keyMode` `string` - Makes the publication conditional: if_new publishes only a key which does not exist yet, if_exists only one which does. One of: if_new, if_exists. Constants: KeyMode::IF_NEW, KeyMode::IF_EXISTS.
 - `$streamData` `mixed` - Not used by Centrifugo yet.
 - `$b64streamData` `string` - Not used by Centrifugo yet.
 - `$idempotencyKey` `string` - Makes the publication idempotent: another one with the same key within the broker's idempotency window is not published.
@@ -5466,8 +5560,8 @@ MapRemoveRequest is sent when a client removes a key from a map channel.
 
 - `$client` `string` - The unique ID Centrifugo gave the connection.
 - `$transport` `string` - The connection's transport.
-- `$protocol` `string` - The client protocol. One of: json, protobuf.
-- `$encoding` `string` - Binary when the proxy has binary_encoding enabled, so that payloads come in the b64 fields, and json otherwise. One of: json, binary.
+- `$protocol` `string` - The client protocol. One of: json, protobuf. Constants: Protocol::JSON, Protocol::PROTOBUF.
+- `$encoding` `string` - Binary when the proxy has binary_encoding enabled, so that payloads come in the b64 fields, and json otherwise. One of: json, binary. Constants: Encoding::JSON, Encoding::BINARY.
 - `$user` `string` - The connection's user ID.
 - `$channel` `string` - The map channel the client removes the key from.
 - `$key` `string` - The key the client removes.
@@ -5582,6 +5676,22 @@ The message as toJson gives it, for a json_encode of your own.
 The message as Centrifugo reads it: JSON, fields at their zero value
 left out. $path prefixes the field names in error messages.
 
+#### `Op`
+
+The values of the op field of FilterNode, as its comment lists them.
+
+The field is a string: a value Centrifugo accepts which these do not
+name is still a valid one.
+
+#### `Protocol`
+
+The values of the protocol field of ConnectRequest, RefreshRequest,
+SubscribeRequest, PublishRequest, MapPublishRequest, MapRemoveRequest,
+RPCRequest and SubRefreshRequest, as its comment lists them.
+
+The field is a string: a value Centrifugo accepts which these do not
+name is still a valid one.
+
 #### `PublishRequest`
 
 ```php
@@ -5603,8 +5713,8 @@ PublishRequest is sent when a client publishes into a channel.
 
 - `$client` `string` - The unique ID Centrifugo gave the connection.
 - `$transport` `string` - The connection's transport.
-- `$protocol` `string` - The client protocol. One of: json, protobuf.
-- `$encoding` `string` - Binary when the proxy has binary_encoding enabled, so that payloads come in the b64 fields, and json otherwise. One of: json, binary.
+- `$protocol` `string` - The client protocol. One of: json, protobuf. Constants: Protocol::JSON, Protocol::PROTOBUF.
+- `$encoding` `string` - Binary when the proxy has binary_encoding enabled, so that payloads come in the b64 fields, and json otherwise. One of: json, binary. Constants: Encoding::JSON, Encoding::BINARY.
 - `$user` `string` - The connection's user ID.
 - `$channel` `string` - The channel the client publishes into.
 - `$data` `mixed` - The data the client publishes.
@@ -5678,8 +5788,8 @@ RPCRequest is sent when a client makes an RPC call.
 
 - `$client` `string` - The unique ID Centrifugo gave the connection.
 - `$transport` `string` - The connection's transport.
-- `$protocol` `string` - The client protocol. One of: json, protobuf.
-- `$encoding` `string` - Binary when the proxy has binary_encoding enabled, so that payloads come in the b64 fields, and json otherwise. One of: json, binary.
+- `$protocol` `string` - The client protocol. One of: json, protobuf. Constants: Protocol::JSON, Protocol::PROTOBUF.
+- `$encoding` `string` - Binary when the proxy has binary_encoding enabled, so that payloads come in the b64 fields, and json otherwise. One of: json, binary. Constants: Encoding::JSON, Encoding::BINARY.
 - `$user` `string` - The connection's user ID.
 - `$method` `string` - The method the client calls, empty if it named none.
 - `$data` `mixed` - The data the client sent with the call.
@@ -5734,8 +5844,8 @@ RefreshRequest is sent when a connection is about to expire.
 
 - `$client` `string` - The unique ID Centrifugo gave the connection.
 - `$transport` `string` - The connection's transport.
-- `$protocol` `string` - The client protocol. One of: json, protobuf.
-- `$encoding` `string` - Binary when the proxy has binary_encoding enabled, so that payloads come in the b64 fields, and json otherwise. One of: json, binary.
+- `$protocol` `string` - The client protocol. One of: json, protobuf. Constants: Protocol::JSON, Protocol::PROTOBUF.
+- `$encoding` `string` - Binary when the proxy has binary_encoding enabled, so that payloads come in the b64 fields, and json otherwise. One of: json, binary. Constants: Encoding::JSON, Encoding::BINARY.
 - `$user` `string` - The connection's user ID.
 - `$meta` `mixed` - The connection's meta, when the proxy has include_connection_meta.
 - `$labels` `array<string, string>` - PRO only — connection labels attached to the originating centrifuge.Client. Centrifugo PRO always populates this from Client.Labels() (no opt-in toggle).
@@ -5890,8 +6000,8 @@ SubRefreshRequest is sent when a subscription is about to expire.
 
 - `$client` `string` - The unique ID Centrifugo gave the connection.
 - `$transport` `string` - The connection's transport.
-- `$protocol` `string` - The client protocol. One of: json, protobuf.
-- `$encoding` `string` - Binary when the proxy has binary_encoding enabled, so that payloads come in the b64 fields, and json otherwise. One of: json, binary.
+- `$protocol` `string` - The client protocol. One of: json, protobuf. Constants: Protocol::JSON, Protocol::PROTOBUF.
+- `$encoding` `string` - Binary when the proxy has binary_encoding enabled, so that payloads come in the b64 fields, and json otherwise. One of: json, binary. Constants: Encoding::JSON, Encoding::BINARY.
 - `$user` `string` - The connection's user ID.
 - `$channel` `string` - The channel whose subscription is about to expire.
 - `$meta` `mixed` - The connection's meta, when the proxy has include_connection_meta.
@@ -6023,8 +6133,8 @@ SubscribeRequest is sent when a client subscribes to a channel.
 
 - `$client` `string` - The unique ID Centrifugo gave the connection.
 - `$transport` `string` - The connection's transport.
-- `$protocol` `string` - The client protocol. One of: json, protobuf.
-- `$encoding` `string` - Binary when the proxy has binary_encoding enabled, so that payloads come in the b64 fields, and json otherwise. One of: json, binary.
+- `$protocol` `string` - The client protocol. One of: json, protobuf. Constants: Protocol::JSON, Protocol::PROTOBUF.
+- `$encoding` `string` - Binary when the proxy has binary_encoding enabled, so that payloads come in the b64 fields, and json otherwise. One of: json, binary. Constants: Encoding::JSON, Encoding::BINARY.
 - `$user` `string` - The connection's user ID.
 - `$channel` `string` - The channel the client subscribes to.
 - `$token` `string` - The subscription token the client sent for the channel, if any.
@@ -6065,7 +6175,7 @@ SubscribeResult accepts the subscription.
 - `$data` `mixed` - Custom data sent to the client in the subscribe reply.
 - `$b64data` `string` - Data in base64, for binary data.
 - `$override` `SubscribeOptionOverride|null` - Overrides channel options of the namespace for this subscription.
-- `$allow` `list<string>` - Capabilities granted in the channel for this subscription. Centrifugo PRO only. One of: sub, pub, hst, prs.
+- `$allow` `list<string>` - Capabilities granted in the channel for this subscription. Centrifugo PRO only. One of: sub, pub, hst, prs. Constants: Allow::SUB, Allow::PUB, Allow::HST, Allow::PRS.
 - `$serverTagsFilter` `FilterNode|null` - Makes the subscription receive only publications whose tags match it. Centrifugo PRO only.
 
 ##### `jsonSerialize(): RawJson`
@@ -6076,5 +6186,12 @@ The message as toJson gives it, for a json_encode of your own.
 
 The message as Centrifugo reads it: JSON, fields at their zero value
 left out. $path prefixes the field names in error messages.
+
+#### `Type`
+
+The values of the type field of ChannelEvent, as its comment lists them.
+
+The field is a string: a value Centrifugo accepts which these do not
+name is still a valid one.
 
 </details>

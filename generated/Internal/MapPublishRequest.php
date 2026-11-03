@@ -48,6 +48,7 @@ final class MapPublishRequest implements Message, Request
      * @param string $keyMode Makes the publish conditional: if_new writes only if the key
      *     does not exist, if_exists only if it exists. Empty always writes.
      *     One of: if_new, if_exists.
+     *     Constants: KeyMode::IF_NEW, KeyMode::IF_EXISTS.
      */
     public function __construct(
         public string $channel,

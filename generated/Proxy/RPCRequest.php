@@ -20,9 +20,11 @@ final class RPCRequest implements Message
      * @param string $client The unique ID Centrifugo gave the connection.
      * @param string $transport The connection's transport.
      * @param string $protocol The client protocol. One of: json, protobuf.
+     *     Constants: Protocol::JSON, Protocol::PROTOBUF.
      * @param string $encoding Binary when the proxy has binary_encoding enabled, so that
      *     payloads come in the b64 fields, and json otherwise.
      *     One of: json, binary.
+     *     Constants: Encoding::JSON, Encoding::BINARY.
      * @param string $user The connection's user ID.
      * @param string $method The method the client calls, empty if it named none.
      * @param mixed $data The data the client sent with the call.

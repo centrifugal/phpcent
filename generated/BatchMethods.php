@@ -654,9 +654,11 @@ trait BatchMethods
      *     device.
      * @param string $provider The provider of the device token. Required. One of: fcm,
      *     hms, apns, webpush.
+     *     Constants: Provider::FCM, Provider::HMS, Provider::APNS, Provider::WEBPUSH.
      * @param string $token The push token of the device. For webpush, it is the browser
      *     PushSubscription serialized as a JSON string. Required.
      * @param string $platform The device platform. Required. One of: ios, android, web.
+     *     Constants: Platform::IOS, Platform::ANDROID, Platform::WEB.
      * @param string $user The user associated with the device.
      * @param array<string, string> $meta Additional custom metadata of the device.
      * @param list<string> $topics The full list of the device's topic subscriptions, replacing
@@ -833,6 +835,7 @@ trait BatchMethods
      *
      * @param string $deviceId The ID of the device. Required.
      * @param string $op The operation. Required. One of: add, remove, set.
+     *     Constants: Op::ADD, Op::REMOVE, Op::SET.
      * @param list<string> $topics The topics for the operation.
      * @param string $user An optional ownership guard: the update is applied only if the
      *     device currently belongs to this user. Otherwise the call fails with a
@@ -894,6 +897,7 @@ trait BatchMethods
      * @param string $user The user ID. Required. "" updates the global binding, which every
      *     device - anonymous ones included - gets on its next $deviceRegister.
      * @param string $op The operation. Required. One of: add, remove, set.
+     *     Constants: Op::ADD, Op::REMOVE, Op::SET.
      * @param list<string> $topics The topics for the operation.
      *
      * @return Pending<UserTopicUpdateResult>
@@ -980,6 +984,7 @@ trait BatchMethods
      *     SendPushNotificationRequest). Required.
      * @param string $status The status of the push notification. Required. One of:
      *     delivered, interacted.
+     *     Constants: Status::DELIVERED, Status::INTERACTED.
      * @param string $deviceId The Centrifugo device ID. Required.
      * @param string $msgId The message ID issued by the provider.
      *
@@ -1046,6 +1051,7 @@ trait BatchMethods
      * @param string $keyMode Makes the publish conditional: if_new writes only if the key
      *     does not exist, if_exists only if it exists. Empty always writes.
      *     One of: if_new, if_exists.
+     *     Constants: KeyMode::IF_NEW, KeyMode::IF_EXISTS.
      *
      * @return Pending<MapPublishResult>
      */

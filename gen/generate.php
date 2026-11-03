@@ -439,6 +439,7 @@ function decoder(ProtoField $f): string
 function fieldDoc(ProtoMessage $m, ProtoField $f): array
 {
     $lines = $f->doc;
+    $consts = $GLOBALS['constDocs']["{$m->name}.{$f->name}"] ?? null;
     if ($lines !== []) {
         $first = $lines[0];
         $name = preg_quote($f->name, '/');
@@ -453,8 +454,12 @@ function fieldDoc(ProtoMessage $m, ProtoField $f): array
             $lines[0] = '$' . camel($f->name) . $mm[1];
         }
     }
+    $lines = fieldRefs($m, $lines);
+    if ($consts !== null) {
+        $lines[] = "Constants: {$consts}.";
+    }
 
-    return fieldRefs($m, $lines);
+    return $lines;
 }
 
 /**
@@ -968,6 +973,77 @@ function checkWrappers(Proto $s, string $name): void
     }
 }
 
+/**
+ * The classes of constants of a proto's fields with listed values, each a
+ * file in $dir: Op::ADD, Provider::FCM. A class named as a message, or as a
+ * hand-written class of the namespace, fails the generation.
+ *
+ * @param list<ConstGroup> $groups
+ * @param array<string, true> $taken the class names the namespace has
+ *
+ * @return array<string, string> file path => code
+ */
+function emitConsts(array $groups, string $namespace, string $proto, string $dir, array $taken): array
+{
+    $files = [];
+    foreach ($groups as $g) {
+        $class = $g->className();
+        if (isset($taken[$class])) {
+            throw new \RuntimeException("{$proto}: the constants of {$g->field} would be {$namespace}\\{$class}, which is taken");
+        }
+        $taken[$class] = true;
+        $messages = $g->messages;
+        $last = array_pop($messages);
+        $in = $messages === [] ? $last : implode(', ', $messages) . " and {$last}";
+        $out = \sprintf(HEADER, $proto, $namespace) . "\n";
+        $out .= docblock([
+            ...explode("\n", wordwrap("The values of the {$g->field} field of {$in}, as its comment lists them.", 77)),
+            '',
+            'The field is a string: a value Centrifugo accepts which these do not',
+            'name is still a valid one.',
+        ], '');
+        $out .= "final class {$class}\n{\n";
+        foreach ($g->values as $v) {
+            $out .= '    public const string ' . ConstGroup::constName($v) . " = '{$v}';\n";
+        }
+        $out .= "\n    private function __construct() {}\n}\n";
+        $files["{$dir}{$class}.php"] = $out;
+    }
+
+    return $files;
+}
+
+/**
+ * The constants naming a field's listed values, for its docs:
+ * "Op::ADD, Op::REMOVE, Op::SET".
+ *
+ * @var array<string, string> message.field => text
+ */
+$GLOBALS['constDocs'] = [];
+
+/** @param list<ConstGroup> $groups */
+function recordConstDocs(array $groups): void
+{
+    $GLOBALS['constDocs'] = [];
+    foreach ($groups as $g) {
+        $names = array_map(static fn(string $v): string => $g->className() . '::' . ConstGroup::constName($v), $g->values);
+        foreach ($g->messages as $m) {
+            $GLOBALS['constDocs']["{$m}.{$g->field}"] = implode(', ', $names);
+        }
+    }
+}
+
+/** @return array<string, true> the class names written by hand in a namespace's directory */
+function handwritten(string $dir): array
+{
+    $out = [];
+    foreach (glob(ROOT . "/src/{$dir}*.php") ?: [] as $f) {
+        $out[basename($f, '.php')] = true;
+    }
+
+    return $out;
+}
+
 /** @return array<string, string> generated file path => code */
 function generate(): array
 {
@@ -982,6 +1058,16 @@ function generate(): array
         $byRequest[$c->request->name] = $c;
     }
     $checks = new Checks($api, $cmds);
+    $public = static fn(string $name): bool => !isset($skip[$name]) && !isset($byRequest[$name]);
+    $apiGroups = Rules::constGroups($api, static fn(string $name): bool => !isset($skip[$name]));
+    recordConstDocs($apiGroups);
+    $taken = handwritten('');
+    foreach ($api->messages as $m) {
+        if ($public($m->name)) {
+            $taken[$m->name] = true;
+        }
+    }
+    $files += emitConsts($apiGroups, 'Centrifugal\\Phpcent', 'api.proto', '', $taken);
     foreach ($api->messages as $m) {
         if (!isset($skip[$m->name])) {
             $command = $byRequest[$m->name] ?? null;
@@ -995,6 +1081,10 @@ function generate(): array
 
     $proxy = $schema = Proto::parse((string) file_get_contents(ROOT . '/proto/proxy.proto'), 'proxy.proto');
     checkWrappers($proxy, 'proxy.proto');
+    $proxyNames = array_fill_keys(array_map(static fn(ProtoMessage $m): string => $m->name, proxyMessages($proxy)), true);
+    $proxyGroups = Rules::constGroups($proxy, static fn(string $name): bool => isset($proxyNames[$name]));
+    recordConstDocs($proxyGroups);
+    $files += emitConsts($proxyGroups, 'Centrifugal\\Phpcent\\Proxy', 'proxy.proto', 'Proxy/', handwritten('Proxy/') + $proxyNames);
     foreach (proxyMessages($proxy) as $m) {
         $files["Proxy/{$m->name}.php"] = emitMessage($m, 'Centrifugal\\Phpcent\\Proxy', 'proxy.proto', 'proxy protocol', null);
     }

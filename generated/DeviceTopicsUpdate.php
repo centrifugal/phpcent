@@ -17,6 +17,7 @@ final class DeviceTopicsUpdate implements Message
 {
     /**
      * @param string $op The operation. Required. One of: add, remove, set.
+     *     Constants: Op::ADD, Op::REMOVE, Op::SET.
      * @param list<string> $topics The topics for the operation.
      */
     public function __construct(

@@ -22,8 +22,10 @@ final class ChannelsCapability implements Message
      * @param list<string> $channels The channels, or channel patterns, it applies to.
      * @param list<string> $allow The operations it grants: sub is subscribe, pub publish, hst
      *     history, prs presence. One of: sub, pub, hst, prs.
+     *     Constants: Allow::SUB, Allow::PUB, Allow::HST, Allow::PRS.
      * @param string $match How channels are matched: empty for exact names. One of:
      *     wildcard, regex.
+     *     Constants: ChannelsCapabilityMatch::WILDCARD, ChannelsCapabilityMatch::REGEX.
      */
     public function __construct(
         public array $channels = [],

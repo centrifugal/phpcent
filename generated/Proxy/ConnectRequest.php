@@ -21,9 +21,11 @@ final class ConnectRequest implements Message
      * @param string $transport The connection's transport: "websocket", "sse", "uni_sse" and
      *     the like.
      * @param string $protocol The client protocol. One of: json, protobuf.
+     *     Constants: Protocol::JSON, Protocol::PROTOBUF.
      * @param string $encoding Binary when the proxy has binary_encoding enabled, so that
      *     payloads come in the b64 fields, and json otherwise.
      *     One of: json, binary.
+     *     Constants: Encoding::JSON, Encoding::BINARY.
      * @param mixed $data The custom data the client sent with its connect command, if any.
      * @param string $b64data Data in base64, sent instead of data in binary encoding mode.
      * @param string $name The client's name, if it sent one.

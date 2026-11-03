@@ -30,9 +30,11 @@ final class DeviceRegisterRequest implements Message, Request
      *     device.
      * @param string $provider The provider of the device token. Required. One of: fcm,
      *     hms, apns, webpush.
+     *     Constants: Provider::FCM, Provider::HMS, Provider::APNS, Provider::WEBPUSH.
      * @param string $token The push token of the device. For webpush, it is the browser
      *     PushSubscription serialized as a JSON string. Required.
      * @param string $platform The device platform. Required. One of: ios, android, web.
+     *     Constants: Platform::IOS, Platform::ANDROID, Platform::WEB.
      * @param string $user The user associated with the device.
      * @param array<string, string> $meta Additional custom metadata of the device.
      * @param list<string> $topics The full list of the device's topic subscriptions, replacing

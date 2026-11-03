@@ -30,6 +30,7 @@ final class SubscribeResult implements Message
      *     subscription.
      * @param list<string> $allow Capabilities granted in the channel for this subscription.
      *     Centrifugo PRO only. One of: sub, pub, hst, prs.
+     *     Constants: Allow::SUB, Allow::PUB, Allow::HST, Allow::PRS.
      * @param FilterNode|null $serverTagsFilter Makes the subscription receive only publications
      *     whose tags match it. Centrifugo PRO only.
      */

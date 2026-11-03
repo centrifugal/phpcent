@@ -28,6 +28,7 @@ final class MapPublishResult implements Message
      * @param string $keyMode Makes the publication conditional: if_new publishes only a key
      *     which does not exist yet, if_exists only one which does.
      *     One of: if_new, if_exists.
+     *     Constants: KeyMode::IF_NEW, KeyMode::IF_EXISTS.
      * @param mixed $streamData Not used by Centrifugo yet.
      * @param string $b64streamData Not used by Centrifugo yet.
      * @param string $idempotencyKey Makes the publication idempotent: another one with the

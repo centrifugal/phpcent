@@ -31,6 +31,7 @@ use Centrifugal\Phpcent\Exception\UnknownChannelException;
 use Centrifugal\Phpcent\FcmPushNotification;
 use Centrifugal\Phpcent\Internal\PresenceStatsRequest;
 use Centrifugal\Phpcent\Internal\Request;
+use Centrifugal\Phpcent\Op;
 use Centrifugal\Phpcent\PushLimitStrategy;
 use Centrifugal\Phpcent\PushNotification;
 use Centrifugal\Phpcent\PushRateLimitStrategy;
@@ -558,7 +559,7 @@ final class ClientTest extends TestCase
         // Empty means anonymous users, and the global binding: not checked.
         $c->invalidateUserTokens(user: '');
         self::assertSame('{}', $fake->last()['body']);
-        $c->userTopicUpdate(user: '', op: 'add', topics: ['t']);
+        $c->userTopicUpdate(user: '', op: Op::ADD, topics: ['t']);
         self::assertSame('{"op":"add","topics":["t"]}', $fake->last()['body']);
         // An optional nested message left unset, or set empty, is not checked.
         $c->sendPushNotification(recipient: new PushRecipient(fcmTokens: ['t']), notification: new PushNotification(fcm: new FcmPushNotification(message: ['k' => 'v'])), limitStrategy: new PushLimitStrategy(timeLimit: new PushTimeLimitStrategy(sendAfterTime: '', sendBeforeTime: '')));

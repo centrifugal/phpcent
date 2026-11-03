@@ -234,6 +234,26 @@ final class Checks
     }
 }
 
+/**
+ * Whether a message is a method's result holding a stream position, offset
+ * and epoch, which position() gives as a StreamPosition: publish's, history's,
+ * map_read_state's and map_read_stream's.
+ */
+function hasPosition(ProtoMessage $m): bool
+{
+    global $schema;
+    $isResult = false;
+    foreach ($schema->byName['Reply']->fields ?? [] as $f) {
+        $isResult = $isResult || $f->type === $m->name;
+    }
+    $types = [];
+    foreach ($m->fields as $f) {
+        $types[$f->name] = $f->type;
+    }
+
+    return $isResult && ($types['offset'] ?? '') === 'uint64' && ($types['epoch'] ?? '') === 'string';
+}
+
 /** The PHP condition true when field $f of $this is at its zero value: unset. */
 function zeroCheck(ProtoField $f, bool $required): string
 {
@@ -653,6 +673,13 @@ function emitMessage(ProtoMessage $m, string $namespace, string $proto, string $
     }
 
     $out .= emitChecks($m, $checks);
+    if ($command === null && $checks !== null && hasPosition($m)) {
+        $out .= "\n    /**\n     * The result's position in the channel's stream, offset and epoch: what\n";
+        $out .= "     * history takes as its since, subscribe as its recoverSince, and\n";
+        $out .= "     * mapReadStream as its sinceOffset and sinceEpoch.\n     */\n";
+        $out .= "    public function position(): StreamPosition\n    {\n";
+        $out .= "        return new StreamPosition(offset: \$this->offset, epoch: \$this->epoch);\n    }\n";
+    }
 
     // toJson: the message as JSON, zero values left out, payloads spliced in.
     $out .= "\n    /**\n     * The message as Centrifugo reads it: JSON, fields at their zero value\n";
@@ -688,6 +715,65 @@ function emitMessage(ProtoMessage $m, string $namespace, string $proto, string $
     }
     return $out . "    }\n}\n";
 }
+
+// The paged methods (spec 3.8): each gets a <method>All on the client,
+// returning a Generator of the items of every page - Pages, by hand, holds the
+// loops - and the docs of its paging.
+const PAGED = [
+    'history' => ['Pages::history', 'publications', <<<'DOC'
+        Every publication from since on - the first page as the request asks,
+        each after it from the last publication of the one before - read a
+        page of $limit at a time when the iteration reaches it. It stops at a
+        page shorter than $limit, so a full last page costs one more request,
+        which comes back empty. $limit must be 1 or more, and $reverse false:
+        the call throws InvalidRequestException otherwise, before anything is
+        sent. To read what came after a publication:
+
+            $pub = $client->publish(channel: 'news', data: $data);
+            foreach ($client->historyAll(channel: 'news', limit: 100, since: $pub->position()) as $p) {
+                handle($p);
+            }
+
+        A since whose epoch is no longer the stream's throws
+        UnrecoverablePositionException: the stream was reset, and reading from
+        its start is the only recovery.
+        DOC],
+    'device_list' => ['Pages::deviceList', 'items', <<<'DOC'
+        Every device the filter selects, read a page at a time - $limit per
+        page, or Centrifugo's default - when the iteration reaches it, each
+        page after the first at the next cursor of the one before. Devices
+        registered or removed while listing may or may not be seen.
+        DOC],
+    'device_topic_list' => ['Pages::deviceTopicList', 'items', <<<'DOC'
+        Every device topic the filter selects, read a page at a time - $limit
+        per page, or Centrifugo's default - when the iteration reaches it, each
+        page after the first at the next cursor of the one before. Topics
+        changed while listing may or may not be seen.
+        DOC],
+    'user_topic_list' => ['Pages::userTopicList', 'items', <<<'DOC'
+        Every user topic the filter selects, read a page at a time - $limit per
+        page, or Centrifugo's default - when the iteration reaches it, each
+        page after the first at the next cursor of the one before. Topics
+        changed while listing may or may not be seen.
+        DOC],
+    'map_read_state' => ['Pages::mapReadState', 'entries', <<<'DOC'
+        Every entry of the map's state, read a page at a time - $limit per
+        page, or Centrifugo's default - when the iteration reaches it, each
+        page after the first at the cursor of the one before. Every page after
+        the first is read at the first one's revision - its offset and epoch
+        as $revisionOffset and $revisionEpoch, unless the call sets them - so
+        that the map's stream reset between pages throws
+        UnrecoverablePositionException instead of mixing two states: reading
+        again from the first page is the recovery.
+        DOC],
+];
+
+const PAGED_DOC = <<<'DOC'
+    It returns at once; leaving the loop early reads no further page. An
+    exception of a page's call ends the iteration, where it was, after the
+    items before it. The request is checked when the method is called: an
+    invalid one throws InvalidRequestException before anything is sent.
+    DOC;
 
 // Parameter names the methods take besides a request's fields.
 const OWN_PARAMS = ['timeout', 'maxAttempts', 'attemptTimeout', 'onAttemptError'];
@@ -827,7 +913,7 @@ function methodsHeader(array $cmds, array $uses): string
 
 function emitClientMethods(array $cmds): string
 {
-    $out = methodsHeader($cmds, ['Centrifugal\\Phpcent\\Exception\\CentException', 'Centrifugal\\Phpcent\\Internal\\Limits', 'Centrifugal\\Phpcent\\Internal\\Request']);
+    $out = methodsHeader($cmds, ['Centrifugal\\Phpcent\\Exception\\CentException', 'Centrifugal\\Phpcent\\Internal\\Limits', 'Centrifugal\\Phpcent\\Internal\\Pages', 'Centrifugal\\Phpcent\\Internal\\Request']);
     $out .= "/**\n * The server API methods of Client, one per method of api.proto.\n *\n * @internal\n */\n";
     $out .= "trait ClientMethods\n{\n";
     $out .= "    /**\n     * @template T\n     *\n     * @param Request<T> \$request\n     *\n     * @return T\n     */\n";
@@ -848,6 +934,24 @@ function emitClientMethods(array $cmds): string
         $returns = $c->method === 'broadcast' ? 'BroadcastResult' : $c->result;
         $call = $c->method === 'broadcast' ? "\$this->sendBroadcast({$request}, \$timeout)" : "\$this->invoke({$request}, \$timeout)";
         $out .= method($doc, "public function {$name}", [...$params, '?float $timeout = null'], $returns, "return {$call};");
+        if (isset(PAGED[$c->method])) {
+            [$pages, $itemsField, $pagedDoc] = PAGED[$c->method];
+            global $schema;
+            $item = null;
+            foreach ($schema->byName[$c->result]->fields as $f) {
+                if ($f->name === $itemsField && $f->repeated) {
+                    $item = $f->type;
+                }
+            }
+            if ($item === null) {
+                throw new \RuntimeException("api.proto: {$c->result} has no repeated {$itemsField}");
+            }
+            $doc = [...lines($pagedDoc), '', ...lines(PAGED_DOC), '', ...$fieldDocs,
+                '@param ?float $timeout Seconds bounding each page\'s call: requestTimeout when null.',
+                '', "@return \\Generator<int, {$item}>", '', '@throws CentException'];
+            $page = "fn({$c->request->name} \$r): {$c->result} => \$this->invoke(\$r, \$timeout)";
+            $out .= method($doc, "public function {$name}All", [...$params, '?float $timeout = null'], '\Generator', "return {$pages}({$request}, {$page});");
+        }
         if ($c->method === 'broadcast') {
             $doc = [...lines(BROADCAST_RETRY_DOC), '', ...$fieldDocs,
                 '@param int $maxAttempts Attempts at most, the first included.',

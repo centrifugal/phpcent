@@ -24,6 +24,16 @@ final class PublishResult implements Message
     ) {}
 
     /**
+     * The result's position in the channel's stream, offset and epoch: what
+     * history takes as its since, subscribe as its recoverSince, and
+     * mapReadStream as its sinceOffset and sinceEpoch.
+     */
+    public function position(): StreamPosition
+    {
+        return new StreamPosition(offset: $this->offset, epoch: $this->epoch);
+    }
+
+    /**
      * The message as Centrifugo reads it: JSON, fields at their zero value
      * left out. $path prefixes the field names in error messages.
      */

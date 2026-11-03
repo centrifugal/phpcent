@@ -232,6 +232,36 @@ Centrifugo PRO only.
 - `$limit` - The maximum number of devices to return.
 - `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
+#### `deviceListAll(
+    ?DeviceFilter $filter = null,
+    bool $includeTotalCount = false,
+    bool $includeMeta = false,
+    bool $includeTopics = false,
+    bool $includeWebpushKeys = false,
+    string $cursor = '',
+    int $limit = 0,
+    ?float $timeout = null,
+): Generator`
+
+Every device the filter selects, read a page at a time - $limit per
+page, or Centrifugo's default - when the iteration reaches it, each
+page after the first at the next cursor of the one before. Devices
+registered or removed while listing may or may not be seen.
+
+It returns at once; leaving the loop early reads no further page. An
+exception of a page's call ends the iteration, where it was, after the
+items before it. The request is checked when the method is called: an
+invalid one throws InvalidRequestException before anything is sent.
+
+- `$filter` - Selects the devices to list: all of them when unset.
+- `$includeTotalCount` - Includes the total count for the filter in the result.
+- `$includeMeta` - Includes meta of each device.
+- `$includeTopics` - Includes topics of each device.
+- `$includeWebpushKeys` - Includes $webpushKeys of each device (webpush only).
+- `$cursor` - The pagination cursor: $nextCursor of the previous page, empty for the first page.
+- `$limit` - The maximum number of devices to return.
+- `$timeout` - Seconds bounding each page's call: requestTimeout when null.
+
 #### `deviceRegister(
     string $provider,
     string $token,
@@ -286,6 +316,32 @@ subscriptions. Centrifugo PRO only.
 - `$cursor` - The pagination cursor: $nextCursor of the previous page, empty for the first page.
 - `$limit` - The maximum number of items to return.
 - `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+
+#### `deviceTopicListAll(
+    ?DeviceTopicFilter $filter = null,
+    bool $includeTotalCount = false,
+    bool $includeDevice = false,
+    string $cursor = '',
+    int $limit = 0,
+    ?float $timeout = null,
+): Generator`
+
+Every device topic the filter selects, read a page at a time - $limit
+per page, or Centrifugo's default - when the iteration reaches it, each
+page after the first at the next cursor of the one before. Topics
+changed while listing may or may not be seen.
+
+It returns at once; leaving the loop early reads no further page. An
+exception of a page's call ends the iteration, where it was, after the
+items before it. The request is checked when the method is called: an
+invalid one throws InvalidRequestException before anything is sent.
+
+- `$filter` - Selects the device topics to list.
+- `$includeTotalCount` - Includes the total count for the filter in the result.
+- `$includeDevice` - Includes the Device of each item.
+- `$cursor` - The pagination cursor: $nextCursor of the previous page, empty for the first page.
+- `$limit` - The maximum number of items to return.
+- `$timeout` - Seconds bounding each page's call: requestTimeout when null.
 
 #### `deviceTopicUpdate(
     string $deviceId,
@@ -373,6 +429,44 @@ History must be enabled for the channel.
 - `$since` - Returns publications after this stream position.
 - `$reverse` - Iterates in reverse order, from latest to earliest.
 - `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+
+#### `historyAll(
+    string $channel,
+    int $limit = 0,
+    ?StreamPosition $since = null,
+    bool $reverse = false,
+    ?float $timeout = null,
+): Generator`
+
+Every publication from since on - the first page as the request asks,
+each after it from the last publication of the one before - read a
+page of $limit at a time when the iteration reaches it. It stops at a
+page shorter than $limit, so a full last page costs one more request,
+which comes back empty. $limit must be 1 or more, and $reverse false:
+the call throws InvalidRequestException otherwise, before anything is
+sent. To read what came after a publication:
+
+```php
+$pub = $client->publish(channel: 'news', data: $data);
+foreach ($client->historyAll(channel: 'news', limit: 100, since: $pub->position()) as $p) {
+    handle($p);
+}
+```
+
+A since whose epoch is no longer the stream's throws
+UnrecoverablePositionException: the stream was reset, and reading from
+its start is the only recovery.
+
+It returns at once; leaving the loop early reads no further page. An
+exception of a page's call ends the iteration, where it was, after the
+items before it. The request is checked when the method is called: an
+invalid one throws InvalidRequestException before anything is sent.
+
+- `$channel` - The name of the channel. Required.
+- `$limit` - The maximum number of publications to return; -1 returns all the channel keeps. If not set, only the current stream position is returned, without publications.
+- `$since` - Returns publications after this stream position.
+- `$reverse` - Iterates in reverse order, from latest to earliest.
+- `$timeout` - Seconds bounding each page's call: requestTimeout when null.
 
 #### `historyRemove(string $channel, ?float $timeout = null): HistoryRemoveResult`
 
@@ -469,6 +563,40 @@ optional pagination.
 - `$revisionOffset` - The offset of the position from a previous state read, used with $revisionEpoch.
 - `$revisionEpoch` - The epoch of the position from a previous state read. If the epoch changed, the call fails with an unrecoverable position error.
 - `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+
+#### `mapReadStateAll(
+    string $channel,
+    string $cursor = '',
+    int $limit = 0,
+    string $key = '',
+    bool $asc = false,
+    int $revisionOffset = 0,
+    string $revisionEpoch = '',
+    ?float $timeout = null,
+): Generator`
+
+Every entry of the map's state, read a page at a time - $limit per
+page, or Centrifugo's default - when the iteration reaches it, each
+page after the first at the cursor of the one before. Every page after
+the first is read at the first one's revision - its offset and epoch
+as $revisionOffset and $revisionEpoch, unless the call sets them - so
+that the map's stream reset between pages throws
+UnrecoverablePositionException instead of mixing two states: reading
+again from the first page is the recovery.
+
+It returns at once; leaving the loop early reads no further page. An
+exception of a page's call ends the iteration, where it was, after the
+items before it. The request is checked when the method is called: an
+invalid one throws InvalidRequestException before anything is sent.
+
+- `$channel` - The name of the map channel. Required.
+- `$cursor` - The pagination cursor from the previous page. Empty starts from the beginning.
+- `$limit` - The maximum number of entries per page: -1 means no limit, 0 returns only the stream position. Page sizes may exceed it with the Redis map broker.
+- `$key` - Reads a single entry by exact key. cursor and limit are ignored when it is set.
+- `$asc` - Sorts ordered state by score ascending instead of descending. Ignored for unordered channels.
+- `$revisionOffset` - The offset of the position from a previous state read, used with $revisionEpoch.
+- `$revisionEpoch` - The epoch of the position from a previous state read. If the epoch changed, the call fails with an unrecoverable position error.
+- `$timeout` - Seconds bounding each page's call: requestTimeout when null.
 
 #### `mapReadStream(
     string $channel,
@@ -754,6 +882,30 @@ subscriptions. Centrifugo PRO only.
 - `$cursor` - The pagination cursor: $nextCursor of the previous page, empty for the first page.
 - `$limit` - The maximum number of items to return.
 - `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+
+#### `userTopicListAll(
+    ?UserTopicFilter $filter = null,
+    bool $includeTotalCount = false,
+    string $cursor = '',
+    int $limit = 0,
+    ?float $timeout = null,
+): Generator`
+
+Every user topic the filter selects, read a page at a time - $limit per
+page, or Centrifugo's default - when the iteration reaches it, each
+page after the first at the next cursor of the one before. Topics
+changed while listing may or may not be seen.
+
+It returns at once; leaving the loop early reads no further page. An
+exception of a page's call ends the iteration, where it was, after the
+items before it. The request is checked when the method is called: an
+invalid one throws InvalidRequestException before anything is sent.
+
+- `$filter` - Selects the user topics to list.
+- `$includeTotalCount` - Includes the total count for the filter in the result.
+- `$cursor` - The pagination cursor: $nextCursor of the previous page, empty for the first page.
+- `$limit` - The maximum number of items to return.
+- `$timeout` - Seconds bounding each page's call: requestTimeout when null.
 
 #### `userTopicUpdate(
     string $user,
@@ -4286,6 +4438,12 @@ HistoryResult is the result of a history call.
 
 The message as toJson gives it, for a json_encode of your own.
 
+##### `position(): StreamPosition`
+
+The result's position in the channel's stream, offset and epoch: what
+history takes as its since, subscribe as its recoverSince, and
+mapReadStream as its sinceOffset and sinceEpoch.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -4427,6 +4585,12 @@ MapPublishResult is the result of a map publish call.
 
 The message as toJson gives it, for a json_encode of your own.
 
+##### `position(): StreamPosition`
+
+The result's position in the channel's stream, offset and epoch: what
+history takes as its since, subscribe as its recoverSince, and
+mapReadStream as its sinceOffset and sinceEpoch.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -4454,6 +4618,12 @@ MapReadStateResult is the result of a map read state call.
 
 The message as toJson gives it, for a json_encode of your own.
 
+##### `position(): StreamPosition`
+
+The result's position in the channel's stream, offset and epoch: what
+history takes as its since, subscribe as its recoverSince, and
+mapReadStream as its sinceOffset and sinceEpoch.
+
 ##### `toJson(string $path = ''): string`
 
 The message as Centrifugo reads it: JSON, fields at their zero value
@@ -4474,6 +4644,12 @@ MapReadStreamResult is the result of a map read stream call.
 ##### `jsonSerialize(): RawJson`
 
 The message as toJson gives it, for a json_encode of your own.
+
+##### `position(): StreamPosition`
+
+The result's position in the channel's stream, offset and epoch: what
+history takes as its since, subscribe as its recoverSince, and
+mapReadStream as its sinceOffset and sinceEpoch.
 
 ##### `toJson(string $path = ''): string`
 
@@ -4501,6 +4677,12 @@ MapRemoveResult is the result of a map remove call.
 ##### `jsonSerialize(): RawJson`
 
 The message as toJson gives it, for a json_encode of your own.
+
+##### `position(): StreamPosition`
+
+The result's position in the channel's stream, offset and epoch: what
+history takes as its since, subscribe as its recoverSince, and
+mapReadStream as its sinceOffset and sinceEpoch.
 
 ##### `toJson(string $path = ''): string`
 
@@ -4704,6 +4886,12 @@ PublishResult is the result of a successful publish.
 ##### `jsonSerialize(): RawJson`
 
 The message as toJson gives it, for a json_encode of your own.
+
+##### `position(): StreamPosition`
+
+The result's position in the channel's stream, offset and epoch: what
+history takes as its since, subscribe as its recoverSince, and
+mapReadStream as its sinceOffset and sinceEpoch.
 
 ##### `toJson(string $path = ''): string`
 

@@ -32,6 +32,7 @@ use Centrifugal\Phpcent\Internal\MapReadStateRequest;
 use Centrifugal\Phpcent\Internal\MapReadStreamRequest;
 use Centrifugal\Phpcent\Internal\MapRemoveRequest;
 use Centrifugal\Phpcent\Internal\MapStatsRequest;
+use Centrifugal\Phpcent\Internal\Pages;
 use Centrifugal\Phpcent\Internal\PresenceRequest;
 use Centrifugal\Phpcent\Internal\PresenceStatsRequest;
 use Centrifugal\Phpcent\Internal\PublishRequest;
@@ -493,6 +494,56 @@ trait ClientMethods
     }
 
     /**
+     * Every publication from since on - the first page as the request asks,
+     * each after it from the last publication of the one before - read a
+     * page of $limit at a time when the iteration reaches it. It stops at a
+     * page shorter than $limit, so a full last page costs one more request,
+     * which comes back empty. $limit must be 1 or more, and $reverse false:
+     * the call throws InvalidRequestException otherwise, before anything is
+     * sent. To read what came after a publication:
+     *
+     *     $pub = $client->publish(channel: 'news', data: $data);
+     *     foreach ($client->historyAll(channel: 'news', limit: 100, since: $pub->position()) as $p) {
+     *         handle($p);
+     *     }
+     *
+     * A since whose epoch is no longer the stream's throws
+     * UnrecoverablePositionException: the stream was reset, and reading from
+     * its start is the only recovery.
+     *
+     * It returns at once; leaving the loop early reads no further page. An
+     * exception of a page's call ends the iteration, where it was, after the
+     * items before it. The request is checked when the method is called: an
+     * invalid one throws InvalidRequestException before anything is sent.
+     *
+     * @param string $channel The name of the channel. Required.
+     * @param int $limit The maximum number of publications to return; -1 returns all
+     *     the channel keeps. If not set, only the current stream position is
+     *     returned, without publications.
+     * @param StreamPosition|null $since Returns publications after this stream position.
+     * @param bool $reverse Iterates in reverse order, from latest to earliest.
+     * @param ?float $timeout Seconds bounding each page's call: requestTimeout when null.
+     *
+     * @return \Generator<int, Publication>
+     *
+     * @throws CentException
+     */
+    public function historyAll(
+        string $channel,
+        int $limit = 0,
+        ?StreamPosition $since = null,
+        bool $reverse = false,
+        ?float $timeout = null,
+    ): \Generator {
+        return Pages::history(new HistoryRequest(
+            channel: $channel,
+            limit: $limit,
+            since: $since,
+            reverse: $reverse,
+        ), fn(HistoryRequest $r): HistoryResult => $this->invoke($r, $timeout));
+    }
+
+    /**
      * Removes publications from the history of a channel.
      * The current top stream position is kept, so clients do not get
      * disconnected because of insufficient state.
@@ -907,6 +958,54 @@ trait ClientMethods
     }
 
     /**
+     * Every device the filter selects, read a page at a time - $limit per
+     * page, or Centrifugo's default - when the iteration reaches it, each
+     * page after the first at the next cursor of the one before. Devices
+     * registered or removed while listing may or may not be seen.
+     *
+     * It returns at once; leaving the loop early reads no further page. An
+     * exception of a page's call ends the iteration, where it was, after the
+     * items before it. The request is checked when the method is called: an
+     * invalid one throws InvalidRequestException before anything is sent.
+     *
+     * @param DeviceFilter|null $filter Selects the devices to list: all of them when unset.
+     * @param bool $includeTotalCount Includes the total count for the filter in the
+     *     result.
+     * @param bool $includeMeta Includes meta of each device.
+     * @param bool $includeTopics Includes topics of each device.
+     * @param bool $includeWebpushKeys Includes $webpushKeys of each device (webpush
+     *     only).
+     * @param string $cursor The pagination cursor: $nextCursor of the previous page,
+     *     empty for the first page.
+     * @param int $limit The maximum number of devices to return.
+     * @param ?float $timeout Seconds bounding each page's call: requestTimeout when null.
+     *
+     * @return \Generator<int, Device>
+     *
+     * @throws CentException
+     */
+    public function deviceListAll(
+        ?DeviceFilter $filter = null,
+        bool $includeTotalCount = false,
+        bool $includeMeta = false,
+        bool $includeTopics = false,
+        bool $includeWebpushKeys = false,
+        string $cursor = '',
+        int $limit = 0,
+        ?float $timeout = null,
+    ): \Generator {
+        return Pages::deviceList(new DeviceListRequest(
+            filter: $filter,
+            includeTotalCount: $includeTotalCount,
+            includeMeta: $includeMeta,
+            includeTopics: $includeTopics,
+            includeWebpushKeys: $includeWebpushKeys,
+            cursor: $cursor,
+            limit: $limit,
+        ), fn(DeviceListRequest $r): DeviceListResult => $this->invoke($r, $timeout));
+    }
+
+    /**
      * Returns a paginated list of device topic
      * subscriptions. Centrifugo PRO only.
      *
@@ -937,6 +1036,47 @@ trait ClientMethods
             cursor: $cursor,
             limit: $limit,
         ), $timeout);
+    }
+
+    /**
+     * Every device topic the filter selects, read a page at a time - $limit
+     * per page, or Centrifugo's default - when the iteration reaches it, each
+     * page after the first at the next cursor of the one before. Topics
+     * changed while listing may or may not be seen.
+     *
+     * It returns at once; leaving the loop early reads no further page. An
+     * exception of a page's call ends the iteration, where it was, after the
+     * items before it. The request is checked when the method is called: an
+     * invalid one throws InvalidRequestException before anything is sent.
+     *
+     * @param DeviceTopicFilter|null $filter Selects the device topics to list.
+     * @param bool $includeTotalCount Includes the total count for the filter in the
+     *     result.
+     * @param bool $includeDevice Includes the Device of each item.
+     * @param string $cursor The pagination cursor: $nextCursor of the previous page,
+     *     empty for the first page.
+     * @param int $limit The maximum number of items to return.
+     * @param ?float $timeout Seconds bounding each page's call: requestTimeout when null.
+     *
+     * @return \Generator<int, DeviceTopic>
+     *
+     * @throws CentException
+     */
+    public function deviceTopicListAll(
+        ?DeviceTopicFilter $filter = null,
+        bool $includeTotalCount = false,
+        bool $includeDevice = false,
+        string $cursor = '',
+        int $limit = 0,
+        ?float $timeout = null,
+    ): \Generator {
+        return Pages::deviceTopicList(new DeviceTopicListRequest(
+            filter: $filter,
+            includeTotalCount: $includeTotalCount,
+            includeDevice: $includeDevice,
+            cursor: $cursor,
+            limit: $limit,
+        ), fn(DeviceTopicListRequest $r): DeviceTopicListResult => $this->invoke($r, $timeout));
     }
 
     /**
@@ -999,6 +1139,44 @@ trait ClientMethods
             cursor: $cursor,
             limit: $limit,
         ), $timeout);
+    }
+
+    /**
+     * Every user topic the filter selects, read a page at a time - $limit per
+     * page, or Centrifugo's default - when the iteration reaches it, each
+     * page after the first at the next cursor of the one before. Topics
+     * changed while listing may or may not be seen.
+     *
+     * It returns at once; leaving the loop early reads no further page. An
+     * exception of a page's call ends the iteration, where it was, after the
+     * items before it. The request is checked when the method is called: an
+     * invalid one throws InvalidRequestException before anything is sent.
+     *
+     * @param UserTopicFilter|null $filter Selects the user topics to list.
+     * @param bool $includeTotalCount Includes the total count for the filter in the
+     *     result.
+     * @param string $cursor The pagination cursor: $nextCursor of the previous page,
+     *     empty for the first page.
+     * @param int $limit The maximum number of items to return.
+     * @param ?float $timeout Seconds bounding each page's call: requestTimeout when null.
+     *
+     * @return \Generator<int, UserTopic>
+     *
+     * @throws CentException
+     */
+    public function userTopicListAll(
+        ?UserTopicFilter $filter = null,
+        bool $includeTotalCount = false,
+        string $cursor = '',
+        int $limit = 0,
+        ?float $timeout = null,
+    ): \Generator {
+        return Pages::userTopicList(new UserTopicListRequest(
+            filter: $filter,
+            includeTotalCount: $includeTotalCount,
+            cursor: $cursor,
+            limit: $limit,
+        ), fn(UserTopicListRequest $r): UserTopicListResult => $this->invoke($r, $timeout));
     }
 
     /**
@@ -1271,6 +1449,63 @@ trait ClientMethods
             revisionOffset: $revisionOffset,
             revisionEpoch: $revisionEpoch,
         ), $timeout);
+    }
+
+    /**
+     * Every entry of the map's state, read a page at a time - $limit per
+     * page, or Centrifugo's default - when the iteration reaches it, each
+     * page after the first at the cursor of the one before. Every page after
+     * the first is read at the first one's revision - its offset and epoch
+     * as $revisionOffset and $revisionEpoch, unless the call sets them - so
+     * that the map's stream reset between pages throws
+     * UnrecoverablePositionException instead of mixing two states: reading
+     * again from the first page is the recovery.
+     *
+     * It returns at once; leaving the loop early reads no further page. An
+     * exception of a page's call ends the iteration, where it was, after the
+     * items before it. The request is checked when the method is called: an
+     * invalid one throws InvalidRequestException before anything is sent.
+     *
+     * @param string $channel The name of the map channel. Required.
+     * @param string $cursor The pagination cursor from the previous page. Empty starts
+     *     from the beginning.
+     * @param int $limit The maximum number of entries per page: -1 means no limit, 0
+     *     returns only the stream position. Page sizes may exceed it with the
+     *     Redis map broker.
+     * @param string $key Reads a single entry by exact key. cursor and limit are ignored
+     *     when it is set.
+     * @param bool $asc Sorts ordered state by score ascending instead of descending.
+     *     Ignored for unordered channels.
+     * @param int $revisionOffset The offset of the position from a previous state
+     *     read, used with $revisionEpoch.
+     * @param string $revisionEpoch The epoch of the position from a previous state
+     *     read. If the epoch changed, the call fails with an unrecoverable
+     *     position error.
+     * @param ?float $timeout Seconds bounding each page's call: requestTimeout when null.
+     *
+     * @return \Generator<int, MapEntry>
+     *
+     * @throws CentException
+     */
+    public function mapReadStateAll(
+        string $channel,
+        string $cursor = '',
+        int $limit = 0,
+        string $key = '',
+        bool $asc = false,
+        int $revisionOffset = 0,
+        string $revisionEpoch = '',
+        ?float $timeout = null,
+    ): \Generator {
+        return Pages::mapReadState(new MapReadStateRequest(
+            channel: $channel,
+            cursor: $cursor,
+            limit: $limit,
+            key: $key,
+            asc: $asc,
+            revisionOffset: $revisionOffset,
+            revisionEpoch: $revisionEpoch,
+        ), fn(MapReadStateRequest $r): MapReadStateResult => $this->invoke($r, $timeout));
     }
 
     /**

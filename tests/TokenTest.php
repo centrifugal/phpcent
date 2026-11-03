@@ -98,8 +98,10 @@ final class TokenTest extends TestCase
             meta: ['plan' => 'pro'],
             caps: [new ChannelsCapability(channels: ['news'], allow: ['sub'])],
             labels: ['region' => 'eu'],
+            profile: 'chat',
         )));
-        self::assertSame(['sub', 'exp', 'iat', 'jti', 'aud', 'iss', 'info', 'subs', 'meta', 'caps', 'labels'], array_keys($c));
+        self::assertSame(['sub', 'exp', 'iat', 'jti', 'aud', 'iss', 'info', 'subs', 'meta', 'caps', 'labels', 'profile'], array_keys($c));
+        self::assertSame('chat', $c['profile']);
         self::assertSame(['ch' => ['data' => [], 'override' => ['presence' => ['value' => true]]]], $c['subs']);
         $s = self::claims(Token::subscription($key, new SubscriptionClaims(channel: 'c', expiresAt: self::at(2000000000), data: [1], allow: ['pub'], b64info: 'AA==')));
         self::assertSame(['sub', 'exp', 'iat', 'channel', 'b64info', 'data', 'allow'], array_keys($s));

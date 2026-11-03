@@ -3047,6 +3047,7 @@ new ConnectionClaims(
     mixed $meta = null,
     array $caps = [],
     array $labels = [],
+    string $profile = '',
 )
 ```
 
@@ -3067,6 +3068,7 @@ https://centrifugal.dev/docs/server/authentication.
 - `$meta` `mixed` - custom data attached to the connection. Not visible to other clients - Centrifugo never sends it - but the token carries it, visible to the user owning the token: put nothing in it that user must not see.
 - `$caps` `list<ChannelsCapability>` - capabilities granting the connection operations in channels. Centrifugo PRO only.
 - `$labels` `array<string, string>` - the connection's client labels: for metrics, targeted server API calls and CEL expressions. Centrifugo PRO only.
+- `$profile` `string` - the dictionary compression profile of the connection: it overrides the profile the client declared. Centrifugo PRO only.
 
 ### enum `Expiry`
 

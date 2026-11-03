@@ -46,6 +46,9 @@ final class ConnectionClaims
      * @param array<string, string> $labels the connection's client labels: for
      *     metrics, targeted server API calls and CEL expressions. Centrifugo
      *     PRO only.
+     * @param string $profile the dictionary compression profile of the
+     *     connection: it overrides the profile the client declared. Centrifugo
+     *     PRO only.
      */
     public function __construct(
         public \DateTimeInterface|Expiry $expiresAt,
@@ -62,5 +65,6 @@ final class ConnectionClaims
         public mixed $meta = null,
         public array $caps = [],
         public array $labels = [],
+        public string $profile = '',
     ) {}
 }

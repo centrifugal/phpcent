@@ -64,6 +64,9 @@ final class Token
         if ($c->labels !== []) {
             $p[] = '"labels":' . Encode::stringMap($c->labels, 'labels');
         }
+        if ($c->profile !== '') {
+            $p[] = '"profile":' . Encode::string($c->profile, 'profile');
+        }
 
         return self::sign($key, $p);
     }

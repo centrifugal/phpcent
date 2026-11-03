@@ -11,8 +11,8 @@ misuse. Read this before changing code.
 | Path | What |
 |---|---|
 | `proto/api.proto`, `proto/proxy.proto` | Copies of Centrifugo's protos, from a released tag (`CENTRIFUGO_REF=v6.10.2 composer sync-proto`) |
-| `gen/required_fields.txt` | The fields the protos mark "Required.", made required named arguments. Generation fails when the protos' list differs: a newly required field breaks every call without it, so review the change - fix the proto upstream if Centrifugo accepts the field absent - then `php gen/generate.php --accept-required` |
-| `gen/` | The generator: `Proto.php` parses the protos, `generate.php` writes `generated/`, `api_docs.php` writes `API.md` |
+| `gen/required_fields.txt` | The fields the protos mark "Required.", made required named arguments and constructor arguments, and checked for a value before sending (but those whose empty value has a meaning). Generation fails when the protos' list differs: a newly required field breaks every call without it, so review the change - fix the proto upstream if Centrifugo accepts the field absent - then `php gen/generate.php --accept-required` |
+| `gen/` | The generator: `Proto.php` parses the protos, `Rules.php` reads their comments ("Required.", presence wrappers, "One of:"), `generate.php` writes `generated/`, `api_docs.php` writes `API.md` |
 | `generated/` | Generated - never edited: the result and nested message types; `ClientMethods`, `BatchMethods`, `CommandMethods`, the methods taking each request's fields as named arguments; `Internal/` the request classes they build; `Proxy/` types |
 | `API.md` | The API reference, generated from the docblocks by `composer docs` - never edited |
 | `src/Client.php` | The client: configuration, sending, broadcast, `broadcastWithRetry` |
@@ -116,5 +116,16 @@ release. `composer.json` has no `version`: the tag is the version.
 - **`rpc` is not offered**: it calls server API extensions, which Centrifugo
   does not provide.
 - **`BoolValue` fields are `?bool`.** `null` leaves the server's setting alone,
-  which `false` cannot say.
+  which `false` cannot say. The other presence wrappers - `deviceUpdate`'s
+  update messages - stay nullable objects, sent whenever set, even as `{}`
+  (spec 0.3, 2); every other message set but empty is left out.
+- **Constants are final classes of strings, not enums**: a value Centrifugo
+  adds must stay sendable. A class is named by its field, or by its message
+  and field where the name is taken or reserved (`FilterNodeOp`,
+  `ChannelsCapabilityMatch`).
+- **Required-field errors name wire paths** (`limit_strategy.rate_limit`),
+  as the encoding errors do, not the camelCase arguments.
+- **The `<method>All` iterators are not generator functions**: they check the
+  request and return a `Generator`, so an invalid request throws at the call,
+  not on the first iteration.
 - **An oversized body is a 400**, as in gocent, not a 413.

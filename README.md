@@ -21,7 +21,7 @@ composer require centrifugal/phpcent
 phpcent 7 replaces phpcent 6: see [MIGRATING.md](MIGRATING.md). phpcent
 implements the
 [Centrifugo server SDK specification](https://github.com/centrifugal/gocent/blob/master/spec.md),
-version 0.2.
+version 0.3.
 
 ## Example
 
@@ -40,6 +40,50 @@ request as named arguments - pass them by name: their order follows
 `api.proto` and is not part of the API - and returns its result, throwing
 unless Centrifugo did everything asked. Create the client once and reuse it:
 it keeps its connection to Centrifugo alive between calls.
+
+A field `api.proto` marks "Required." is a named argument without a default,
+and is checked for a value before sending: `channel: ''`, `version: 0` or an
+empty `notification` throws `InvalidRequestException` naming the field -
+`limit_strategy.rate_limit.policies[0].rate is required` - as Centrifugo would
+refuse it. A field whose empty value has a meaning is not checked:
+`invalidateUserTokens(user: '')` invalidates anonymous users' tokens. Nested
+messages left empty are not sent; the update messages of `deviceUpdate` are
+sent whenever set, so `userUpdate: new DeviceUserUpdate(user: '')` detaches the
+devices from their user, and an empty `DeviceTimezoneUpdate` clears their
+timezone.
+
+Fields with a fixed set of values have constants, one class per field:
+`Provider::FCM`, `Platform::IOS`, `Op::ADD`, `Status::DELIVERED`,
+`KeyMode::IF_NEW`, `FilterNodeOp::AND`, `Cmp::EQ`, and in the proxy namespace
+`Encoding::BINARY`, `Protocol::JSON` and the rest. The fields stay strings, so
+a value Centrifugo adds can be sent before phpcent names it.
+
+## Pages and stream positions
+
+`historyAll`, `deviceListAll`, `deviceTopicListAll`, `userTopicListAll` and
+`mapReadStateAll` take the method's arguments and return a `Generator` of
+every item of every page, reading a page when the loop reaches it - leaving
+the loop early reads no more. The request is checked when the method is
+called; `historyAll` needs a `limit` of 1 or more, the size of a page, and
+cannot read in `reverse`. The results of `publish`, `history`,
+`mapReadState`, `mapReadStream`, `mapPublish` and `mapRemove` give their
+`position()` in the channel's stream - what to read on from:
+
+```php
+$pub = $client->publish(channel: 'news', data: $data);
+// Later: everything published after it, 100 to a page.
+foreach ($client->historyAll(channel: 'news', limit: 100, since: $pub->position()) as $p) {
+    handle($p->data);
+}
+```
+
+A position whose epoch is no longer the stream's throws
+`UnrecoverablePositionException`: the stream was reset, and reading from its
+start is the only recovery. `mapReadStateAll` reads every page after the
+first at the first one's revision, so that a map reset while reading throws
+it too, rather than mixing two states. Items of a paged method may change
+under the iteration: a device registered while listing may or may not be
+seen.
 
 ## Payloads
 

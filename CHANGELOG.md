@@ -17,6 +17,17 @@ Migrating from phpcent 6: see [MIGRATING.md](MIGRATING.md).
 * Fields the protos mark required are required named arguments. Results render with Centrifugo's field names under `json_encode`, errors as `{code, message}`; `$result->failed` is a property.
 * With a PSR-18 client, its timeouts throw `TimeoutException` and its TLS certificate errors are not retryable. `Pending::resolved` and the public constructors of results and partial-failure exceptions make test doubles.
 
+Spec 0.3, changed since the earlier v7 development builds:
+
+* phpcent implements spec 0.3 of the [Centrifugo server SDK specification](https://github.com/centrifugal/gocent/blob/master/spec.md). The protos are synced from Centrifugo's master, with the `One of:` sentences and `ConnectResult::$profile`: **they must be synced again from a Centrifugo release tag before phpcent's release.**
+* **Changed:** a field the protos mark "Required." is checked for a value before sending, in a call, a batch and a command: `channel: ''`, `version: 0`, an empty `notification` or `new RateLimitPolicy(rate: 0, ...)` now throw `InvalidRequestException` naming the field's path - `limit_strategy.rate_limit.policies[0].rate is required` - where Centrifugo refused them with code 107. Fields whose empty value has a meaning (`invalidateUserTokens`'s and `userTopicUpdate`'s `user`, the device updates' values) are not checked; a payload's JSON null, `new RawJson('null')`, is a value.
+* **Changed:** the nested messages take their required fields as constructor arguments without a default: `new RateLimitPolicy(rate: 1, intervalMs: 1000)`, `new DeviceTopicsUpdate(op: Op::ADD)`, `new FcmPushNotification(message: ...)`, `new DeviceUserUpdate(user: '')`.
+* **Changed:** `deviceUpdate`'s `userUpdate`, `timezoneUpdate`, `localeUpdate` and `metaUpdate` are sent whenever set, even empty - `new DeviceUserUpdate(user: '')` detaches the devices from their user, an empty timezone, locale or meta clears it - where an empty one was left out. Any other message set but empty is still left out.
+* Constants for the fields with listed values, a class per field: `Provider::FCM`, `Platform::IOS`, `Op::ADD`, `Status::DELIVERED`, `KeyMode::IF_NEW`, `FilterNodeOp::AND`, `Cmp::EQ`; in `Proxy`, `Encoding::BINARY`, `Protocol::JSON`, `Allow::SUB`, `ChannelsCapabilityMatch::REGEX`, `Type::OCCUPIED`, `Proxy\Op`, `Proxy\Cmp`, `Proxy\KeyMode`. The fields stay strings.
+* `historyAll`, `deviceListAll`, `deviceTopicListAll`, `userTopicListAll` and `mapReadStateAll`: a `Generator` of every item, a page read when reached; `mapReadStateAll` reads later pages at the first one's revision. `position()` on the results of `publish`, `history`, `mapReadState`, `mapReadStream`, `mapPublish` and `mapRemove`.
+* `ConnectionClaims::$profile`, the Centrifugo PRO compression profile claim.
+* Docs: the redirect hint says Centrifugo's API never redirects a call - check the endpoint's scheme and path; commands' payloads go apart as JSON, never as a string of it; what Centrifugo makes of a proxy response with none of result, error and disconnect.
+
 v6.0.0 - v6.0.3
 ===============
 

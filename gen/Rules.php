@@ -6,7 +6,7 @@ namespace Centrifugal\Phpcent\Gen;
 
 /**
  * What the generator reads in the protos' comments: the phrases of spec
- * section 2 and 3.3. Kept apart from generate.php for GeneratorTest.
+ * section 2 and 3.3, and the constants' pinned names. Kept apart from generate.php for GeneratorTest.
  */
 final class Rules
 {
@@ -96,24 +96,43 @@ final class Rules
     }
 
     /**
-     * The constant classes of a proto, in its order: a class per string field
-     * with listed values, named by the field - Provider, Op, KeyMode - holding
-     * a constant per value: Provider::FCM, KeyMode::IF_NEW. Where fields of
-     * one name list different values in different messages, the set listed
-     * in the most messages keeps the short name and the others are named by
-     * their message too - Op for the topic updates, FilterNodeOp for
-     * FilterNode - and a tie names all of them so. A name PHP reserves, as
-     * Match, is named by its message too. Only the messages $include accepts
-     * count: those the namespace has classes for.
+     * The constant classes of a proto, in its order: a class per name the
+     * pins give the string fields with listed values - Provider, Op, KeyMode -
+     * holding a constant per value: Provider::FCM, KeyMode::IF_NEW. The names
+     * are the spec's table (section 3.3), held in gen/constants_*.txt as
+     * "Message.field Name" or "*.field Name" lines: never derived, so that a
+     * name never changes because an unrelated message appeared. The
+     * generation fails on a field with listed values no pin names, a pin no
+     * field uses, one name over different values, and a name PHP reserves.
+     * Only the messages $include accepts count: those the namespace has
+     * classes for.
      *
      * @param callable(string): bool $include
      *
      * @return list<ConstGroup>
      */
-    public static function constGroups(Proto $s, callable $include): array
+    public static function constGroups(Proto $s, callable $include, string $pins, string $name): array
     {
-        /** @var array<string, list<ConstGroup>> $byField */
-        $byField = [];
+        $pinned = [];
+        foreach (explode("\n", $pins) as $i => $line) {
+            $line = trim($line);
+            if ($line === '' || str_starts_with($line, '#')) {
+                continue;
+            }
+            if (preg_match('/^((?:\*|[A-Z]\w*)\.[a-z]\w*)\s+([A-Z]\w*)$/', $line, $m) !== 1) {
+                throw new \RuntimeException("{$name}:" . ($i + 1) . ": not a pin, \"Message.field Name\" or \"*.field Name\": {$line}");
+            }
+            if (isset($pinned[$m[1]])) {
+                throw new \RuntimeException("{$name}: {$m[1]} pinned twice");
+            }
+            if (self::reserved($m[2])) {
+                throw new \RuntimeException("{$name}: {$m[2]} cannot name a PHP class");
+            }
+            $pinned[$m[1]] = $m[2];
+        }
+        $used = [];
+        /** @var array<string, ConstGroup> $groups */
+        $groups = [];
         foreach ($s->messages as $m) {
             if (!$include($m->name)) {
                 continue;
@@ -127,41 +146,22 @@ final class Rules
                 if ($values === null) {
                     continue;
                 }
-                $group = null;
-                foreach ($byField[$f->name] ?? [] as $g) {
-                    if ($g->values === $values) {
-                        $group = $g;
-                    }
+                $selector = isset($pinned["{$m->name}.{$f->name}"]) ? "{$m->name}.{$f->name}" : "*.{$f->name}";
+                $class = $pinned[$selector] ?? throw new \RuntimeException("{$m->name}.{$f->name} lists its values, but {$name} gives it no name: name it there and in the spec's table of section 3.3");
+                $used[$selector] = true;
+                $g = $groups[$class] ??= new ConstGroup($class, $f->name, $values);
+                if ($g->values !== $values) {
+                    throw new \RuntimeException("{$name}: {$class} names " . implode(', ', $g->values) . " and, in {$m->name}.{$f->name}, " . implode(', ', $values));
                 }
-                if ($group === null) {
-                    $group = new ConstGroup($f->name, $values);
-                    $byField[$f->name][] = $group;
-                }
-                $group->messages[] = $m->name;
+                $g->messages[] = $m->name;
             }
         }
-        $out = [];
-        foreach ($byField as $name => $groups) {
-            $most = $groups[0];
-            foreach ($groups as $g) {
-                if (\count($g->messages) > \count($most->messages)) {
-                    $most = $g;
-                }
-            }
-            $tie = \count(array_filter($groups, static fn(ConstGroup $g): bool => \count($g->messages) === \count($most->messages))) > 1;
-            foreach ($groups as $g) {
-                if ($g === $most && !$tie && !self::reserved($g->className())) {
-                    continue;
-                }
-                if (\count($g->messages) > 1) {
-                    throw new \RuntimeException("field {$name} lists " . implode(', ', $g->values) . ' in ' . implode(', ', $g->messages) . ' and other values elsewhere, or is a reserved name: cannot name its constants');
-                }
-                $g->prefix = $g->messages[0];
-            }
-            array_push($out, ...$groups);
+        $unused = array_diff_key($pinned, $used);
+        if ($unused !== []) {
+            throw new \RuntimeException("{$name}: no field with listed values for " . implode(', ', array_keys($unused)));
         }
 
-        return $out;
+        return array_values($groups);
     }
 
     /** Whether PHP refuses the name for a class. */
@@ -180,17 +180,15 @@ final class Rules
     }
 }
 
-/** The constants of a string field with listed values, and the messages whose field of that name lists exactly them. */
+/** The constants of a name the pins give, and the messages whose fields list them. */
 final class ConstGroup
 {
     /** @var list<string> */
     public array $messages = [];
 
-    /** The message name, set when the field name alone would be ambiguous. */
-    public string $prefix = '';
-
     /** @param list<string> $values */
     public function __construct(
+        public readonly string $name,
         public readonly string $field,
         public readonly array $values,
     ) {}
@@ -198,7 +196,7 @@ final class ConstGroup
     /** The class holding the constants: Op, KeyMode, FilterNodeOp. */
     public function className(): string
     {
-        return $this->prefix . str_replace('_', '', ucwords($this->field, '_'));
+        return $this->name;
     }
 
     /** The constant of a value: IF_NEW for "if_new". */

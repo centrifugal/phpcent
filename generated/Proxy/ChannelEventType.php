@@ -12,7 +12,7 @@ namespace Centrifugal\Phpcent\Proxy;
  * The field is a string: a value Centrifugo accepts which these do not
  * name is still a valid one.
  */
-final class Type
+final class ChannelEventType
 {
     public const string OCCUPIED = 'occupied';
     public const string VACATED = 'vacated';

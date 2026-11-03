@@ -157,80 +157,90 @@ final class GeneratorTest extends TestCase
         Rules::listedValues($doc);
     }
 
-    /** @return array<string, list<string>> class => constants, as value => name */
-    private static function constClasses(string $proto): array
+    /** @return array<string, list<string>> class => constants */
+    private static function constClasses(string $proto, string $pins): array
     {
         $out = [];
-        foreach (Rules::constGroups(Proto::parse($proto, 'test.proto'), static fn(string $name): bool => $name !== 'Skipped') as $g) {
+        foreach (Rules::constGroups(Proto::parse($proto, 'test.proto'), static fn(string $name): bool => $name !== 'Skipped', $pins, 'pins') as $g) {
             $out[$g->className()] = array_map(ConstGroup::constName(...), $g->values);
         }
 
         return $out;
     }
 
-    public function testConstantNames(): void
+    private const string PROTO = <<<'PROTO'
+        message A {
+          string op = 1; // One of: add, remove.
+        }
+        message B {
+          string op = 1; // One of: add, remove.
+          string protocol = 2; // One of: json, protobuf.
+        }
+        message C {
+          string op = 1; // One of: and, or.
+          string protocol = 2; // One of: json, protobuf.
+        }
+        message Skipped {
+          string op = 1; // Not generated. One of: x, y.
+        }
+        PROTO;
+
+    public function testConstantNamesArePinned(): void
     {
-        // The set listed in the most messages keeps the short name.
+        // A pin of the message wins over one of every message.
         self::assertSame([
             'Op' => ['ADD', 'REMOVE'],
-            'COp' => ['AND', 'OR'],
-            'KeyMode' => ['IF_NEW'],
-            'MMatch' => ['WILDCARD'],
-        ], self::constClasses(<<<'PROTO'
-            message A {
-              string op = 1; // One of: add, remove.
-            }
-            message B {
-              string op = 1; // One of: add, remove.
-            }
-            message C {
-              string op = 1; // One of: and, or.
-              string key_mode = 2; // One of: if_new.
-            }
-            message M {
-              string match = 1; // A PHP keyword. One of: wildcard.
-            }
-            message Skipped {
-              string op = 1; // Not generated. One of: x, y.
-            }
-            PROTO));
+            'Protocol' => ['JSON', 'PROTOBUF'],
+            'FilterNodeOp' => ['AND', 'OR'],
+        ], self::constClasses(self::PROTO, "# comment\nC.op FilterNodeOp\n*.op Op\n*.protocol Protocol\n"));
     }
 
-    public function testConstantNamesTie(): void
+    /** @return iterable<string, array{string, string}> */
+    public static function badPins(): iterable
     {
-        self::assertSame(['AOp' => ['ADD'], 'BOp' => ['AND']], self::constClasses(<<<'PROTO'
-            message A {
-              string op = 1; // One of: add.
-            }
-            message B {
-              string op = 1; // One of: and.
-            }
-            PROTO));
+        yield 'a field without a name' => ["C.op FilterNodeOp\n*.op Op\n", 'gives it no name'];
+        yield 'a pin no field uses' => ["C.op FilterNodeOp\n*.op Op\n*.protocol Protocol\nD.mode Mode\n", 'no field with listed values for D.mode'];
+        yield 'one name over different values' => ["*.op Op\n*.protocol Protocol\n", 'Op names add, remove and, in C.op, and, or'];
+        yield 'a reserved name' => ["C.op Match\n*.op Op\n*.protocol Protocol\n", 'cannot name a PHP class'];
+        yield 'not a pin' => ["C.op\n", 'not a pin'];
+    }
+
+    #[DataProvider('badPins')]
+    public function testBadPinsFail(string $pins, string $message): void
+    {
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage($message);
+        self::constClasses(self::PROTO, $pins);
     }
 
     /**
-     * Each constant equals its value, and the classes are those the protos
-     * list: the proxy's FilterNode op is Op, as no other proxy field is named
-     * op, and the API's is FilterNodeOp.
+     * Each constant equals its value, and the classes are the spec's table:
+     * the same names for the same fields in both protos.
      */
     public function testEveryListedValueIsAConstant(): void
     {
         $seen = [];
-        foreach (['api.proto' => 'Centrifugal\\Phpcent\\', 'proxy.proto' => 'Centrifugal\\Phpcent\\Proxy\\'] as $proto => $ns) {
-            $s = self::proto($proto);
-            foreach (Rules::constGroups($s, static fn(string $name): bool => true) as $g) {
+        foreach (['api' => 'Centrifugal\\Phpcent\\', 'proxy' => 'Centrifugal\\Phpcent\\Proxy\\'] as $proto => $ns) {
+            $pins = (string) file_get_contents(__DIR__ . "/../gen/constants_{$proto}.txt");
+            foreach (Rules::constGroups(self::proto("{$proto}.proto"), static fn(string $name): bool => true, $pins, $proto) as $g) {
                 $class = new \ReflectionClass($ns . $g->className());
                 self::assertSame(array_combine(array_map(ConstGroup::constName(...), $g->values), $g->values), $class->getConstants(), $class->getName());
                 $seen[] = $class->getName();
             }
         }
-        self::assertSame([
-            FilterNodeOp::class, Op::class, Cmp::class, Provider::class, Platform::class, Status::class, KeyMode::class,
-            Proxy\Op::class, Proxy\Cmp::class, Proxy\Protocol::class, Proxy\Encoding::class, Proxy\Allow::class,
-            Proxy\ChannelsCapabilityMatch::class, Proxy\KeyMode::class, Proxy\Type::class,
-        ], $seen);
+        sort($seen);
+        $want = [
+            Cmp::class, FilterNodeOp::class, KeyMode::class, Op::class, Platform::class, Provider::class, Status::class,
+            Proxy\Allow::class, Proxy\CapabilityMatch::class, Proxy\ChannelEventType::class, Proxy\Cmp::class,
+            Proxy\Encoding::class, Proxy\FilterNodeOp::class, Proxy\KeyMode::class, Proxy\Protocol::class,
+        ];
+        sort($want);
+        self::assertSame($want, $seen);
         self::assertSame('if_new', KeyMode::IF_NEW);
         self::assertSame('and', FilterNodeOp::AND);
+        self::assertSame('and', Proxy\FilterNodeOp::AND);
+        self::assertSame('regex', Proxy\CapabilityMatch::REGEX);
+        self::assertSame('vacated', Proxy\ChannelEventType::VACATED);
         self::assertSame('binary', Proxy\Encoding::BINARY);
     }
 

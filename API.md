@@ -5459,6 +5459,14 @@ its comment lists them.
 The field is a string: a value Centrifugo accepts which these do not
 name is still a valid one.
 
+#### `CapabilityMatch`
+
+The values of the match field of ChannelsCapability, as its comment lists
+them.
+
+The field is a string: a value Centrifugo accepts which these do not
+name is still a valid one.
+
 #### `ChannelEvent`
 
 ```php
@@ -5469,7 +5477,7 @@ ChannelEvent is a change of a channel's state.
 
 - `$timeMs` `int` - When it happened, in Unix milliseconds.
 - `$channel` `string` - The channel it happened in.
-- `$type` `string` - Occupied when the channel got its first subscriber, vacated when it lost its last one. More types may come; the field is a string, not an enum, for JSON interoperability. One of: occupied, vacated. Constants: Type::OCCUPIED, Type::VACATED.
+- `$type` `string` - Occupied when the channel got its first subscriber, vacated when it lost its last one. More types may come; the field is a string, not an enum, for JSON interoperability. One of: occupied, vacated. Constants: ChannelEventType::OCCUPIED, ChannelEventType::VACATED.
 
 ##### `jsonSerialize(): RawJson`
 
@@ -5479,6 +5487,13 @@ The message as toJson gives it, for a json_encode of your own.
 
 The message as Centrifugo reads it: JSON, fields at their zero value
 left out. $path prefixes the field names in error messages.
+
+#### `ChannelEventType`
+
+The values of the type field of ChannelEvent, as its comment lists them.
+
+The field is a string: a value Centrifugo accepts which these do not
+name is still a valid one.
 
 #### `ChannelsCapability`
 
@@ -5492,7 +5507,7 @@ operation and matches the channel. Centrifugo PRO only.
 
 - `$channels` `list<string>` - The channels, or channel patterns, it applies to.
 - `$allow` `list<string>` - The operations it grants: sub is subscribe, pub publish, hst history, prs presence. One of: sub, pub, hst, prs. Constants: Allow::SUB, Allow::PUB, Allow::HST, Allow::PRS.
-- `$match` `string` - How channels are matched: empty for exact names. One of: wildcard, regex. Constants: ChannelsCapabilityMatch::WILDCARD, ChannelsCapabilityMatch::REGEX.
+- `$match` `string` - How channels are matched: empty for exact names. One of: wildcard, regex. Constants: CapabilityMatch::WILDCARD, CapabilityMatch::REGEX.
 
 ##### `jsonSerialize(): RawJson`
 
@@ -5502,14 +5517,6 @@ The message as toJson gives it, for a json_encode of your own.
 
 The message as Centrifugo reads it: JSON, fields at their zero value
 left out. $path prefixes the field names in error messages.
-
-#### `ChannelsCapabilityMatch`
-
-The values of the match field of ChannelsCapability, as its comment lists
-them.
-
-The field is a string: a value Centrifugo accepts which these do not
-name is still a valid one.
 
 #### `Cmp`
 
@@ -5624,7 +5631,7 @@ FilterNode is a node of a publication tags filter expression. A leaf node
 compares one tag: it sets key, cmp and val or vals, and leaves op empty. A
 logical node combines its nodes: it sets op and nodes only.
 
-- `$op` `string` - The logical operation. Empty for a leaf node. One of: and, or, not. Constants: Op::AND, Op::OR, Op::NOT.
+- `$op` `string` - The logical operation. Empty for a leaf node. One of: and, or, not. Constants: FilterNodeOp::AND, FilterNodeOp::OR, FilterNodeOp::NOT.
 - `$key` `string` - The tag a leaf node compares.
 - `$cmp` `string` - The comparison of a leaf node: ex is exists, nex does not exist, sw starts with, ew ends with, ct contains. One of: eq, neq, in, nin, ex, nex, sw, ew, ct, gt, gte, lt, lte. Constants: Cmp::EQ, Cmp::NEQ, Cmp::IN, Cmp::NIN, Cmp::EX, Cmp::NEX, Cmp::SW, Cmp::EW, Cmp::CT, Cmp::GT, Cmp::GTE, Cmp::LT, Cmp::LTE.
 - `$val` `string` - The value most comparisons compare the tag with.
@@ -5639,6 +5646,13 @@ The message as toJson gives it, for a json_encode of your own.
 
 The message as Centrifugo reads it: JSON, fields at their zero value
 left out. $path prefixes the field names in error messages.
+
+#### `FilterNodeOp`
+
+The values of the op field of FilterNode, as its comment lists them.
+
+The field is a string: a value Centrifugo accepts which these do not
+name is still a valid one.
 
 #### `KeyMode`
 
@@ -5868,13 +5882,6 @@ The message as toJson gives it, for a json_encode of your own.
 
 The message as Centrifugo reads it: JSON, fields at their zero value
 left out. $path prefixes the field names in error messages.
-
-#### `Op`
-
-The values of the op field of FilterNode, as its comment lists them.
-
-The field is a string: a value Centrifugo accepts which these do not
-name is still a valid one.
 
 #### `Protocol`
 
@@ -6379,12 +6386,5 @@ The message as toJson gives it, for a json_encode of your own.
 
 The message as Centrifugo reads it: JSON, fields at their zero value
 left out. $path prefixes the field names in error messages.
-
-#### `Type`
-
-The values of the type field of ChannelEvent, as its comment lists them.
-
-The field is a string: a value Centrifugo accepts which these do not
-name is still a valid one.
 
 </details>

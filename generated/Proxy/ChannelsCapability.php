@@ -25,7 +25,7 @@ final class ChannelsCapability implements Message
      *     Constants: Allow::SUB, Allow::PUB, Allow::HST, Allow::PRS.
      * @param string $match How channels are matched: empty for exact names. One of:
      *     wildcard, regex.
-     *     Constants: ChannelsCapabilityMatch::WILDCARD, ChannelsCapabilityMatch::REGEX.
+     *     Constants: CapabilityMatch::WILDCARD, CapabilityMatch::REGEX.
      */
     public function __construct(
         public array $channels = [],

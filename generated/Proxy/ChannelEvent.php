@@ -22,7 +22,7 @@ final class ChannelEvent implements Message
      * @param string $type Occupied when the channel got its first subscriber, vacated
      *     when it lost its last one. More types may come; the field is a string,
      *     not an enum, for JSON interoperability. One of: occupied, vacated.
-     *     Constants: Type::OCCUPIED, Type::VACATED.
+     *     Constants: ChannelEventType::OCCUPIED, ChannelEventType::VACATED.
      */
     public function __construct(
         public int $timeMs = 0,

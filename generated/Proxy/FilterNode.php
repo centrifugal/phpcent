@@ -20,7 +20,7 @@ final class FilterNode implements Message
 {
     /**
      * @param string $op The logical operation. Empty for a leaf node. One of: and, or, not.
-     *     Constants: Op::AND, Op::OR, Op::NOT.
+     *     Constants: FilterNodeOp::AND, FilterNodeOp::OR, FilterNodeOp::NOT.
      * @param string $key The tag a leaf node compares.
      * @param string $cmp The comparison of a leaf node: ex is exists, nex does not exist,
      *     sw starts with, ew ends with, ct contains. One of: eq, neq, in, nin, ex,

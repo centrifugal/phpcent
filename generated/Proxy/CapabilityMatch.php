@@ -13,7 +13,7 @@ namespace Centrifugal\Phpcent\Proxy;
  * The field is a string: a value Centrifugo accepts which these do not
  * name is still a valid one.
  */
-final class ChannelsCapabilityMatch
+final class CapabilityMatch
 {
     public const string WILDCARD = 'wildcard';
     public const string REGEX = 'regex';

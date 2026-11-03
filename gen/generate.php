@@ -1163,7 +1163,7 @@ function generate(): array
     }
     $checks = new Checks($api, $cmds);
     $public = static fn(string $name): bool => !isset($skip[$name]) && !isset($byRequest[$name]);
-    $apiGroups = Rules::constGroups($api, static fn(string $name): bool => !isset($skip[$name]));
+    $apiGroups = Rules::constGroups($api, static fn(string $name): bool => !isset($skip[$name]), (string) file_get_contents(__DIR__ . '/constants_api.txt'), 'gen/constants_api.txt');
     recordConstDocs($apiGroups);
     $taken = handwritten('');
     foreach ($api->messages as $m) {
@@ -1186,7 +1186,7 @@ function generate(): array
     $proxy = $schema = Proto::parse((string) file_get_contents(ROOT . '/proto/proxy.proto'), 'proxy.proto');
     checkWrappers($proxy, 'proxy.proto');
     $proxyNames = array_fill_keys(array_map(static fn(ProtoMessage $m): string => $m->name, proxyMessages($proxy)), true);
-    $proxyGroups = Rules::constGroups($proxy, static fn(string $name): bool => isset($proxyNames[$name]));
+    $proxyGroups = Rules::constGroups($proxy, static fn(string $name): bool => isset($proxyNames[$name]), (string) file_get_contents(__DIR__ . '/constants_proxy.txt'), 'gen/constants_proxy.txt');
     recordConstDocs($proxyGroups);
     $files += emitConsts($proxyGroups, 'Centrifugal\\Phpcent\\Proxy', 'proxy.proto', 'Proxy/', handwritten('Proxy/') + $proxyNames);
     foreach (proxyMessages($proxy) as $m) {

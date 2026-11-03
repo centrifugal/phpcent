@@ -1,0 +1,13 @@
+# The names of the constants of api.proto's fields with a "One of:" sentence,
+# as the spec's section 3.3 pins them for every SDK: a selector, Message.field,
+# and the name. A name never changes once given; a field with a new sentence
+# fails the generation until it is named here and in the spec's table.
+FilterNode.op FilterNodeOp
+FilterNode.cmp Cmp
+DeviceRegisterRequest.provider Provider
+DeviceRegisterRequest.platform Platform
+DeviceTopicsUpdate.op Op
+DeviceTopicUpdateRequest.op Op
+UserTopicUpdateRequest.op Op
+UpdatePushStatusRequest.status Status
+MapPublishRequest.key_mode KeyMode

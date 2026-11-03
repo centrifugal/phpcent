@@ -21,6 +21,7 @@ final class PushNotification implements Message
      * @param WebPushPushNotification|null $webpush The notification for Web Push.
      * @param int $expireAt The Unix time in seconds when Centrifugo stops trying to
      *     send the notification. Not related to the providers' TTL fields.
+     *     Required when the request sets $limitStrategy.
      */
     public function __construct(
         public ?FcmPushNotification $fcm = null,

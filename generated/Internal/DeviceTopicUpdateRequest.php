@@ -26,7 +26,7 @@ final class DeviceTopicUpdateRequest implements Message, Request
 
     /**
      * @param string $deviceId The ID of the device. Required.
-     * @param string $op The operation: add, remove or set. Required.
+     * @param string $op The operation. Required. One of: add, remove, set.
      * @param list<string> $topics The topics for the operation.
      * @param string $user An optional ownership guard: the update is applied only if the
      *     device currently belongs to this user. Otherwise the call fails with a

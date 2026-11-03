@@ -15,7 +15,7 @@ use Centrifugal\Phpcent\Internal\Encode;
 final class DeviceTopicsUpdate implements Message
 {
     /**
-     * @param string $op The operation: add, remove or set. Required.
+     * @param string $op The operation. Required. One of: add, remove, set.
      * @param list<string> $topics The topics for the operation.
      */
     public function __construct(

@@ -36,6 +36,9 @@ final class ConnectResult implements Message
      *     Centrifugo PRO only.
      * @param array<string, string> $labels PRO only — client labels attached to the centrifuge.Client by Centrifugo PRO.
      *     Parsed by OSS but not used (OSS does not populate centrifuge.ConnectReply.Labels).
+     * @param string $profile Assigns the connection to a dictionary compression profile, as the
+     *     profile claim of a connection token does: it overrides the profile the
+     *     client declared. Centrifugo PRO only.
      */
     public function __construct(
         public string $user = '',
@@ -49,6 +52,7 @@ final class ConnectResult implements Message
         public mixed $meta = null,
         public array $caps = [],
         public array $labels = [],
+        public string $profile = '',
     ) {}
 
     /**
@@ -91,6 +95,9 @@ final class ConnectResult implements Message
         if ($this->labels !== []) {
             $p[] = '"labels":' . Encode::stringMap($this->labels, $path . 'labels');
         }
+        if ($this->profile !== '') {
+            $p[] = '"profile":' . Encode::string($this->profile, $path . 'profile');
+        }
 
         return '{' . implode(',', $p) . '}';
     }
@@ -118,6 +125,7 @@ final class ConnectResult implements Message
             meta: Decode::payload($d, 'meta'),
             caps: Decode::listOf($d, 'caps', $path, ChannelsCapability::fromWire(...)),
             labels: Decode::mapOf($d, 'labels', $path, Decode::asString(...)),
+            profile: Decode::string($d, 'profile', $path),
         );
     }
 }

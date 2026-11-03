@@ -26,8 +26,8 @@ final class UpdatePushStatusRequest implements Message, Request
     /**
      * @param string $analyticsUid The $analyticsUid of the push notification (as in
      *     SendPushNotificationRequest). Required.
-     * @param string $status The status of the push notification: delivered or
-     *     interacted. Required.
+     * @param string $status The status of the push notification. Required. One of:
+     *     delivered, interacted.
      * @param string $deviceId The Centrifugo device ID. Required.
      * @param string $msgId The message ID issued by the provider.
      */

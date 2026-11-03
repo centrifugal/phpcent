@@ -19,9 +19,9 @@ final class ChannelEvent implements Message
     /**
      * @param int $timeMs When it happened, in Unix milliseconds.
      * @param string $channel The channel it happened in.
-     * @param string $type "occupied" when the channel got its first subscriber, "vacated"
+     * @param string $type Occupied when the channel got its first subscriber, vacated
      *     when it lost its last one. More types may come; the field is a string,
-     *     not an enum, for JSON interoperability.
+     *     not an enum, for JSON interoperability. One of: occupied, vacated.
      */
     public function __construct(
         public int $timeMs = 0,

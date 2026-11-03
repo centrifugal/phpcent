@@ -20,11 +20,11 @@ use Centrifugal\Phpcent\Internal\Encode;
 final class FilterNode implements Message
 {
     /**
-     * @param string $op The logical operation of a non-leaf node: "and", "or" or "not".
-     *     Empty for a leaf node.
+     * @param string $op The logical operation of a non-leaf node. Empty for a leaf node.
+     *     One of: and, or, not.
      * @param string $key The label key a leaf node compares.
-     * @param string $cmp The comparison of a leaf node: "eq", "neq", "in", "nin", "ex",
-     *     "nex", "sw", "ew", "ct", "gt", "gte", "lt" or "lte".
+     * @param string $cmp The comparison of a leaf node. One of: eq, neq, in, nin, ex, nex,
+     *     sw, ew, ct, gt, gte, lt, lte.
      * @param string $val The value to compare with, for single-value comparisons.
      * @param list<string> $vals The values to compare with, for "in" and "nin".
      * @param list<FilterNode> $nodes The child nodes of a logical operation.

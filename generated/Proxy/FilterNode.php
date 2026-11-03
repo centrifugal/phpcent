@@ -19,11 +19,11 @@ use Centrifugal\Phpcent\RawJson;
 final class FilterNode implements Message
 {
     /**
-     * @param string $op The logical operation: "and", "or" or "not". Empty for a leaf node.
+     * @param string $op The logical operation. Empty for a leaf node. One of: and, or, not.
      * @param string $key The tag a leaf node compares.
-     * @param string $cmp The comparison of a leaf node: "eq", "neq", "in", "nin", "ex"
-     *     (exists), "nex" (does not exist), "sw" (starts with), "ew" (ends with), "ct"
-     *     (contains), "gt", "gte", "lt" or "lte".
+     * @param string $cmp The comparison of a leaf node: ex is exists, nex does not exist,
+     *     sw starts with, ew ends with, ct contains. One of: eq, neq, in, nin, ex,
+     *     nex, sw, ew, ct, gt, gte, lt, lte.
      * @param string $val The value most comparisons compare the tag with.
      * @param list<string> $vals The values "in" and "nin" compare the tag with.
      * @param list<FilterNode> $nodes The operands of a logical node.

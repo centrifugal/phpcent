@@ -26,7 +26,7 @@ final class UserTopicUpdateRequest implements Message, Request
     /**
      * @param string $user The user ID. Required. "" updates the global binding, which every
      *     device - anonymous ones included - gets on its next $deviceRegister.
-     * @param string $op The operation: add, remove or set. Required.
+     * @param string $op The operation. Required. One of: add, remove, set.
      * @param list<string> $topics The topics for the operation.
      */
     public function __construct(

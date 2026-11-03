@@ -25,8 +25,9 @@ final class MapPublishResult implements Message
      * @param array<string, string> $tags Attached to the publication: clients cannot send tags, so this
      *     is where server-side tag filters get their tags from.
      * @param int $score Not used by Centrifugo yet.
-     * @param string $keyMode Makes the publication conditional: "if_new" publishes only a key
-     *     which does not exist yet, "if_exists" only one which does.
+     * @param string $keyMode Makes the publication conditional: if_new publishes only a key
+     *     which does not exist yet, if_exists only one which does.
+     *     One of: if_new, if_exists.
      * @param mixed $streamData Not used by Centrifugo yet.
      * @param string $b64streamData Not used by Centrifugo yet.
      * @param string $idempotencyKey Makes the publication idempotent: another one with the

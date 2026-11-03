@@ -41,7 +41,8 @@ final class SendPushNotificationRequest implements Message, Request
      *     unavailable.
      * @param PushLimitStrategy|null $limitStrategy Sets time constraints and rate limits. Only applies
      *     with a filter recipient; devices are then processed one by one
-     *     instead of in batches.
+     *     instead of in batches. Needs notification.expire_at: a push the limits
+     *     hold back is not tried forever.
      * @param string $analyticsUid The identifier for push notification analytics. If
      *     not set, uid is used.
      * @param array<string, PushLocalization> $localizations Optional per language/locale localizations. Setting

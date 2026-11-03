@@ -763,11 +763,11 @@ trait ClientMethods
      * @param string $id The device ID. Omit it on first registration: Centrifugo
      *     generates one and returns it. Pass the stored value to update the
      *     device.
-     * @param string $provider The provider of the device token: fcm, hms, apns or
-     *     webpush. Required.
+     * @param string $provider The provider of the device token. Required. One of: fcm,
+     *     hms, apns, webpush.
      * @param string $token The push token of the device. For webpush, it is the browser
      *     PushSubscription serialized as a JSON string. Required.
-     * @param string $platform The device platform: ios, android or web. Required.
+     * @param string $platform The device platform. Required. One of: ios, android, web.
      * @param string $user The user associated with the device.
      * @param array<string, string> $meta Additional custom metadata of the device.
      * @param list<string> $topics The full list of the device's topic subscriptions, replacing
@@ -943,7 +943,7 @@ trait ClientMethods
      * Centrifugo PRO only.
      *
      * @param string $deviceId The ID of the device. Required.
-     * @param string $op The operation: add, remove or set. Required.
+     * @param string $op The operation. Required. One of: add, remove, set.
      * @param list<string> $topics The topics for the operation.
      * @param string $user An optional ownership guard: the update is applied only if the
      *     device currently belongs to this user. Otherwise the call fails with a
@@ -1004,7 +1004,7 @@ trait ClientMethods
      *
      * @param string $user The user ID. Required. "" updates the global binding, which every
      *     device - anonymous ones included - gets on its next $deviceRegister.
-     * @param string $op The operation: add, remove or set. Required.
+     * @param string $op The operation. Required. One of: add, remove, set.
      * @param list<string> $topics The topics for the operation.
      * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
      *     httpClient of your own, its timeouts bound the request instead.
@@ -1041,7 +1041,8 @@ trait ClientMethods
      *     unavailable.
      * @param PushLimitStrategy|null $limitStrategy Sets time constraints and rate limits. Only applies
      *     with a filter recipient; devices are then processed one by one
-     *     instead of in batches.
+     *     instead of in batches. Needs notification.expire_at: a push the limits
+     *     hold back is not tried forever.
      * @param string $analyticsUid The identifier for push notification analytics. If
      *     not set, uid is used.
      * @param array<string, PushLocalization> $localizations Optional per language/locale localizations. Setting
@@ -1088,8 +1089,8 @@ trait ClientMethods
      *
      * @param string $analyticsUid The $analyticsUid of the push notification (as in
      *     SendPushNotificationRequest). Required.
-     * @param string $status The status of the push notification: delivered or
-     *     interacted. Required.
+     * @param string $status The status of the push notification. Required. One of:
+     *     delivered, interacted.
      * @param string $deviceId The Centrifugo device ID. Required.
      * @param string $msgId The message ID issued by the provider.
      * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
@@ -1153,9 +1154,9 @@ trait ClientMethods
      * @param string $versionEpoch Scopes version. A different epoch resets version
      *     comparison.
      * @param int $score Currently not used by the server API.
-     * @param string $keyMode Makes the publish conditional: "if_new" writes only if the
-     *     key does not exist, "if_exists" only if it exists. Empty always
-     *     writes.
+     * @param string $keyMode Makes the publish conditional: if_new writes only if the key
+     *     does not exist, if_exists only if it exists. Empty always writes.
+     *     One of: if_new, if_exists.
      * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
      *     httpClient of your own, its timeouts bound the request instead.
      *

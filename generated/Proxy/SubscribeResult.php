@@ -28,8 +28,8 @@ final class SubscribeResult implements Message
      * @param string $b64data Data in base64, for binary data.
      * @param SubscribeOptionOverride|null $override Overrides channel options of the namespace for this
      *     subscription.
-     * @param list<string> $allow Capabilities granted in the channel for this subscription:
-     *     "sub", "pub", "hst" and "prs". Centrifugo PRO only.
+     * @param list<string> $allow Capabilities granted in the channel for this subscription.
+     *     Centrifugo PRO only. One of: sub, pub, hst, prs.
      * @param FilterNode|null $serverTagsFilter Makes the subscription receive only publications
      *     whose tags match it. Centrifugo PRO only.
      */

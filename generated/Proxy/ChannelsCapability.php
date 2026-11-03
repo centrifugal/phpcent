@@ -20,10 +20,10 @@ final class ChannelsCapability implements Message
 {
     /**
      * @param list<string> $channels The channels, or channel patterns, it applies to.
-     * @param list<string> $allow The operations it grants: "sub" (subscribe), "pub" (publish),
-     *     "hst" (history) and "prs" (presence).
-     * @param string $match How channels are matched: empty for exact names, "wildcard" or
-     *     "regex".
+     * @param list<string> $allow The operations it grants: sub is subscribe, pub publish, hst
+     *     history, prs presence. One of: sub, pub, hst, prs.
+     * @param string $match How channels are matched: empty for exact names. One of:
+     *     wildcard, regex.
      */
     public function __construct(
         public array $channels = [],

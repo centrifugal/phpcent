@@ -27,11 +27,11 @@ final class DeviceRegisterRequest implements Message, Request
      * @param string $id The device ID. Omit it on first registration: Centrifugo
      *     generates one and returns it. Pass the stored value to update the
      *     device.
-     * @param string $provider The provider of the device token: fcm, hms, apns or
-     *     webpush. Required.
+     * @param string $provider The provider of the device token. Required. One of: fcm,
+     *     hms, apns, webpush.
      * @param string $token The push token of the device. For webpush, it is the browser
      *     PushSubscription serialized as a JSON string. Required.
-     * @param string $platform The device platform: ios, android or web. Required.
+     * @param string $platform The device platform. Required. One of: ios, android, web.
      * @param string $user The user associated with the device.
      * @param array<string, string> $meta Additional custom metadata of the device.
      * @param list<string> $topics The full list of the device's topic subscriptions, replacing

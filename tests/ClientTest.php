@@ -18,6 +18,7 @@ use Centrifugal\Phpcent\Exception\BatchSentException;
 use Centrifugal\Phpcent\Exception\BroadcastFailedChannelsException;
 use Centrifugal\Phpcent\Exception\ClosedException;
 use Centrifugal\Phpcent\Exception\DecodeException;
+use Centrifugal\Phpcent\Exception\FunctionException;
 use Centrifugal\Phpcent\Exception\HttpException;
 use Centrifugal\Phpcent\Exception\InternalException;
 use Centrifugal\Phpcent\Exception\InvalidConfigException;
@@ -75,6 +76,9 @@ final class ClientTest extends TestCase
         yield 'bad header value' => [['apiEndpoint' => 'http://a/api', 'headers' => ['X-A' => "a\r\nb"]], 'printable ASCII'];
         yield 'empty host' => [['apiEndpoint' => 'http://a/api', 'headers' => ['Host' => '']], 'Host'];
         yield 'zero timeout' => [['apiEndpoint' => 'http://a/api', 'requestTimeout' => 0.0], 'requestTimeout'];
+        // Zero is not "no timeout": unset is the default, and a call cannot be unbounded.
+        yield 'int zero timeout' => [['apiEndpoint' => 'http://a/api', 'requestTimeout' => 0], 'requestTimeout'];
+        yield 'negative timeout' => [['apiEndpoint' => 'http://a/api', 'requestTimeout' => -1.0], 'requestTimeout'];
         yield 'NaN timeout' => [['apiEndpoint' => 'http://a/api', 'requestTimeout' => \NAN], 'requestTimeout'];
         yield 'owned curl option' => [['apiEndpoint' => 'http://a/api', 'curlOptions' => [\CURLOPT_URL => 'x']], 'CURLOPT_URL'];
         yield 'factory without client' => [['apiEndpoint' => 'http://a/api', 'httpFactory' => new Psr17Factory()], 'httpFactory'];
@@ -151,9 +155,57 @@ final class ClientTest extends TestCase
         }]);
         $c->info();
         self::assertSame('/one/api/info', $fake->last()['path']);
-        $addr = 'http://a/api/info';
-        $this->expectException(InvalidConfigException::class);
-        $c->info();
+        // An endpoint failing apiEndpoint's rules fails the call, before sending.
+        $sent = \count($fake->requests);
+        foreach (['http://a/api/info' => 'ends with the method', 'ftp://a/api' => 'absolute', 'http://u:p@a/api' => 'credentials'] as $bad => $message) {
+            $addr = $bad;
+            try {
+                $c->info();
+                self::fail("sent to {$bad}");
+            } catch (InvalidConfigException $e) {
+                self::assertStringContainsString('apiEndpointFunc', $e->getMessage());
+                self::assertStringContainsString($message, $e->getMessage());
+                self::assertFalse(Retry::retryable($e));
+            }
+        }
+        self::assertCount($sent, $fake->requests);
+    }
+
+    /**
+     * An exception of apiEndpointFunc or bearerTokenFunc fails the call as a
+     * FunctionException naming the function, the function's exception its
+     * previous one, judged by it for retries.
+     */
+    public function testFunctionsExceptions(): void
+    {
+        $fake = new FakeCentrifugo();
+        $cause = new \RuntimeException('discovery down');
+        $timeout = new TimeoutException('token service timed out');
+        $cases = [
+            [['apiEndpoint' => null, 'apiEndpointFunc' => static fn(): never => throw $cause], 'apiEndpointFunc', $cause, false],
+            [['apiKey' => '', 'bearerTokenFunc' => static fn(): never => throw $cause], 'bearerTokenFunc', $cause, false],
+            [['apiKey' => '', 'bearerTokenFunc' => static fn(): never => throw $timeout], 'bearerTokenFunc', $timeout, true],
+        ];
+        foreach ($cases as [$options, $function, $previous, $retryable]) {
+            try {
+                FakeCentrifugo::client($fake, $options)->info();
+                self::fail("{$function}: no exception");
+            } catch (FunctionException $e) {
+                self::assertSame($function, $e->function);
+                self::assertSame($previous, $e->getPrevious());
+                self::assertStringStartsWith("{$function}: ", $e->getMessage());
+                self::assertStringContainsString($previous->getMessage(), $e->getMessage());
+                self::assertSame($retryable, Retry::retryable($e));
+            }
+        }
+        // A value which is not a string is the configuration's mistake.
+        try {
+            FakeCentrifugo::client($fake, ['apiKey' => '', 'bearerTokenFunc' => static fn(): mixed => 42])->info();
+            self::fail('an int token was sent');
+        } catch (InvalidConfigException $e) {
+            self::assertStringContainsString('bearerTokenFunc returned int', $e->getMessage());
+        }
+        self::assertSame([], $fake->requests);
     }
 
     // Every method.
@@ -485,7 +537,7 @@ final class ClientTest extends TestCase
         }
         self::assertSame([], $fake->requests);
         // 0 does not mean "no timeout", as in curl: it is refused, as a negative one is.
-        foreach ([0.0, -1.0] as $timeout) {
+        foreach ([0.0, 0, -1.0] as $timeout) {
             try {
                 FakeCentrifugo::client($fake)->info(timeout: $timeout);
                 self::fail("timeout {$timeout} taken");
@@ -714,7 +766,7 @@ final class ClientTest extends TestCase
     {
         $fake = new FakeCentrifugo();
         $c = FakeCentrifugo::client($fake);
-        foreach ([['maxAttempts' => 0], ['maxAttempts' => -1], ['attemptTimeout' => -1.0], ['attemptTimeout' => 0.0]] as $opts) {
+        foreach ([['maxAttempts' => 0], ['maxAttempts' => -1], ['attemptTimeout' => -1.0], ['attemptTimeout' => 0.0], ['attemptTimeout' => 0]] as $opts) {
             try {
                 $c->broadcastWithRetry(...['channels' => ['a'], 'data' => 1, ...$opts]);
                 self::fail('accepted ' . json_encode($opts));

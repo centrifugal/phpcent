@@ -7,6 +7,7 @@ namespace Centrifugal\Phpcent;
 use Centrifugal\Phpcent\Exception\ApiException;
 use Centrifugal\Phpcent\Exception\BatchFailedCommandsException;
 use Centrifugal\Phpcent\Exception\BroadcastFailedChannelsException;
+use Centrifugal\Phpcent\Exception\FunctionException;
 use Centrifugal\Phpcent\Exception\HttpException;
 use Centrifugal\Phpcent\Exception\NetworkException;
 use Centrifugal\Phpcent\Exception\TimeoutException;
@@ -21,10 +22,13 @@ final class Retry
      * Retryable are an ApiException Centrifugo marked temporary, and code 100
      * from Centrifugo versions which did not mark errors yet; a network
      * failure; a timeout; an HttpException 429 or 5xx; a broadcast or batch
-     * partial error with at least one retryable part.
+     * partial error with at least one retryable part. A FunctionException -
+     * what apiEndpointFunc or bearerTokenFunc threw - is judged by the
+     * function's own exception.
      *
      * Not retryable are the request's own errors - an unknown channel, a bad
-     * request, InvalidRequestException - and InvalidConfigException,
+     * request, InvalidRequestException - and InvalidConfigException - also a
+     * bad endpoint or token from apiEndpointFunc or bearerTokenFunc -
      * ClosedException, a DecodeException, rejected credentials and a refused
      * TLS certificate.
      *
@@ -37,6 +41,7 @@ final class Retry
     {
         return match (true) {
             $error === null => false,
+            $error instanceof FunctionException => self::retryable($error->getPrevious()),
             $error instanceof BroadcastFailedChannelsException => $error->retryableChannels() !== [],
             $error instanceof BatchFailedCommandsException => self::anyRetryable($error->failed),
             $error instanceof ApiException => $error->temporary || $error->getCode() === 100,

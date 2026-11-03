@@ -142,7 +142,8 @@ larger integers silently. PHP's own `int` stops at 2^63.
 
 ## Timeouts
 
-`requestTimeout` - ten seconds by default - bounds every call. A call's own
+`requestTimeout` - ten seconds by default - bounds every call; it cannot be
+turned off, and zero is refused as a negative is. A call's own
 `timeout`, in seconds, replaces it for that call, longer or shorter:
 
 ```php
@@ -174,7 +175,8 @@ timeout, replacing `requestTimeout` for it, longer or shorter; the call's
 | `HttpException` | the request did not reach the API method: `$statusCode`, `$body`, `$headers`; `UnauthorizedException` for rejected credentials |
 | `DecodeException` | the reply was not Centrifugo's - usually `apiEndpoint` points elsewhere |
 | `InvalidRequestException` | the client could tell the request is wrong and did not send it |
-| `InvalidConfigException` | the client was not created: the message names the option and the fix |
+| `InvalidConfigException` | the client is refused as configured: not created, or on a call an endpoint from `apiEndpointFunc` or a token from `bearerTokenFunc` it cannot send. The message names the option and the fix |
+| `FunctionException` | `apiEndpointFunc` or `bearerTokenFunc` threw: its exception is the previous one, the message names the function, and `Retry::retryable` judges it by the function's exception |
 | `NetworkException`, `TimeoutException`, `ClosedException` | as their names say |
 
 They live in `Centrifugal\Phpcent\Exception`, and all implement

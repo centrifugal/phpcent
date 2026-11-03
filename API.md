@@ -40,12 +40,12 @@ requestTimeout bounds the call.
 
 - `$apiEndpoint` `?string` - the base URL of the API, "http://localhost:8000/api". Each method is sent to it plus its name, "/publish".
 - `$apiKey` `string` - sent as X-API-Key. Leave it and bearerTokenFunc unset when requests are authenticated another way - mutual TLS, a proxy - or not at all.
-- `$apiEndpointFunc` `?callable(): string` - instead of apiEndpoint, returns it for each request, for addresses discovered rather than fixed
-- `$bearerTokenFunc` `?callable(): string` - returns the token sent as "Authorization: Bearer" with each request, for Centrifugo PRO's JWKS authentication of the API - an ApiTokens's token method, say. Not together with apiKey.
+- `$apiEndpointFunc` `?callable(): string` - instead of apiEndpoint, returns it for each request, for addresses discovered rather than fixed. An endpoint failing apiEndpoint's rules fails the call with InvalidConfigException; an exception of the function's fails it with FunctionException, the function's exception its previous one.
+- `$bearerTokenFunc` `?callable(): string` - returns the token sent as "Authorization: Bearer" with each request, for Centrifugo PRO's JWKS authentication of the API - an ApiTokens's token method, say. Not together with apiKey. An empty token, or one which is not printable ASCII, fails the call with InvalidConfigException; an exception of the function's fails it with FunctionException.
 - `$httpClient` `?ClientInterface` - a PSR-18 client sending the requests, instead of curl: Guzzle, Symfony HttpClient, a fake in tests. It is never changed: credentials and headers go on each request, and its redirect policy applies. PSR-18 has no way to give a request a deadline: Guzzle and Symfony's Psr18Client get the call's through their own API; any other client has its own timeouts - set them on it. Its timeouts throw TimeoutException too.
 - `$httpFactory` `(RequestFactoryInterface&StreamFactoryInterface)|null` - the PSR-17 factories for httpClient's requests; not needed when httpClient implements them itself, as Symfony's Psr18Client does
 - `$curlOptions` `array<int, mixed>` - extra curl options for the default transport: CURLOPT_CAINFO, CURLOPT_SSLCERT, CURLOPT_IPRESOLVE and the like. Not the options phpcent sets itself.
-- `$requestTimeout` `float` - seconds bounding a call without a timeout of its own, 10 by default. curl bounds the whole request by it - connecting, sending, reading the reply - and so do Guzzle and Symfony's client. Another httpClient's own timeouts bound the request instead.
+- `$requestTimeout` `float` - seconds bounding a call without a timeout of its own, 10 by default. curl bounds the whole request by it - connecting, sending, reading the reply - and so do Guzzle and Symfony's client. Another httpClient's own timeouts bound the request instead. Zero is refused, as a negative is: left out, it is the default, and a call cannot be left unbounded.
 - `$headers` `array<string, string>` - extra headers for every request, for a proxy in front of Centrifugo. Not X-API-Key, Authorization or Content-Type. A User-Agent replaces phpcent's.
 - `$onRequest` `?callable(RequestInfo): void` - called after every HTTP request with a RequestInfo, for metrics; the call waits for it. It must not throw: what it throws goes to the caller in place of the call's outcome
 
@@ -1816,10 +1816,13 @@ error came from a temporary condition, not from the request.
 Retryable are an ApiException Centrifugo marked temporary, and code 100
 from Centrifugo versions which did not mark errors yet; a network
 failure; a timeout; an HttpException 429 or 5xx; a broadcast or batch
-partial error with at least one retryable part.
+partial error with at least one retryable part. A FunctionException -
+what apiEndpointFunc or bearerTokenFunc threw - is judged by the
+function's own exception.
 
 Not retryable are the request's own errors - an unknown channel, a bad
-request, InvalidRequestException - and InvalidConfigException,
+request, InvalidRequestException - and InvalidConfigException - also a
+bad endpoint or token from apiEndpointFunc or bearerTokenFunc -
 ClosedException, a DecodeException, rejected credentials and a refused
 TLS certificate.
 
@@ -2638,6 +2641,7 @@ Every exception implements `CentException`.
 - `BroadcastFailedChannelsException` (a `\RuntimeException`)
 - `ClosedException` (a `\RuntimeException`)
 - `DecodeException` (a `\RuntimeException`)
+- `FunctionException` (a `\RuntimeException`)
 - `HttpException` (a `\RuntimeException`)
   - `UnauthorizedException`
 - `InvalidConfigException` (a `\InvalidArgumentException`)
@@ -2794,6 +2798,22 @@ The reply is not a Centrifugo API reply. The usual cause is an apiEndpoint
 which does not point at Centrifugo's API, so that something else - a proxy,
 a web page - answers instead.
 
+### `FunctionException`
+
+```php
+new FunctionException(string $function, Throwable $previous)
+```
+
+What apiEndpointFunc or bearerTokenFunc threw, failing the call before
+anything was sent: the function's own exception is the previous one, and the
+message names the function - "bearerTokenFunc: RuntimeException: ...".
+
+Retry::retryable judges it by the function's exception: retryable when that
+is a phpcent exception which is - a TimeoutException, say - and not
+otherwise.
+
+- `$function` `string` - the option holding the function: "apiEndpointFunc" or "bearerTokenFunc"
+
 ### `HttpException`
 
 ```php
@@ -2840,6 +2860,10 @@ new InvalidConfigException(string $message = '', int $code = 0, ?Throwable $prev
 ```
 
 A configuration with a mistake: the message names the option and the fix.
+Thrown creating a client, and on a call whose apiEndpointFunc returns an
+endpoint failing apiEndpoint's rules, or whose bearerTokenFunc returns an
+empty token or one which is not printable ASCII - before anything is sent.
+Not retryable.
 
 ### `InvalidRequestException`
 

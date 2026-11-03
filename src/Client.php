@@ -8,6 +8,7 @@ use Centrifugal\Phpcent\Exception\ApiException;
 use Centrifugal\Phpcent\Exception\BroadcastFailedChannelsException;
 use Centrifugal\Phpcent\Exception\CentException;
 use Centrifugal\Phpcent\Exception\ClosedException;
+use Centrifugal\Phpcent\Exception\FunctionException;
 use Centrifugal\Phpcent\Exception\InvalidConfigException;
 use Centrifugal\Phpcent\Exception\InvalidRequestException;
 use Centrifugal\Phpcent\Exception\TimeoutException;
@@ -71,11 +72,16 @@ final class Client
      *     unset when requests are authenticated another way - mutual TLS, a
      *     proxy - or not at all.
      * @param ?callable(): string $apiEndpointFunc instead of apiEndpoint, returns
-     *     it for each request, for addresses discovered rather than fixed
+     *     it for each request, for addresses discovered rather than fixed. An
+     *     endpoint failing apiEndpoint's rules fails the call with
+     *     InvalidConfigException; an exception of the function's fails it with
+     *     FunctionException, the function's exception its previous one.
      * @param ?callable(): string $bearerTokenFunc returns the token sent as
      *     "Authorization: Bearer" with each request, for Centrifugo PRO's JWKS
      *     authentication of the API - an ApiTokens's token method, say. Not
-     *     together with apiKey.
+     *     together with apiKey. An empty token, or one which is not printable
+     *     ASCII, fails the call with InvalidConfigException; an exception of
+     *     the function's fails it with FunctionException.
      * @param ?ClientInterface $httpClient a PSR-18 client sending the requests,
      *     instead of curl: Guzzle, Symfony HttpClient, a fake in tests. It is
      *     never changed: credentials and headers go on each request, and its
@@ -93,7 +99,8 @@ final class Client
      *     its own, 10 by default. curl bounds the whole request by it -
      *     connecting, sending, reading the reply - and so do Guzzle and
      *     Symfony's client. Another httpClient's own timeouts bound the
-     *     request instead.
+     *     request instead. Zero is refused, as a negative is: left out, it is
+     *     the default, and a call cannot be left unbounded.
      * @param array<string, string> $headers extra headers for every request, for
      *     a proxy in front of Centrifugo. Not X-API-Key, Authorization or
      *     Content-Type. A User-Agent replaces phpcent's.
@@ -419,11 +426,11 @@ final class Client
     {
         $base = $this->endpoint;
         if ($this->endpointFunc !== null) {
-            $base = self::checkEndpoint(($this->endpointFunc)(), 'apiEndpointFunc');
+            $base = self::checkEndpoint(self::callFunc($this->endpointFunc, 'apiEndpointFunc'), 'apiEndpointFunc');
         }
         $headers = $this->headers;
         if ($this->tokenFunc !== null) {
-            $token = ($this->tokenFunc)();
+            $token = self::callFunc($this->tokenFunc, 'bearerTokenFunc');
             if ($token === '' || !Headers::validValue($token)) {
                 throw new InvalidConfigException('bearerTokenFunc returned an empty token, or one which is not printable ASCII');
             }
@@ -441,6 +448,26 @@ final class Client
         }
 
         return $resp->body;
+    }
+
+    /**
+     * What a configured function returns: InvalidConfigException when it is
+     * not a string, FunctionException, naming the function, when it throws.
+     *
+     * @param \Closure(): string $func
+     */
+    private static function callFunc(\Closure $func, string $option): string
+    {
+        try {
+            $v = $func();
+        } catch (\Throwable $e) {
+            throw new FunctionException($option, $e);
+        }
+        if (!\is_string($v)) {
+            throw new InvalidConfigException("{$option} returned " . get_debug_type($v) . ', not a string');
+        }
+
+        return $v;
     }
 
     private function report(string $method, int $commands, int $failed, float $start, int $status, ?\Throwable $error): void

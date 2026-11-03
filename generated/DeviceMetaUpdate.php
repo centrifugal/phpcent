@@ -18,7 +18,7 @@ final class DeviceMetaUpdate implements Message
      * @param array<string, string> $meta The meta to set. Required. An empty map clears it.
      */
     public function __construct(
-        public array $meta = [],
+        public array $meta,
     ) {}
 
     /**

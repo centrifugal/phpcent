@@ -6,6 +6,7 @@ declare(strict_types=1);
 
 namespace Centrifugal\Phpcent\Internal;
 
+use Centrifugal\Phpcent\Exception\InvalidRequestException;
 use Centrifugal\Phpcent\MapReadStreamResult;
 use Centrifugal\Phpcent\Message;
 use Centrifugal\Phpcent\RawJson;
@@ -33,7 +34,7 @@ final class MapReadStreamRequest implements Message, Request
      * @param bool $reverse Returns entries newest first.
      */
     public function __construct(
-        public string $channel = '',
+        public string $channel,
         public int $sinceOffset = 0,
         public string $sinceEpoch = '',
         public int $limit = 0,
@@ -49,6 +50,20 @@ final class MapReadStreamRequest implements Message, Request
     public static function decodeResult(mixed $v, string $path): MapReadStreamResult
     {
         return MapReadStreamResult::fromWire($v, $path);
+    }
+
+    /**
+     * Throws InvalidRequestException naming the first field the proto marks
+     * "Required." which is unset or empty, nested ones included - but for
+     * those whose empty value has a meaning. $path prefixes the names.
+     *
+     * @internal
+     */
+    public function checkRequired(string $path = ''): void
+    {
+        if ($this->channel === '') {
+            throw new InvalidRequestException($path . 'channel is required');
+        }
     }
 
     /**

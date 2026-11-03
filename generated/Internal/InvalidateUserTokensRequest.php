@@ -6,6 +6,7 @@ declare(strict_types=1);
 
 namespace Centrifugal\Phpcent\Internal;
 
+use Centrifugal\Phpcent\Exception\InvalidRequestException;
 use Centrifugal\Phpcent\InvalidateUserTokensResult;
 use Centrifugal\Phpcent\Message;
 use Centrifugal\Phpcent\RawJson;
@@ -34,8 +35,8 @@ final class InvalidateUserTokensRequest implements Message, Request
      *     channel.
      */
     public function __construct(
+        public string $user,
         public int $expireAt = 0,
-        public string $user = '',
         public int $issuedBefore = 0,
         public string $channel = '',
     ) {}
@@ -50,6 +51,15 @@ final class InvalidateUserTokensRequest implements Message, Request
     {
         return InvalidateUserTokensResult::fromWire($v, $path);
     }
+
+    /**
+     * Throws InvalidRequestException naming the first field the proto marks
+     * "Required." which is unset or empty, nested ones included - but for
+     * those whose empty value has a meaning. $path prefixes the names.
+     *
+     * @internal
+     */
+    public function checkRequired(string $path = ''): void {}
 
     /**
      * The message as Centrifugo reads it: JSON, fields at their zero value

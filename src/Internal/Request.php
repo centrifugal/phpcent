@@ -21,6 +21,13 @@ interface Request extends Message
     public static function apiMethod(): string;
 
     /**
+     * Throws InvalidRequestException naming the first field the proto marks
+     * "Required." which the request leaves unset or empty, nested ones
+     * included - but for those whose empty value has a meaning.
+     */
+    public function checkRequired(string $path = ''): void;
+
+    /**
      * The result of the request's method, from its reply.
      *
      * @return TResult

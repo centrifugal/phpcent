@@ -7,6 +7,7 @@ declare(strict_types=1);
 namespace Centrifugal\Phpcent\Internal;
 
 use Centrifugal\Phpcent\DeviceRegisterResult;
+use Centrifugal\Phpcent\Exception\InvalidRequestException;
 use Centrifugal\Phpcent\Message;
 use Centrifugal\Phpcent\RawJson;
 
@@ -42,10 +43,10 @@ final class DeviceRegisterRequest implements Message, Request
      *     tag, for example en-US.
      */
     public function __construct(
+        public string $provider,
+        public string $token,
+        public string $platform,
         public string $id = '',
-        public string $provider = '',
-        public string $token = '',
-        public string $platform = '',
         public string $user = '',
         public array $meta = [],
         public array $topics = [],
@@ -62,6 +63,26 @@ final class DeviceRegisterRequest implements Message, Request
     public static function decodeResult(mixed $v, string $path): DeviceRegisterResult
     {
         return DeviceRegisterResult::fromWire($v, $path);
+    }
+
+    /**
+     * Throws InvalidRequestException naming the first field the proto marks
+     * "Required." which is unset or empty, nested ones included - but for
+     * those whose empty value has a meaning. $path prefixes the names.
+     *
+     * @internal
+     */
+    public function checkRequired(string $path = ''): void
+    {
+        if ($this->provider === '') {
+            throw new InvalidRequestException($path . 'provider is required');
+        }
+        if ($this->token === '') {
+            throw new InvalidRequestException($path . 'token is required');
+        }
+        if ($this->platform === '') {
+            throw new InvalidRequestException($path . 'platform is required');
+        }
     }
 
     /**

@@ -30,6 +30,20 @@ final class DeviceFilter implements Message
     ) {}
 
     /**
+     * Whether every field is at its zero value: the message is not sent.
+     *
+     * @internal
+     */
+    public function isZero(): bool
+    {
+        return $this->ids === []
+            && $this->users === []
+            && $this->topics === []
+            && $this->providers === []
+            && $this->platforms === [];
+    }
+
+    /**
      * The message as Centrifugo reads it: JSON, fields at their zero value
      * left out. $path prefixes the field names in error messages.
      */

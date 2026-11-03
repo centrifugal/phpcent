@@ -6,6 +6,7 @@ declare(strict_types=1);
 
 namespace Centrifugal\Phpcent;
 
+use Centrifugal\Phpcent\Exception\InvalidRequestException;
 use Centrifugal\Phpcent\Internal\Decode;
 use Centrifugal\Phpcent\Internal\Encode;
 
@@ -19,9 +20,34 @@ final class ApnsPushNotification implements Message
      * @param mixed $payload The APNs payload as JSON. Required.
      */
     public function __construct(
+        public mixed $payload,
         public array $headers = [],
-        public mixed $payload = null,
     ) {}
+
+    /**
+     * Throws InvalidRequestException naming the first field the proto marks
+     * "Required." which is unset or empty, nested ones included - but for
+     * those whose empty value has a meaning. $path prefixes the names.
+     *
+     * @internal
+     */
+    public function checkRequired(string $path = ''): void
+    {
+        if ($this->payload === null) {
+            throw new InvalidRequestException($path . 'payload is required');
+        }
+    }
+
+    /**
+     * Whether every field is at its zero value: the message is not sent.
+     *
+     * @internal
+     */
+    public function isZero(): bool
+    {
+        return $this->headers === []
+            && $this->payload === null;
+    }
 
     /**
      * The message as Centrifugo reads it: JSON, fields at their zero value

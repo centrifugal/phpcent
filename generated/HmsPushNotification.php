@@ -6,6 +6,7 @@ declare(strict_types=1);
 
 namespace Centrifugal\Phpcent;
 
+use Centrifugal\Phpcent\Exception\InvalidRequestException;
 use Centrifugal\Phpcent\Internal\Decode;
 use Centrifugal\Phpcent\Internal\Encode;
 
@@ -18,8 +19,32 @@ final class HmsPushNotification implements Message
      * @param mixed $message The HMS Message object as JSON. Required.
      */
     public function __construct(
-        public mixed $message = null,
+        public mixed $message,
     ) {}
+
+    /**
+     * Throws InvalidRequestException naming the first field the proto marks
+     * "Required." which is unset or empty, nested ones included - but for
+     * those whose empty value has a meaning. $path prefixes the names.
+     *
+     * @internal
+     */
+    public function checkRequired(string $path = ''): void
+    {
+        if ($this->message === null) {
+            throw new InvalidRequestException($path . 'message is required');
+        }
+    }
+
+    /**
+     * Whether every field is at its zero value: the message is not sent.
+     *
+     * @internal
+     */
+    public function isZero(): bool
+    {
+        return $this->message === null;
+    }
 
     /**
      * The message as Centrifugo reads it: JSON, fields at their zero value

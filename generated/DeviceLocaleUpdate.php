@@ -18,7 +18,7 @@ final class DeviceLocaleUpdate implements Message
      * @param string $locale The locale to set. Required. "" clears it.
      */
     public function __construct(
-        public string $locale = '',
+        public string $locale,
     ) {}
 
     /**

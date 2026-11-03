@@ -6,6 +6,7 @@ declare(strict_types=1);
 
 namespace Centrifugal\Phpcent\Internal;
 
+use Centrifugal\Phpcent\Exception\InvalidRequestException;
 use Centrifugal\Phpcent\MapRemoveResult;
 use Centrifugal\Phpcent\Message;
 use Centrifugal\Phpcent\RawJson;
@@ -31,8 +32,8 @@ final class MapRemoveRequest implements Message, Request
      *     "idempotency". Keys are kept for 5 minutes by default.
      */
     public function __construct(
-        public string $channel = '',
-        public string $key = '',
+        public string $channel,
+        public string $key,
         public string $idempotencyKey = '',
     ) {}
 
@@ -45,6 +46,23 @@ final class MapRemoveRequest implements Message, Request
     public static function decodeResult(mixed $v, string $path): MapRemoveResult
     {
         return MapRemoveResult::fromWire($v, $path);
+    }
+
+    /**
+     * Throws InvalidRequestException naming the first field the proto marks
+     * "Required." which is unset or empty, nested ones included - but for
+     * those whose empty value has a meaning. $path prefixes the names.
+     *
+     * @internal
+     */
+    public function checkRequired(string $path = ''): void
+    {
+        if ($this->channel === '') {
+            throw new InvalidRequestException($path . 'channel is required');
+        }
+        if ($this->key === '') {
+            throw new InvalidRequestException($path . 'key is required');
+        }
     }
 
     /**

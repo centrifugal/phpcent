@@ -19,7 +19,7 @@ final class DeviceUserUpdate implements Message
      *     user.
      */
     public function __construct(
-        public string $user = '',
+        public string $user,
     ) {}
 
     /**

@@ -6,6 +6,7 @@ declare(strict_types=1);
 
 namespace Centrifugal\Phpcent;
 
+use Centrifugal\Phpcent\Exception\InvalidRequestException;
 use Centrifugal\Phpcent\Internal\Decode;
 use Centrifugal\Phpcent\Internal\Encode;
 
@@ -19,9 +20,34 @@ final class DeviceTopicsUpdate implements Message
      * @param list<string> $topics The topics for the operation.
      */
     public function __construct(
-        public string $op = '',
+        public string $op,
         public array $topics = [],
     ) {}
+
+    /**
+     * Throws InvalidRequestException naming the first field the proto marks
+     * "Required." which is unset or empty, nested ones included - but for
+     * those whose empty value has a meaning. $path prefixes the names.
+     *
+     * @internal
+     */
+    public function checkRequired(string $path = ''): void
+    {
+        if ($this->op === '') {
+            throw new InvalidRequestException($path . 'op is required');
+        }
+    }
+
+    /**
+     * Whether every field is at its zero value: the message is not sent.
+     *
+     * @internal
+     */
+    public function isZero(): bool
+    {
+        return $this->op === ''
+            && $this->topics === [];
+    }
 
     /**
      * The message as Centrifugo reads it: JSON, fields at their zero value

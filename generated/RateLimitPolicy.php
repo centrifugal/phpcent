@@ -6,6 +6,7 @@ declare(strict_types=1);
 
 namespace Centrifugal\Phpcent;
 
+use Centrifugal\Phpcent\Exception\InvalidRequestException;
 use Centrifugal\Phpcent\Internal\Decode;
 
 /**
@@ -18,9 +19,26 @@ final class RateLimitPolicy implements Message
      * @param int $intervalMs The interval in milliseconds. Required.
      */
     public function __construct(
-        public int $rate = 0,
-        public int $intervalMs = 0,
+        public int $rate,
+        public int $intervalMs,
     ) {}
+
+    /**
+     * Throws InvalidRequestException naming the first field the proto marks
+     * "Required." which is unset or empty, nested ones included - but for
+     * those whose empty value has a meaning. $path prefixes the names.
+     *
+     * @internal
+     */
+    public function checkRequired(string $path = ''): void
+    {
+        if ($this->rate === 0) {
+            throw new InvalidRequestException($path . 'rate is required');
+        }
+        if ($this->intervalMs === 0) {
+            throw new InvalidRequestException($path . 'interval_ms is required');
+        }
+    }
 
     /**
      * The message as Centrifugo reads it: JSON, fields at their zero value

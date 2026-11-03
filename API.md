@@ -3525,7 +3525,7 @@ connection.
 #### `ApnsPushNotification`
 
 ```php
-new ApnsPushNotification(array $headers = [], mixed $payload = null)
+new ApnsPushNotification(mixed $payload, array $headers = [])
 ```
 
 ApnsPushNotification is a notification for APNs. Centrifugo PRO only.
@@ -3885,7 +3885,7 @@ left out. $path prefixes the field names in error messages.
 #### `DeviceLocaleUpdate`
 
 ```php
-new DeviceLocaleUpdate(string $locale = '')
+new DeviceLocaleUpdate(string $locale)
 ```
 
 DeviceLocaleUpdate sets the locale of devices. Centrifugo PRO only.
@@ -3904,7 +3904,7 @@ left out. $path prefixes the field names in error messages.
 #### `DeviceMetaUpdate`
 
 ```php
-new DeviceMetaUpdate(array $meta = [])
+new DeviceMetaUpdate(array $meta)
 ```
 
 DeviceMetaUpdate sets the meta of devices. Centrifugo PRO only.
@@ -3961,7 +3961,7 @@ left out. $path prefixes the field names in error messages.
 #### `DeviceTimezoneUpdate`
 
 ```php
-new DeviceTimezoneUpdate(string $timezone = '')
+new DeviceTimezoneUpdate(string $timezone)
 ```
 
 DeviceTimezoneUpdate sets the timezone of devices. Centrifugo PRO only.
@@ -4072,7 +4072,7 @@ left out. $path prefixes the field names in error messages.
 #### `DeviceTopicsUpdate`
 
 ```php
-new DeviceTopicsUpdate(string $op = '', array $topics = [])
+new DeviceTopicsUpdate(string $op, array $topics = [])
 ```
 
 DeviceTopicsUpdate changes the topics of devices. Centrifugo PRO only.
@@ -4110,7 +4110,7 @@ left out. $path prefixes the field names in error messages.
 #### `DeviceUserUpdate`
 
 ```php
-new DeviceUserUpdate(string $user = '')
+new DeviceUserUpdate(string $user)
 ```
 
 DeviceUserUpdate sets the user of devices. Centrifugo PRO only.
@@ -4166,7 +4166,7 @@ left out. $path prefixes the field names in error messages.
 #### `FcmPushNotification`
 
 ```php
-new FcmPushNotification(mixed $message = null)
+new FcmPushNotification(mixed $message)
 ```
 
 FcmPushNotification is a notification for FCM. Centrifugo PRO only.
@@ -4280,7 +4280,7 @@ left out. $path prefixes the field names in error messages.
 #### `HmsPushNotification`
 
 ```php
-new HmsPushNotification(mixed $message = null)
+new HmsPushNotification(mixed $message)
 ```
 
 HmsPushNotification is a notification for HMS. Centrifugo PRO only.
@@ -4800,11 +4800,7 @@ left out. $path prefixes the field names in error messages.
 #### `PushTimeLimitStrategy`
 
 ```php
-new PushTimeLimitStrategy(
-    string $sendAfterTime = '',
-    string $sendBeforeTime = '',
-    bool $noTzSendNow = false,
-)
+new PushTimeLimitStrategy(string $sendAfterTime, string $sendBeforeTime, bool $noTzSendNow = false)
 ```
 
 PushTimeLimitStrategy sends pushes within a window of the device local
@@ -4826,7 +4822,7 @@ left out. $path prefixes the field names in error messages.
 #### `RateLimitPolicy`
 
 ```php
-new RateLimitPolicy(int $rate = 0, int $intervalMs = 0)
+new RateLimitPolicy(int $rate, int $intervalMs)
 ```
 
 RateLimitPolicy allows rate pushes per $intervalMs. Centrifugo PRO only.
@@ -5183,7 +5179,7 @@ left out. $path prefixes the field names in error messages.
 #### `WebPushPushNotification`
 
 ```php
-new WebPushPushNotification(array $headers = [], mixed $payload = null)
+new WebPushPushNotification(mixed $payload, array $headers = [])
 ```
 
 WebPushPushNotification is a notification for Web Push.

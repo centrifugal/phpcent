@@ -6,6 +6,7 @@ declare(strict_types=1);
 
 namespace Centrifugal\Phpcent\Internal;
 
+use Centrifugal\Phpcent\Exception\InvalidRequestException;
 use Centrifugal\Phpcent\Message;
 use Centrifugal\Phpcent\RawJson;
 use Centrifugal\Phpcent\RevokeTokenResult;
@@ -30,8 +31,8 @@ final class RevokeTokenRequest implements Message, Request
      * @param string $uid The unique ID of the token to revoke (jti claim). Required.
      */
     public function __construct(
+        public string $uid,
         public int $expireAt = 0,
-        public string $uid = '',
     ) {}
 
     public static function apiMethod(): string
@@ -43,6 +44,20 @@ final class RevokeTokenRequest implements Message, Request
     public static function decodeResult(mixed $v, string $path): RevokeTokenResult
     {
         return RevokeTokenResult::fromWire($v, $path);
+    }
+
+    /**
+     * Throws InvalidRequestException naming the first field the proto marks
+     * "Required." which is unset or empty, nested ones included - but for
+     * those whose empty value has a meaning. $path prefixes the names.
+     *
+     * @internal
+     */
+    public function checkRequired(string $path = ''): void
+    {
+        if ($this->uid === '') {
+            throw new InvalidRequestException($path . 'uid is required');
+        }
     }
 
     /**

@@ -6,6 +6,7 @@ declare(strict_types=1);
 
 namespace Centrifugal\Phpcent\Internal;
 
+use Centrifugal\Phpcent\Exception\InvalidRequestException;
 use Centrifugal\Phpcent\Message;
 use Centrifugal\Phpcent\PushLimitStrategy;
 use Centrifugal\Phpcent\PushLocalization;
@@ -53,8 +54,8 @@ final class SendPushNotificationRequest implements Message, Request
      *     available in templating.
      */
     public function __construct(
-        public ?PushRecipient $recipient = null,
-        public ?PushNotification $notification = null,
+        public ?PushRecipient $recipient,
+        public ?PushNotification $notification,
         public string $uid = '',
         public int $sendAt = 0,
         public bool $optimizeForReliability = false,
@@ -74,6 +75,27 @@ final class SendPushNotificationRequest implements Message, Request
     public static function decodeResult(mixed $v, string $path): SendPushNotificationResult
     {
         return SendPushNotificationResult::fromWire($v, $path);
+    }
+
+    /**
+     * Throws InvalidRequestException naming the first field the proto marks
+     * "Required." which is unset or empty, nested ones included - but for
+     * those whose empty value has a meaning. $path prefixes the names.
+     *
+     * @internal
+     */
+    public function checkRequired(string $path = ''): void
+    {
+        if ($this->recipient === null || $this->recipient->isZero()) {
+            throw new InvalidRequestException($path . 'recipient is required');
+        }
+        if ($this->notification === null || $this->notification->isZero()) {
+            throw new InvalidRequestException($path . 'notification is required');
+        }
+        $this->notification->checkRequired($path . 'notification.');
+        if ($this->limitStrategy !== null && !$this->limitStrategy->isZero()) {
+            $this->limitStrategy->checkRequired($path . 'limit_strategy.');
+        }
     }
 
     /**

@@ -6,6 +6,7 @@ declare(strict_types=1);
 
 namespace Centrifugal\Phpcent\Internal;
 
+use Centrifugal\Phpcent\Exception\InvalidRequestException;
 use Centrifugal\Phpcent\Message;
 use Centrifugal\Phpcent\RawJson;
 use Centrifugal\Phpcent\UserTopicUpdateResult;
@@ -30,8 +31,8 @@ final class UserTopicUpdateRequest implements Message, Request
      * @param list<string> $topics The topics for the operation.
      */
     public function __construct(
-        public string $user = '',
-        public string $op = '',
+        public string $user,
+        public string $op,
         public array $topics = [],
     ) {}
 
@@ -44,6 +45,20 @@ final class UserTopicUpdateRequest implements Message, Request
     public static function decodeResult(mixed $v, string $path): UserTopicUpdateResult
     {
         return UserTopicUpdateResult::fromWire($v, $path);
+    }
+
+    /**
+     * Throws InvalidRequestException naming the first field the proto marks
+     * "Required." which is unset or empty, nested ones included - but for
+     * those whose empty value has a meaning. $path prefixes the names.
+     *
+     * @internal
+     */
+    public function checkRequired(string $path = ''): void
+    {
+        if ($this->op === '') {
+            throw new InvalidRequestException($path . 'op is required');
+        }
     }
 
     /**

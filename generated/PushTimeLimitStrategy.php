@@ -6,6 +6,7 @@ declare(strict_types=1);
 
 namespace Centrifugal\Phpcent;
 
+use Centrifugal\Phpcent\Exception\InvalidRequestException;
 use Centrifugal\Phpcent\Internal\Decode;
 use Centrifugal\Phpcent\Internal\Encode;
 
@@ -24,10 +25,39 @@ final class PushTimeLimitStrategy implements Message
      *     not set. By default such pushes are dropped.
      */
     public function __construct(
-        public string $sendAfterTime = '',
-        public string $sendBeforeTime = '',
+        public string $sendAfterTime,
+        public string $sendBeforeTime,
         public bool $noTzSendNow = false,
     ) {}
+
+    /**
+     * Throws InvalidRequestException naming the first field the proto marks
+     * "Required." which is unset or empty, nested ones included - but for
+     * those whose empty value has a meaning. $path prefixes the names.
+     *
+     * @internal
+     */
+    public function checkRequired(string $path = ''): void
+    {
+        if ($this->sendAfterTime === '') {
+            throw new InvalidRequestException($path . 'send_after_time is required');
+        }
+        if ($this->sendBeforeTime === '') {
+            throw new InvalidRequestException($path . 'send_before_time is required');
+        }
+    }
+
+    /**
+     * Whether every field is at its zero value: the message is not sent.
+     *
+     * @internal
+     */
+    public function isZero(): bool
+    {
+        return $this->sendAfterTime === ''
+            && $this->sendBeforeTime === ''
+            && $this->noTzSendNow === false;
+    }
 
     /**
      * The message as Centrifugo reads it: JSON, fields at their zero value

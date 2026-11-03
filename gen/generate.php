@@ -114,11 +114,202 @@ function skipped(Proto $s): array
 
 /**
  * Whether the proto marks the field plainly "Required." - a required
- * parameter then. "Required unless ..." stays optional.
+ * parameter then. "Required unless ..." and "Required when ..." stay
+ * optional.
  */
 function required(ProtoField $f): bool
 {
-    return preg_match('/\bRequired\./', implode(' ', $f->doc)) === 1;
+    return Rules::required($f);
+}
+
+/**
+ * Which messages of api.proto the client checks the required fields of
+ * before sending: every request, and each message a request holds - directly
+ * or in a list - which has required fields of its own or holds such a
+ * message. A required field whose empty value has a meaning is not checked.
+ * $zero holds the messages whose emptiness a check tests: an optional nested
+ * message is checked only when set, and a required one must be set.
+ */
+final class Checks
+{
+    /** @var array<string, bool> */
+    private array $need = [];
+
+    /** @var array<string, true> */
+    public array $zero = [];
+
+    /** @var array<string, true> the messages to write checkRequired for */
+    public array $check = [];
+
+    /** @var array<string, true> */
+    private array $seen = [];
+
+    /** @param list<Command> $cmds */
+    public function __construct(private readonly Proto $s, array $cmds)
+    {
+        foreach ($cmds as $c) {
+            $this->visit($c->request->name);
+        }
+        foreach ($this->seen as $name => $_) {
+            if ($this->needs($name)) {
+                $this->check[$name] = true;
+            }
+        }
+        foreach ($cmds as $c) {
+            $this->check[$c->request->name] = true;
+        }
+    }
+
+    public static function checked(ProtoField $f): bool
+    {
+        return Rules::required($f) && !Rules::emptyHasMeaning($f);
+    }
+
+    /** The message type of a field which a check descends into: not a wrapper, with fields to check. */
+    public function nested(ProtoField $f): ?ProtoMessage
+    {
+        $m = $this->s->byName[$f->type] ?? null;
+        if ($m === null || Rules::isWrapper($m) || !$this->needs($m->name)) {
+            return null;
+        }
+
+        return $m;
+    }
+
+    /** Whether a message has fields to check, itself or below. */
+    public function needs(string $name): bool
+    {
+        if (isset($this->need[$name])) {
+            return $this->need[$name];
+        }
+        $this->need[$name] = false; // a message holding itself checks nothing more
+        $v = false;
+        foreach ($this->s->byName[$name]->fields as $f) {
+            if (self::checked($f) || $this->nested($f) !== null) {
+                $v = true;
+            }
+        }
+
+        return $this->need[$name] = $v;
+    }
+
+    private function visit(string $name): void
+    {
+        if (isset($this->seen[$name])) {
+            return;
+        }
+        $this->seen[$name] = true;
+        foreach ($this->s->byName[$name]->fields as $f) {
+            $m = $this->s->byName[$f->type] ?? null;
+            if ($m === null || Rules::isWrapper($m)) {
+                continue;
+            }
+            if ($this->nested($f) !== null) {
+                if ($f->mapKey !== '') {
+                    throw new \RuntimeException("api.proto: {$name}.{$f->name}: a map of messages with required fields is not supported");
+                }
+                $this->visit($m->name);
+                if (!$f->repeated) {
+                    $this->markZero($m->name);
+                }
+            } elseif (self::checked($f) && !$f->repeated && $f->mapKey === '') {
+                $this->markZero($m->name);
+            }
+        }
+    }
+
+    /** A message needs isZero, and so does each message it holds by value. */
+    private function markZero(string $name): void
+    {
+        if (isset($this->zero[$name])) {
+            return;
+        }
+        $this->zero[$name] = true;
+        foreach ($this->s->byName[$name]->fields as $f) {
+            $m = $this->s->byName[$f->type] ?? null;
+            if ($m !== null && !Rules::isWrapper($m) && !$f->repeated && $f->mapKey === '') {
+                $this->markZero($m->name);
+            }
+        }
+    }
+}
+
+/** The PHP condition true when field $f of $this is at its zero value: unset. */
+function zeroCheck(ProtoField $f, bool $required): string
+{
+    global $schema;
+    $n = '$this->' . camel($f->name);
+    $t = $f->type;
+    if ($f->repeated || $f->mapKey !== '') {
+        return "{$n} === []";
+    }
+    if (isset(WRAPPERS[$t]) || $t === 'bytes') {
+        return "{$n} === null";
+    }
+    if (!isset(PHP_TYPES[$t])) {
+        return Rules::isWrapper($schema->byName[$t] ?? null) ? "{$n} === null" : "{$n} === null || {$n}->isZero()";
+    }
+    if (PHP_TYPES[$t][0] === 'bool') {
+        if ($required) {
+            throw new \RuntimeException("bool field {$f->name} cannot be required: false and unset are one value");
+        }
+
+        return "{$n} === false";
+    }
+
+    return "{$n} === " . PHP_TYPES[$t][1];
+}
+
+/** The checkRequired and isZero methods of a message, as the Checks say. */
+function emitChecks(ProtoMessage $m, ?Checks $checks): string
+{
+    if ($checks === null) {
+        return '';
+    }
+    $out = '';
+    if (isset($checks->check[$m->name])) {
+        $out .= "\n    /**\n     * Throws InvalidRequestException naming the first field the proto marks\n";
+        $out .= "     * \"Required.\" which is unset or empty, nested ones included - but for\n";
+        $out .= "     * those whose empty value has a meaning. \$path prefixes the names.\n     *\n     * @internal\n     */\n";
+        $out .= "    public function checkRequired(string \$path = ''): void\n    {\n";
+        foreach ($m->fields as $f) {
+            if (Checks::checked($f)) {
+                $out .= '        if (' . zeroCheck($f, true) . ") {\n";
+                $out .= "            throw new InvalidRequestException(\$path . '{$f->name} is required');\n        }\n";
+            }
+            $nested = $checks->nested($f);
+            if ($nested === null) {
+                continue;
+            }
+            $n = '$this->' . camel($f->name);
+            if ($f->repeated) {
+                // An element of another type is Encode's to refuse.
+                $out .= "        foreach ({$n} as \$i => \$item) {\n";
+                $out .= "            if (\$item instanceof {$nested->name}) {\n";
+                $out .= "                \$item->checkRequired(\$path . '{$f->name}[' . \$i . '].');\n";
+                $out .= "            }\n        }\n";
+            } elseif (Checks::checked($f)) {
+                // Set, as checked just above.
+                $out .= "        {$n}->checkRequired(\$path . '{$f->name}.');\n";
+            } else {
+                $out .= "        if ({$n} !== null && !{$n}->isZero()) {\n";
+                $out .= "            {$n}->checkRequired(\$path . '{$f->name}.');\n        }\n";
+            }
+        }
+        $out .= "    }\n";
+    }
+    if (isset($checks->zero[$m->name])) {
+        $conds = array_map(static function (ProtoField $f): string {
+            $c = zeroCheck($f, false);
+
+            return str_contains($c, '||') ? "({$c})" : $c;
+        }, $m->fields);
+        $out .= "\n    /**\n     * Whether every field is at its zero value: the message is not sent.\n     *\n     * @internal\n     */\n";
+        $out .= "    public function isZero(): bool\n    {\n";
+        $out .= '        return ' . ($conds === [] ? 'true' : implode("\n            && ", $conds)) . ";\n    }\n";
+    }
+
+    return $out;
 }
 
 /** A field's native type, its PHPDoc type, and its default. */
@@ -362,7 +553,7 @@ function methodDoc(Command $c): array
     return docText(fieldRefs($c->request, $doc));
 }
 
-function emitMessage(ProtoMessage $m, string $namespace, string $proto, string $protocol, ?Command $command): string
+function emitMessage(ProtoMessage $m, string $namespace, string $proto, string $protocol, ?Command $command, ?Checks $checks = null): string
 {
     $out = \sprintf(HEADER, $proto, $namespace) . "\n";
     $uses = [];
@@ -372,6 +563,9 @@ function emitMessage(ProtoMessage $m, string $namespace, string $proto, string $
     if ($namespace !== 'Centrifugal\\Phpcent') {
         $uses[] = 'Centrifugal\\Phpcent\\Message';
         $uses[] = 'Centrifugal\\Phpcent\\RawJson';
+    }
+    if ($checks !== null && isset($checks->check[$m->name])) {
+        $uses[] = 'Centrifugal\\Phpcent\\Exception\\InvalidRequestException';
     }
     if ($command !== null) {
         // A request is internal: the types of its fields and its result are
@@ -421,9 +615,21 @@ function emitMessage(ProtoMessage $m, string $namespace, string $proto, string $
         }
         $out .= docblock($params, '    ');
         $out .= "    public function __construct(\n";
-        foreach ($m->fields as $f) {
+        // Required first, without a default: an optional parameter before a
+        // required one is deprecated, and named arguments make the order no
+        // part of the API.
+        $fields = $m->fields;
+        if ($checks !== null) {
+            usort($fields, static fn(ProtoField $a, ProtoField $b): int => (int) required($b) <=> (int) required($a));
+        }
+        foreach ($fields as $f) {
             [$type, , $default] = fieldType($f);
-            $out .= "        public {$type} \$" . camel($f->name) . " = {$default},\n";
+            if ($checks !== null && required($f)) {
+                $GLOBALS['requiredFields']["{$m->name}.{$f->name}"] = true;
+                $out .= "        public {$type} \$" . camel($f->name) . ",\n";
+            } else {
+                $out .= "        public {$type} \$" . camel($f->name) . " = {$default},\n";
+            }
         }
         $out .= "    ) {}\n";
     }
@@ -440,6 +646,8 @@ function emitMessage(ProtoMessage $m, string $namespace, string $proto, string $
             $out .= "        return {$result}::fromWire(\$v, \$path);\n    }\n";
         }
     }
+
+    $out .= emitChecks($m, $checks);
 
     // toJson: the message as JSON, zero values left out, payloads spliced in.
     $out .= "\n    /**\n     * The message as Centrifugo reads it: JSON, fields at their zero value\n";
@@ -564,7 +772,6 @@ function fieldParams(Command $c): array
             $docs[] = '    ' . $t;
         }
         if (required($f)) {
-            $GLOBALS['requiredFields']["{$c->request->name}.{$f->name}"] = true;
             // Required first: an optional parameter before a required one is
             // deprecated. Named arguments make the order no part of the API.
             $required[] = ltrim($type, '?') . " \${$name}";
@@ -774,10 +981,11 @@ function generate(): array
     foreach ($cmds as $c) {
         $byRequest[$c->request->name] = $c;
     }
+    $checks = new Checks($api, $cmds);
     foreach ($api->messages as $m) {
         if (!isset($skip[$m->name])) {
             $command = $byRequest[$m->name] ?? null;
-            $files[($command !== null ? 'Internal/' : '') . "{$m->name}.php"] = emitMessage($m, 'Centrifugal\\Phpcent' . ($command !== null ? '\\Internal' : ''), 'api.proto', 'server API', $command);
+            $files[($command !== null ? 'Internal/' : '') . "{$m->name}.php"] = emitMessage($m, 'Centrifugal\\Phpcent' . ($command !== null ? '\\Internal' : ''), 'api.proto', 'server API', $command, $checks);
         }
     }
     $files['ClientMethods.php'] = emitClientMethods($cmds);

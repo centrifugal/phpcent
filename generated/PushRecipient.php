@@ -41,6 +41,24 @@ final class PushRecipient implements Message
     ) {}
 
     /**
+     * Whether every field is at its zero value: the message is not sent.
+     *
+     * @internal
+     */
+    public function isZero(): bool
+    {
+        return ($this->filter === null || $this->filter->isZero())
+            && $this->fcmTokens === []
+            && $this->fcmTopic === ''
+            && $this->fcmCondition === ''
+            && $this->hmsTokens === []
+            && $this->hmsTopic === ''
+            && $this->hmsCondition === ''
+            && $this->apnsTokens === []
+            && $this->webpushTokens === [];
+    }
+
+    /**
      * The message as Centrifugo reads it: JSON, fields at their zero value
      * left out. $path prefixes the field names in error messages.
      */

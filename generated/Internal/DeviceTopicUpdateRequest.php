@@ -7,6 +7,7 @@ declare(strict_types=1);
 namespace Centrifugal\Phpcent\Internal;
 
 use Centrifugal\Phpcent\DeviceTopicUpdateResult;
+use Centrifugal\Phpcent\Exception\InvalidRequestException;
 use Centrifugal\Phpcent\Message;
 use Centrifugal\Phpcent\RawJson;
 
@@ -33,8 +34,8 @@ final class DeviceTopicUpdateRequest implements Message, Request
      *     conflict error (or not found if there is no such device).
      */
     public function __construct(
-        public string $deviceId = '',
-        public string $op = '',
+        public string $deviceId,
+        public string $op,
         public array $topics = [],
         public string $user = '',
     ) {}
@@ -48,6 +49,23 @@ final class DeviceTopicUpdateRequest implements Message, Request
     public static function decodeResult(mixed $v, string $path): DeviceTopicUpdateResult
     {
         return DeviceTopicUpdateResult::fromWire($v, $path);
+    }
+
+    /**
+     * Throws InvalidRequestException naming the first field the proto marks
+     * "Required." which is unset or empty, nested ones included - but for
+     * those whose empty value has a meaning. $path prefixes the names.
+     *
+     * @internal
+     */
+    public function checkRequired(string $path = ''): void
+    {
+        if ($this->deviceId === '') {
+            throw new InvalidRequestException($path . 'device_id is required');
+        }
+        if ($this->op === '') {
+            throw new InvalidRequestException($path . 'op is required');
+        }
     }
 
     /**

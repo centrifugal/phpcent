@@ -6,6 +6,7 @@ declare(strict_types=1);
 
 namespace Centrifugal\Phpcent\Internal;
 
+use Centrifugal\Phpcent\Exception\InvalidRequestException;
 use Centrifugal\Phpcent\Message;
 use Centrifugal\Phpcent\RawJson;
 use Centrifugal\Phpcent\UpdateUserStatusResult;
@@ -29,7 +30,7 @@ final class UpdateUserStatusRequest implements Message, Request
      *     be restricted by the user_status.state_regex option.
      */
     public function __construct(
-        public array $users = [],
+        public array $users,
         public string $state = '',
     ) {}
 
@@ -42,6 +43,20 @@ final class UpdateUserStatusRequest implements Message, Request
     public static function decodeResult(mixed $v, string $path): UpdateUserStatusResult
     {
         return UpdateUserStatusResult::fromWire($v, $path);
+    }
+
+    /**
+     * Throws InvalidRequestException naming the first field the proto marks
+     * "Required." which is unset or empty, nested ones included - but for
+     * those whose empty value has a meaning. $path prefixes the names.
+     *
+     * @internal
+     */
+    public function checkRequired(string $path = ''): void
+    {
+        if ($this->users === []) {
+            throw new InvalidRequestException($path . 'users is required');
+        }
     }
 
     /**

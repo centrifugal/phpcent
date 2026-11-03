@@ -88,7 +88,7 @@ final class GeneratorTest extends TestCase
     {
         $fake = new FakeCentrifugo();
         $c = FakeCentrifugo::client($fake);
-        $c->deviceUpdate(ids: ['d'], userUpdate: new DeviceUserUpdate(user: ''), timezoneUpdate: new DeviceTimezoneUpdate(timezone: ''), metaUpdate: new DeviceMetaUpdate());
+        $c->deviceUpdate(ids: ['d'], userUpdate: new DeviceUserUpdate(user: ''), timezoneUpdate: new DeviceTimezoneUpdate(timezone: ''), metaUpdate: new DeviceMetaUpdate(meta: []));
         // Objects, never [], even for an empty map.
         self::assertSame('{"ids":["d"],"user_update":{},"meta_update":{},"timezone_update":{}}', $fake->last()['body']);
         $c->deviceUpdate(ids: ['d']);

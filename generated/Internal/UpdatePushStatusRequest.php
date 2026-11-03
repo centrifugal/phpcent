@@ -6,6 +6,7 @@ declare(strict_types=1);
 
 namespace Centrifugal\Phpcent\Internal;
 
+use Centrifugal\Phpcent\Exception\InvalidRequestException;
 use Centrifugal\Phpcent\Message;
 use Centrifugal\Phpcent\RawJson;
 use Centrifugal\Phpcent\UpdatePushStatusResult;
@@ -32,9 +33,9 @@ final class UpdatePushStatusRequest implements Message, Request
      * @param string $msgId The message ID issued by the provider.
      */
     public function __construct(
-        public string $analyticsUid = '',
-        public string $status = '',
-        public string $deviceId = '',
+        public string $analyticsUid,
+        public string $status,
+        public string $deviceId,
         public string $msgId = '',
     ) {}
 
@@ -47,6 +48,26 @@ final class UpdatePushStatusRequest implements Message, Request
     public static function decodeResult(mixed $v, string $path): UpdatePushStatusResult
     {
         return UpdatePushStatusResult::fromWire($v, $path);
+    }
+
+    /**
+     * Throws InvalidRequestException naming the first field the proto marks
+     * "Required." which is unset or empty, nested ones included - but for
+     * those whose empty value has a meaning. $path prefixes the names.
+     *
+     * @internal
+     */
+    public function checkRequired(string $path = ''): void
+    {
+        if ($this->analyticsUid === '') {
+            throw new InvalidRequestException($path . 'analytics_uid is required');
+        }
+        if ($this->status === '') {
+            throw new InvalidRequestException($path . 'status is required');
+        }
+        if ($this->deviceId === '') {
+            throw new InvalidRequestException($path . 'device_id is required');
+        }
     }
 
     /**

@@ -19,34 +19,31 @@ final class Validate
 
     /**
      * The request's JSON, or InvalidRequestException for a request the client
-     * can tell is wrong.
+     * can tell is wrong: a field the proto marks "Required." left unset or
+     * empty - generated, checkRequired - publish and broadcast without data,
+     * or what cannot be encoded.
      *
      * @param Request<mixed> $request
      */
     public static function encode(Request $request): string
     {
         $method = $request::apiMethod();
-        if ($request instanceof PublishRequest) {
-            if ($request->channel === '') {
-                throw new InvalidRequestException('invalid publish request: channel is required');
-            }
-            if ($request->data === null && $request->b64data === '') {
-                throw new InvalidRequestException('invalid publish request: data or b64data is required' . self::NULL_HINT);
-            }
-        } elseif ($request instanceof BroadcastRequest) {
-            if ($request->channels === []) {
-                throw new InvalidRequestException('invalid broadcast request: channels is required');
-            }
-            if ($request->data === null && $request->b64data === '') {
-                throw new InvalidRequestException('invalid broadcast request: data or b64data is required' . self::NULL_HINT);
-            }
-            foreach ($request->channels as $i => $ch) {
-                if ($ch === '') {
-                    throw new InvalidRequestException("invalid broadcast request: channels[{$i}] is empty");
+        try {
+            $request->checkRequired();
+            if ($request instanceof PublishRequest || $request instanceof BroadcastRequest) {
+                // The proto marks data "Required unless b64data is set".
+                if ($request->data === null && $request->b64data === '') {
+                    throw new InvalidRequestException('data or b64data is required' . self::NULL_HINT);
                 }
             }
-        }
-        try {
+            if ($request instanceof BroadcastRequest) {
+                foreach ($request->channels as $i => $ch) {
+                    if ($ch === '') {
+                        throw new InvalidRequestException("channels[{$i}] is empty");
+                    }
+                }
+            }
+
             return $request->toJson();
         } catch (InvalidRequestException $e) {
             throw new InvalidRequestException("invalid {$method} request: {$e->getMessage()}", 0, $e->getPrevious());

@@ -7,6 +7,7 @@ declare(strict_types=1);
 namespace Centrifugal\Phpcent\Internal;
 
 use Centrifugal\Phpcent\DeleteUserStatusResult;
+use Centrifugal\Phpcent\Exception\InvalidRequestException;
 use Centrifugal\Phpcent\Message;
 use Centrifugal\Phpcent\RawJson;
 
@@ -26,7 +27,7 @@ final class DeleteUserStatusRequest implements Message, Request
      * @param list<string> $users The list of user IDs to delete the status for. Required.
      */
     public function __construct(
-        public array $users = [],
+        public array $users,
     ) {}
 
     public static function apiMethod(): string
@@ -38,6 +39,20 @@ final class DeleteUserStatusRequest implements Message, Request
     public static function decodeResult(mixed $v, string $path): DeleteUserStatusResult
     {
         return DeleteUserStatusResult::fromWire($v, $path);
+    }
+
+    /**
+     * Throws InvalidRequestException naming the first field the proto marks
+     * "Required." which is unset or empty, nested ones included - but for
+     * those whose empty value has a meaning. $path prefixes the names.
+     *
+     * @internal
+     */
+    public function checkRequired(string $path = ''): void
+    {
+        if ($this->users === []) {
+            throw new InvalidRequestException($path . 'users is required');
+        }
     }
 
     /**

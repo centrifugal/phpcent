@@ -6,6 +6,7 @@ declare(strict_types=1);
 
 namespace Centrifugal\Phpcent;
 
+use Centrifugal\Phpcent\Exception\InvalidRequestException;
 use Centrifugal\Phpcent\Internal\Decode;
 
 /**
@@ -22,6 +23,34 @@ final class PushLimitStrategy implements Message
         public ?PushRateLimitStrategy $rateLimit = null,
         public ?PushTimeLimitStrategy $timeLimit = null,
     ) {}
+
+    /**
+     * Throws InvalidRequestException naming the first field the proto marks
+     * "Required." which is unset or empty, nested ones included - but for
+     * those whose empty value has a meaning. $path prefixes the names.
+     *
+     * @internal
+     */
+    public function checkRequired(string $path = ''): void
+    {
+        if ($this->rateLimit !== null && !$this->rateLimit->isZero()) {
+            $this->rateLimit->checkRequired($path . 'rate_limit.');
+        }
+        if ($this->timeLimit !== null && !$this->timeLimit->isZero()) {
+            $this->timeLimit->checkRequired($path . 'time_limit.');
+        }
+    }
+
+    /**
+     * Whether every field is at its zero value: the message is not sent.
+     *
+     * @internal
+     */
+    public function isZero(): bool
+    {
+        return ($this->rateLimit === null || $this->rateLimit->isZero())
+            && ($this->timeLimit === null || $this->timeLimit->isZero());
+    }
 
     /**
      * The message as Centrifugo reads it: JSON, fields at their zero value

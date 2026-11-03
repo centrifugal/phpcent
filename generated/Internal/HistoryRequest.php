@@ -6,6 +6,7 @@ declare(strict_types=1);
 
 namespace Centrifugal\Phpcent\Internal;
 
+use Centrifugal\Phpcent\Exception\InvalidRequestException;
 use Centrifugal\Phpcent\HistoryResult;
 use Centrifugal\Phpcent\Message;
 use Centrifugal\Phpcent\RawJson;
@@ -33,7 +34,7 @@ final class HistoryRequest implements Message, Request
      * @param bool $reverse Iterates in reverse order, from latest to earliest.
      */
     public function __construct(
-        public string $channel = '',
+        public string $channel,
         public int $limit = 0,
         public ?StreamPosition $since = null,
         public bool $reverse = false,
@@ -48,6 +49,20 @@ final class HistoryRequest implements Message, Request
     public static function decodeResult(mixed $v, string $path): HistoryResult
     {
         return HistoryResult::fromWire($v, $path);
+    }
+
+    /**
+     * Throws InvalidRequestException naming the first field the proto marks
+     * "Required." which is unset or empty, nested ones included - but for
+     * those whose empty value has a meaning. $path prefixes the names.
+     *
+     * @internal
+     */
+    public function checkRequired(string $path = ''): void
+    {
+        if ($this->channel === '') {
+            throw new InvalidRequestException($path . 'channel is required');
+        }
     }
 
     /**

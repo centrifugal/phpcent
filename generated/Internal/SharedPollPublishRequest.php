@@ -6,6 +6,7 @@ declare(strict_types=1);
 
 namespace Centrifugal\Phpcent\Internal;
 
+use Centrifugal\Phpcent\Exception\InvalidRequestException;
 use Centrifugal\Phpcent\Message;
 use Centrifugal\Phpcent\RawJson;
 use Centrifugal\Phpcent\SharedPollPublishResult;
@@ -35,11 +36,11 @@ final class SharedPollPublishRequest implements Message, Request
      *     versions and unsubscribes current subscribers with insufficient state.
      */
     public function __construct(
-        public string $channel = '',
-        public string $key = '',
+        public string $channel,
+        public string $key,
+        public int $version,
         public mixed $data = null,
         public string $b64data = '',
-        public int $version = 0,
         public string $epoch = '',
     ) {}
 
@@ -52,6 +53,26 @@ final class SharedPollPublishRequest implements Message, Request
     public static function decodeResult(mixed $v, string $path): SharedPollPublishResult
     {
         return SharedPollPublishResult::fromWire($v, $path);
+    }
+
+    /**
+     * Throws InvalidRequestException naming the first field the proto marks
+     * "Required." which is unset or empty, nested ones included - but for
+     * those whose empty value has a meaning. $path prefixes the names.
+     *
+     * @internal
+     */
+    public function checkRequired(string $path = ''): void
+    {
+        if ($this->channel === '') {
+            throw new InvalidRequestException($path . 'channel is required');
+        }
+        if ($this->key === '') {
+            throw new InvalidRequestException($path . 'key is required');
+        }
+        if ($this->version === 0) {
+            throw new InvalidRequestException($path . 'version is required');
+        }
     }
 
     /**

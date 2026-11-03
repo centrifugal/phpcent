@@ -6,6 +6,7 @@ declare(strict_types=1);
 
 namespace Centrifugal\Phpcent;
 
+use Centrifugal\Phpcent\Exception\InvalidRequestException;
 use Centrifugal\Phpcent\Internal\Decode;
 use Centrifugal\Phpcent\Internal\Encode;
 
@@ -26,6 +27,34 @@ final class PushRateLimitStrategy implements Message
         public array $policies = [],
         public bool $dropIfRateLimited = false,
     ) {}
+
+    /**
+     * Throws InvalidRequestException naming the first field the proto marks
+     * "Required." which is unset or empty, nested ones included - but for
+     * those whose empty value has a meaning. $path prefixes the names.
+     *
+     * @internal
+     */
+    public function checkRequired(string $path = ''): void
+    {
+        foreach ($this->policies as $i => $item) {
+            if ($item instanceof RateLimitPolicy) {
+                $item->checkRequired($path . 'policies[' . $i . '].');
+            }
+        }
+    }
+
+    /**
+     * Whether every field is at its zero value: the message is not sent.
+     *
+     * @internal
+     */
+    public function isZero(): bool
+    {
+        return $this->key === ''
+            && $this->policies === []
+            && $this->dropIfRateLimited === false;
+    }
 
     /**
      * The message as Centrifugo reads it: JSON, fields at their zero value

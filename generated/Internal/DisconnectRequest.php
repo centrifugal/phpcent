@@ -8,6 +8,7 @@ namespace Centrifugal\Phpcent\Internal;
 
 use Centrifugal\Phpcent\Disconnect;
 use Centrifugal\Phpcent\DisconnectResult;
+use Centrifugal\Phpcent\Exception\InvalidRequestException;
 use Centrifugal\Phpcent\FilterNode;
 use Centrifugal\Phpcent\Message;
 use Centrifugal\Phpcent\RawJson;
@@ -58,6 +59,15 @@ final class DisconnectRequest implements Message, Request
     {
         return DisconnectResult::fromWire($v, $path);
     }
+
+    /**
+     * Throws InvalidRequestException naming the first field the proto marks
+     * "Required." which is unset or empty, nested ones included - but for
+     * those whose empty value has a meaning. $path prefixes the names.
+     *
+     * @internal
+     */
+    public function checkRequired(string $path = ''): void {}
 
     /**
      * The message as Centrifugo reads it: JSON, fields at their zero value

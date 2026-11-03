@@ -6,6 +6,7 @@ declare(strict_types=1);
 
 namespace Centrifugal\Phpcent\Internal;
 
+use Centrifugal\Phpcent\Exception\InvalidRequestException;
 use Centrifugal\Phpcent\Message;
 use Centrifugal\Phpcent\RawJson;
 use Centrifugal\Phpcent\UnblockUserResult;
@@ -26,7 +27,7 @@ final class UnblockUserRequest implements Message, Request
      * @param string $user The ID of the user to unblock. Required.
      */
     public function __construct(
-        public string $user = '',
+        public string $user,
     ) {}
 
     public static function apiMethod(): string
@@ -38,6 +39,20 @@ final class UnblockUserRequest implements Message, Request
     public static function decodeResult(mixed $v, string $path): UnblockUserResult
     {
         return UnblockUserResult::fromWire($v, $path);
+    }
+
+    /**
+     * Throws InvalidRequestException naming the first field the proto marks
+     * "Required." which is unset or empty, nested ones included - but for
+     * those whose empty value has a meaning. $path prefixes the names.
+     *
+     * @internal
+     */
+    public function checkRequired(string $path = ''): void
+    {
+        if ($this->user === '') {
+            throw new InvalidRequestException($path . 'user is required');
+        }
     }
 
     /**

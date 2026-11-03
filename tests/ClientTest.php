@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Centrifugal\Phpcent\Tests;
 
+use Centrifugal\Phpcent\ApnsPushNotification;
 use Centrifugal\Phpcent\Batch;
 use Centrifugal\Phpcent\BroadcastAttempt;
 use Centrifugal\Phpcent\Client;
 use Centrifugal\Phpcent\Command;
+use Centrifugal\Phpcent\DeviceTopicsUpdate;
 use Centrifugal\Phpcent\Exception\ApiException;
 use Centrifugal\Phpcent\Exception\BadRequestException;
 use Centrifugal\Phpcent\Exception\BatchFailedCommandsException;
@@ -26,11 +28,19 @@ use Centrifugal\Phpcent\Exception\TimeoutException;
 use Centrifugal\Phpcent\Exception\TooManyRequestsException;
 use Centrifugal\Phpcent\Exception\UnauthorizedException;
 use Centrifugal\Phpcent\Exception\UnknownChannelException;
+use Centrifugal\Phpcent\FcmPushNotification;
 use Centrifugal\Phpcent\Internal\PresenceStatsRequest;
 use Centrifugal\Phpcent\Internal\Request;
+use Centrifugal\Phpcent\PushLimitStrategy;
+use Centrifugal\Phpcent\PushNotification;
+use Centrifugal\Phpcent\PushRateLimitStrategy;
+use Centrifugal\Phpcent\PushRecipient;
+use Centrifugal\Phpcent\PushTimeLimitStrategy;
+use Centrifugal\Phpcent\RateLimitPolicy;
 use Centrifugal\Phpcent\RequestInfo;
 use Centrifugal\Phpcent\Retry;
 use Centrifugal\Phpcent\Tests\Support\FakeCentrifugo;
+use Centrifugal\Phpcent\Tests\Support\Fill;
 use Nyholm\Psr7\Factory\Psr17Factory;
 use Nyholm\Psr7\Response;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -157,35 +167,11 @@ final class ClientTest extends TestCase
             }
             /** @var class-string<Request<mixed>> $class */
             $class = 'Centrifugal\\Phpcent\\Internal\\' . ucfirst($name) . 'Request';
-            $args = $name === 'publish' ? ['channel' => 'ch', 'data' => 1] : self::requiredArgs($m);
+            // Every field set, nested ones too: the required-field checks let
+            // it through, and every field reaches the body.
+            $args = Fill::args($class);
             yield $name => [$name, $class, $args];
         }
-    }
-
-    /**
-     * Zero values of a method's required arguments.
-     *
-     * @return array<string, mixed>
-     */
-    private static function requiredArgs(\ReflectionMethod $m): array
-    {
-        $args = [];
-        foreach ($m->getParameters() as $p) {
-            if ($p->isOptional()) {
-                continue;
-            }
-            $type = $p->getType();
-            self::assertInstanceOf(\ReflectionNamedType::class, $type);
-            $args[$p->getName()] = match ($type->getName()) {
-                'string' => '',
-                'int' => 0,
-                'bool' => false,
-                'array' => [],
-                default => new ($type->getName())(),
-            };
-        }
-
-        return $args;
     }
 
     public function testRequiredFieldsAreRequiredArguments(): void
@@ -524,6 +510,60 @@ final class ClientTest extends TestCase
         // Only those rules: a publication with b64data alone is Centrifugo's to judge.
         $c->publish(channel: 'a', b64data: 'AA==');
         self::assertCount(1, $fake->requests);
+    }
+
+    /** @return iterable<string, array{\Closure(Client|Batch|null): mixed, string}> */
+    public static function missingRequired(): iterable
+    {
+        $fcm = new PushNotification(fcm: new FcmPushNotification(message: ['k' => 'v']));
+        $to = new PushRecipient(fcmTokens: ['t']);
+        $push = static fn(Client|Batch|null $c, mixed ...$args): mixed => $c !== null ? $c->sendPushNotification(...$args) : Command::sendPushNotification(...$args);
+        $call = static fn(string $method, array $args): \Closure => static fn(Client|Batch|null $c): mixed => $c !== null ? $c->{$method}(...$args) : Command::{$method}(...$args);
+
+        // A signature which requires a field still lets it be passed empty.
+        yield 'empty string' => [$call('presence', ['channel' => '']), 'invalid presence request: channel is required'];
+        yield 'zero int' => [$call('sharedPollPublish', ['channel' => 'c', 'key' => 'k', 'version' => 0]), 'invalid shared_poll_publish request: version is required'];
+        yield 'empty list' => [$call('getUserStatus', ['users' => []]), 'invalid get_user_status request: users is required'];
+        yield 'empty message' => [static fn(Client|Batch|null $c): mixed => $push($c, recipient: new PushRecipient(), notification: $fcm), 'invalid send_push_notification request: recipient is required'];
+        yield 'nested' => [static fn(Client|Batch|null $c): mixed => $push($c, recipient: $to, notification: new PushNotification(apns: new ApnsPushNotification(payload: null, headers: ['apns-priority' => '10']))), 'notification.apns.payload is required'];
+        yield 'nested in an optional message' => [static fn(Client|Batch|null $c): mixed => $push($c, recipient: $to, notification: $fcm, limitStrategy: new PushLimitStrategy(timeLimit: new PushTimeLimitStrategy(sendAfterTime: '09:00:00', sendBeforeTime: ''))), 'limit_strategy.time_limit.send_before_time is required'];
+        yield 'list element' => [static fn(Client|Batch|null $c): mixed => $push($c, recipient: $to, notification: $fcm, limitStrategy: new PushLimitStrategy(rateLimit: new PushRateLimitStrategy(policies: [new RateLimitPolicy(rate: 1, intervalMs: 1000), new RateLimitPolicy(rate: 0, intervalMs: 1000)]))), 'invalid send_push_notification request: limit_strategy.rate_limit.policies[1].rate is required'];
+        yield 'device update op' => [$call('deviceUpdate', ['ids' => ['d'], 'topicsUpdate' => new DeviceTopicsUpdate(op: '', topics: ['t'])]), 'invalid device_update request: topics_update.op is required'];
+    }
+
+    /** @param \Closure(Client|Batch|null): mixed $call */
+    #[DataProvider('missingRequired')]
+    public function testRequiredFieldsCheckedBeforeSending(\Closure $call, string $message): void
+    {
+        $fake = new FakeCentrifugo();
+        $c = FakeCentrifugo::client($fake);
+        foreach (['client' => $c, 'batch' => $c->newBatch(), 'command' => null] as $where => $target) {
+            try {
+                $call($target);
+                if ($target instanceof Batch) {
+                    $target->send();
+                }
+                self::fail("{$where}: no exception: {$message}");
+            } catch (InvalidRequestException $e) {
+                self::assertStringContainsString($message, $e->getMessage(), $where);
+            }
+        }
+        self::assertSame([], $fake->requests);
+    }
+
+    public function testRequiredFieldsWhoseEmptyValueHasAMeaning(): void
+    {
+        $fake = new FakeCentrifugo();
+        $c = FakeCentrifugo::client($fake);
+        // Empty means anonymous users, and the global binding: not checked.
+        $c->invalidateUserTokens(user: '');
+        self::assertSame('{}', $fake->last()['body']);
+        $c->userTopicUpdate(user: '', op: 'add', topics: ['t']);
+        self::assertSame('{"op":"add","topics":["t"]}', $fake->last()['body']);
+        // An optional nested message left unset, or set empty, is not checked.
+        $c->sendPushNotification(recipient: new PushRecipient(fcmTokens: ['t']), notification: new PushNotification(fcm: new FcmPushNotification(message: ['k' => 'v'])), limitStrategy: new PushLimitStrategy(timeLimit: new PushTimeLimitStrategy(sendAfterTime: '', sendBeforeTime: '')));
+        self::assertSame('{"recipient":{"fcm_tokens":["t"]},"notification":{"fcm":{"message":{"k":"v"}}}}', $fake->last()['body']);
+        self::assertCount(3, $fake->requests);
     }
 
     // Broadcast.

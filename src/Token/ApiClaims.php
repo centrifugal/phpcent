@@ -33,7 +33,7 @@ final class ApiClaims
      * @param ?\DateTimeInterface $expiresAt when the token expires: required by
      *     Token::api, best minutes ahead. Centrifugo PRO would accept a token
      *     without "exp" for as long as its key is published, so Token::api never
-     *     signs one. ApiTokens sets it itself.
+     *     signs one. ApiTokenSource sets it itself.
      * @param ?\DateTimeInterface $issuedAt the "iat" claim; null for now
      * @param string $id the "jti" claim
      */

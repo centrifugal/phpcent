@@ -78,7 +78,7 @@ final class Client
      *     FunctionException, the function's exception its previous one.
      * @param ?callable(): string $bearerTokenFunc returns the token sent as
      *     "Authorization: Bearer" with each request, for Centrifugo PRO's JWKS
-     *     authentication of the API - an ApiTokens's token method, say. Not
+     *     authentication of the API - an ApiTokenSource's token method, say. Not
      *     together with apiKey. An empty token, or one which is not printable
      *     ASCII, fails the call with InvalidConfigException; an exception of
      *     the function's fails it with FunctionException.

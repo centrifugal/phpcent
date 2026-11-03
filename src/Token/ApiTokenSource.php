@@ -11,7 +11,7 @@ use Centrifugal\Phpcent\Exception\InvalidRequestException;
  * client's bearerTokenFunc. It signs a token with Token::api and reuses it for
  * half its lifetime, so a token sent has at least half of it left.
  *
- *     $tokens = new ApiTokens(
+ *     $tokens = new ApiTokenSource(
  *         claims: new ApiClaims(audience: 'centrifugo-api', scope: ['centrifugo:api']),
  *         key: $apiKey,   // its own key, not the client tokens'
  *     );
@@ -23,7 +23,7 @@ use Centrifugal\Phpcent\Exception\InvalidRequestException;
  * find. $claims must leave expiresAt and issuedAt unset: the tokens are issued
  * when needed and expire $ttl seconds later (300 by default).
  */
-final class ApiTokens
+final class ApiTokenSource
 {
     /** @var ?\Closure(): Key */
     private readonly ?\Closure $currentKey;
@@ -40,13 +40,13 @@ final class ApiTokens
         private readonly float $ttl = 300.0,
     ) {
         if (($key === null) === ($currentKey === null)) {
-            throw new InvalidRequestException('token: ApiTokens takes key or currentKey, one of them');
+            throw new InvalidRequestException('token: ApiTokenSource takes key or currentKey, one of them');
         }
         if ($claims->expiresAt !== null || $claims->issuedAt !== null) {
-            throw new InvalidRequestException('token: ApiTokens sets expiresAt and issuedAt itself: leave them unset, and set ttl');
+            throw new InvalidRequestException('token: ApiTokenSource sets expiresAt and issuedAt itself: leave them unset, and set ttl');
         }
         if (!is_finite($ttl) || $ttl <= 0) {
-            throw new InvalidRequestException('token: ApiTokens ttl must be a positive number of seconds');
+            throw new InvalidRequestException('token: ApiTokenSource ttl must be a positive number of seconds');
         }
         $this->currentKey = $currentKey !== null ? $currentKey(...) : null;
     }

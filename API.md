@@ -41,7 +41,7 @@ requestTimeout bounds the call.
 - `$apiEndpoint` `?string` - the base URL of the API, "http://localhost:8000/api". Each method is sent to it plus its name, "/publish".
 - `$apiKey` `string` - sent as X-API-Key. Leave it and bearerTokenFunc unset when requests are authenticated another way - mutual TLS, a proxy - or not at all.
 - `$apiEndpointFunc` `?callable(): string` - instead of apiEndpoint, returns it for each request, for addresses discovered rather than fixed. An endpoint failing apiEndpoint's rules fails the call with InvalidConfigException; an exception of the function's fails it with FunctionException, the function's exception its previous one.
-- `$bearerTokenFunc` `?callable(): string` - returns the token sent as "Authorization: Bearer" with each request, for Centrifugo PRO's JWKS authentication of the API - an ApiTokens's token method, say. Not together with apiKey. An empty token, or one which is not printable ASCII, fails the call with InvalidConfigException; an exception of the function's fails it with FunctionException.
+- `$bearerTokenFunc` `?callable(): string` - returns the token sent as "Authorization: Bearer" with each request, for Centrifugo PRO's JWKS authentication of the API - an ApiTokenSource's token method, say. Not together with apiKey. An empty token, or one which is not printable ASCII, fails the call with InvalidConfigException; an exception of the function's fails it with FunctionException.
 - `$httpClient` `?ClientInterface` - a PSR-18 client sending the requests, instead of curl: Guzzle, Symfony HttpClient, a fake in tests. It is never changed: credentials and headers go on each request, and its redirect policy applies. PSR-18 has no way to give a request a deadline: Guzzle and Symfony's Psr18Client get the call's through their own API; any other client has its own timeouts - set them on it. Its timeouts throw TimeoutException too.
 - `$httpFactory` `(RequestFactoryInterface&StreamFactoryInterface)|null` - the PSR-17 factories for httpClient's requests; not needed when httpClient implements them itself, as Symfony's Psr18Client does
 - `$curlOptions` `array<int, mixed>` - extra curl options for the default transport: CURLOPT_CAINFO, CURLOPT_SSLCERT, CURLOPT_IPRESOLVE and the like. Not the options phpcent sets itself.
@@ -3062,14 +3062,19 @@ connection and subscription tokens users hold:
 - `$scope` `list<string>` - the "scope" claim, its scopes joined by spaces: http_api.jwks.scope is one of them
 - `$issuer` `string` - the "iss" claim: http_api.jwks.issuer
 - `$subject` `string` - the "sub" claim: who calls the API, for the application's own logs
-- `$expiresAt` `?\DateTimeInterface` - when the token expires: required by Token::api, best minutes ahead. Centrifugo PRO would accept a token without "exp" for as long as its key is published, so Token::api never signs one. ApiTokens sets it itself.
+- `$expiresAt` `?\DateTimeInterface` - when the token expires: required by Token::api, best minutes ahead. Centrifugo PRO would accept a token without "exp" for as long as its key is published, so Token::api never signs one. ApiTokenSource sets it itself.
 - `$issuedAt` `?\DateTimeInterface` - the "iat" claim; null for now
 - `$id` `string` - the "jti" claim
 
-### `ApiTokens`
+### `ApiTokenSource`
 
 ```php
-new ApiTokens(ApiClaims $claims, ?Key $key = null, ?callable $currentKey = null, float $ttl = 300.0)
+new ApiTokenSource(
+    ApiClaims $claims,
+    ?Key $key = null,
+    ?callable $currentKey = null,
+    float $ttl = 300.0,
+)
 ```
 
 Issues the tokens a Client sends to Centrifugo PRO: its token method is the
@@ -3077,7 +3082,7 @@ client's bearerTokenFunc. It signs a token with Token::api and reuses it for
 half its lifetime, so a token sent has at least half of it left.
 
 ```php
-$tokens = new ApiTokens(
+$tokens = new ApiTokenSource(
     claims: new ApiClaims(audience: 'centrifugo-api', scope: ['centrifugo:api']),
     key: $apiKey,   // its own key, not the client tokens'
 );
@@ -3283,7 +3288,7 @@ See https://centrifugal.dev/docs/server/authentication.
 A token for Centrifugo PRO's server API with $claims, signed with $key -
 an asymmetric key with an ID, published by jwks: Centrifugo PRO finds it
 by the "kid". See ApiClaims for keeping it apart from client tokens, and
-ApiTokens for one to send with every call.
+ApiTokenSource for one to send with every call.
 
 #### `static connection(Key $key, ConnectionClaims $claims): string`
 

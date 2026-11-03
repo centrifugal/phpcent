@@ -25,7 +25,7 @@ use Centrifugal\Phpcent\RateLimitPolicy;
 use Centrifugal\Phpcent\Status;
 use Centrifugal\Phpcent\Tests\Support\TestServer;
 use Centrifugal\Phpcent\Token\ApiClaims;
-use Centrifugal\Phpcent\Token\ApiTokens;
+use Centrifugal\Phpcent\Token\ApiTokenSource;
 use Centrifugal\Phpcent\Token\ConnectionClaims;
 use Centrifugal\Phpcent\Token\Key;
 use Centrifugal\Phpcent\Token\Token;
@@ -190,9 +190,9 @@ final class ProTest extends IntegrationTestCase
         $pro->deviceRemove(ids: [$reg->result()->id]);
     }
 
-    public function testApiTokens(): void
+    public function testApiTokenSource(): void
     {
-        // Tokens from ApiTokens authenticate API calls to Centrifugo PRO, which
+        // Tokens from ApiTokenSource authenticate API calls to Centrifugo PRO, which
         // verifies them with the keys served at the endpoint of
         // testdata/centrifugo-pro.compose.yml: port 3101 of the host. Tokens
         // without the audience and scope it requires are refused, as are
@@ -204,7 +204,7 @@ final class ProTest extends IntegrationTestCase
             $publish = function (callable $token): void {
                 (new Client(self::addr(), bearerTokenFunc: $token))->publish(channel: $this->unique(), data: new \stdClass());
             };
-            $tokens = new ApiTokens(claims: new ApiClaims(audience: 'centrifugo-api', scope: ['centrifugo:api']), key: $key);
+            $tokens = new ApiTokenSource(claims: new ApiClaims(audience: 'centrifugo-api', scope: ['centrifugo:api']), key: $key);
             $publish($tokens->token(...));
             $this->addToAssertionCount(1);
 
@@ -214,7 +214,7 @@ final class ProTest extends IntegrationTestCase
                 Token::api($key, new ApiClaims(scope: ['centrifugo:api'], expiresAt: $exp)),
                 // A connection token signed with a published key: no audience or scope.
                 Token::connection($key, new ConnectionClaims(expiresAt: $exp, user: '42')),
-                (new ApiTokens(claims: new ApiClaims(audience: 'centrifugo-api'), key: Key::ed25519(str_repeat("\2", 32))->withKeyId('gocent-unpublished')))->token(),
+                (new ApiTokenSource(claims: new ApiClaims(audience: 'centrifugo-api'), key: Key::ed25519(str_repeat("\2", 32))->withKeyId('gocent-unpublished')))->token(),
             ];
             foreach ($refused as $i => $tok) {
                 try {

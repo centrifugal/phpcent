@@ -346,17 +346,17 @@ is called for every request, so return a cached token. Leave both unset when
 mutual TLS, set up in `curlOptions` or `httpClient`, or a proxy authenticates
 instead.
 
-To sign the tokens yourself, `ApiTokens` issues them and reuses each for half
-its lifetime:
+To sign the tokens yourself, `ApiTokenSource` issues them and reuses each for
+half its lifetime:
 
 ```php
-use Centrifugal\Phpcent\Token\{ApiClaims, ApiTokens, Key};
+use Centrifugal\Phpcent\Token\{ApiClaims, ApiTokenSource, Key};
 
-$apiTokens = new ApiTokens(
+$tokenSource = new ApiTokenSource(
     claims: new ApiClaims(audience: 'centrifugo-api', scope: ['centrifugo:api']),
     key: $apiKey,   // its own key - never one of the client tokens
 );
-$client = new Client('https://centrifugo.example.com/api', bearerTokenFunc: $apiTokens->token(...));
+$client = new Client('https://centrifugo.example.com/api', bearerTokenFunc: $tokenSource->token(...));
 ```
 
 Centrifugo PRO accepts a token signed with any key of `http_api.jwks.endpoint`,
@@ -620,7 +620,7 @@ disconnect them with the server API if needed.
 
 Centrifugo PRO's API tokens rotate the same way, from a set of their own at
 `http_api.jwks.endpoint` (see [Authentication](#authentication)).
-`new ApiTokens(currentKey: ...)` takes the key to sign with from a function,
+`new ApiTokenSource(currentKey: ...)` takes the key to sign with from a function,
 so it can switch to the new key at step 2. Each API token is reused for half
 its `ttl`, so in step 3 wait at least `ttl` after the switch.
 

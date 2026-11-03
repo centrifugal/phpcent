@@ -8,7 +8,7 @@ use Centrifugal\Phpcent\Exception\InvalidRequestException;
 use Centrifugal\Phpcent\SharedPoll;
 use Centrifugal\Phpcent\SubscribeOptionOverride;
 use Centrifugal\Phpcent\Token\ApiClaims;
-use Centrifugal\Phpcent\Token\ApiTokens;
+use Centrifugal\Phpcent\Token\ApiTokenSource;
 use Centrifugal\Phpcent\Token\ChannelsCapability;
 use Centrifugal\Phpcent\Token\ConnectionClaims;
 use Centrifugal\Phpcent\Token\Expiry;
@@ -225,11 +225,11 @@ final class TokenTest extends TestCase
         }
     }
 
-    public function testApiTokens(): void
+    public function testApiTokenSource(): void
     {
         $key = Key::ed25519(str_repeat("\3", 32))->withKeyId('api');
         $claims = new ApiClaims(audience: 'centrifugo-api', scope: ['centrifugo:api', 'b']);
-        $tokens = new ApiTokens(claims: $claims, key: $key);
+        $tokens = new ApiTokenSource(claims: $claims, key: $key);
         $t = $tokens->token();
         self::assertSame($t, $tokens->token());
         $c = self::claims($t);
@@ -240,7 +240,7 @@ final class TokenTest extends TestCase
         self::assertSame(300, $c['exp'] - $c['iat']);
 
         // A short ttl: a new token once half of it passed.
-        $short = new ApiTokens(claims: $claims, currentKey: static fn(): Key => $key, ttl: 2.0);
+        $short = new ApiTokenSource(claims: $claims, currentKey: static fn(): Key => $key, ttl: 2.0);
         $first = $short->token();
         usleep(1_100_000);
         self::assertNotSame($first, $short->token());
@@ -253,10 +253,10 @@ final class TokenTest extends TestCase
             static fn(): string => Token::api($key, new ApiClaims(audience: 'a')),
             static fn(): string => Token::api($key, new ApiClaims(scope: [''], expiresAt: $exp)),
             static fn(): string => Token::api($key, new ApiClaims(scope: ['a b'], expiresAt: $exp)),
-            static fn(): ApiTokens => new ApiTokens(claims: new ApiClaims(audience: 'a', expiresAt: $exp), key: $key),
-            static fn(): ApiTokens => new ApiTokens(claims: $claims),
-            static fn(): ApiTokens => new ApiTokens(claims: $claims, key: $key, currentKey: static fn(): Key => $key),
-            static fn(): ApiTokens => new ApiTokens(claims: $claims, key: $key, ttl: -1.0),
+            static fn(): ApiTokenSource => new ApiTokenSource(claims: new ApiClaims(audience: 'a', expiresAt: $exp), key: $key),
+            static fn(): ApiTokenSource => new ApiTokenSource(claims: $claims),
+            static fn(): ApiTokenSource => new ApiTokenSource(claims: $claims, key: $key, currentKey: static fn(): Key => $key),
+            static fn(): ApiTokenSource => new ApiTokenSource(claims: $claims, key: $key, ttl: -1.0),
         ] as $i => $f) {
             try {
                 $f();

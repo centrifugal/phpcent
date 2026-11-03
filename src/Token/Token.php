@@ -116,7 +116,7 @@ final class Token
      * A token for Centrifugo PRO's server API with $claims, signed with $key -
      * an asymmetric key with an ID, published by jwks: Centrifugo PRO finds it
      * by the "kid". See ApiClaims for keeping it apart from client tokens, and
-     * ApiTokens for one to send with every call.
+     * ApiTokenSource for one to send with every call.
      */
     public static function api(Key $key, ApiClaims $claims): string
     {

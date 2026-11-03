@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Centrifugal\Phpcent\Tests;
 
 use Centrifugal\Phpcent\Endpoints\ConnectionToken;
+use Centrifugal\Phpcent\Endpoints\ForbiddenException;
 use Centrifugal\Phpcent\Endpoints\Jwks;
 use Centrifugal\Phpcent\Endpoints\SharedPollSignature;
 use Centrifugal\Phpcent\Endpoints\SubscriptionToken;
-use Centrifugal\Phpcent\Endpoints\Unauthorized;
 use Centrifugal\Phpcent\Http\HttpRequest;
 use Centrifugal\Phpcent\Http\HttpResponse;
 use Centrifugal\Phpcent\Proxy\ConnectHandler;
@@ -62,9 +62,9 @@ final class HandlersTest extends TestCase
         self::assertSame([], $this->errors);
     }
 
-    public function testUnauthorizedIs403(): void
+    public function testForbiddenIs403(): void
     {
-        foreach ([new Unauthorized(), new \RuntimeException('wrapped', 0, new Unauthorized())] as $e) {
+        foreach ([new ForbiddenException(), new \RuntimeException('wrapped', 0, new ForbiddenException())] as $e) {
             $h = new ConnectionToken(static fn(): never => throw $e, $this->onError());
             self::assertSame(403, $h->handle('GET')->status);
         }

@@ -10,8 +10,9 @@ use Centrifugal\Phpcent\Http\HttpResponse;
 
 /**
  * An endpoint client SDKs call. It answers a JSON object, never cached;
- * Unauthorized - also as a previous exception of another - with 403, on which
- * client SDKs stop asking, and disconnect or unsubscribe; any other exception
+ * ForbiddenException - also as a previous exception of another - with 403,
+ * which client SDKs report as their UnauthorizedError: they stop asking, and
+ * disconnect or unsubscribe. Any other exception
  * with 500, which they retry. A malformed request gets 400, a wrong method 405.
  * onError, when set, is told of every 500 and 400, with the exception; it
  * must not throw.
@@ -28,7 +29,7 @@ abstract class Endpoint extends Handler
     {
         if ($error !== null) {
             for ($e = $error; $e !== null; $e = $e->getPrevious()) {
-                if ($e instanceof Unauthorized) {
+                if ($e instanceof ForbiddenException) {
                     return HttpResponse::status(403);
                 }
             }

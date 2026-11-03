@@ -16,7 +16,7 @@ use Centrifugal\Phpcent\Http\HttpResponse;
  * them - with SharedPoll::sign, say - and returns them, in the order signed,
  * with the signature: [$allowed, $signature]. The keys it leaves out are
  * revoked: the client stops tracking them. To end the subscription instead,
- * it throws Unauthorized. It may return only keys it was asked for: a
+ * it throws ForbiddenException. It may return only keys it was asked for: a
  * signature covering another would be refused, and such a key fails the
  * request with 500.
  */

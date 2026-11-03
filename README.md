@@ -519,19 +519,24 @@ Centrifugo's claims, signed with HMAC, RSA, ECDSA or Ed25519 - and the
 SDKs call:
 
 ```php
-use Centrifugal\Phpcent\Endpoints\{ConnectionToken, Unauthorized};
+use Centrifugal\Phpcent\Endpoints\{ConnectionToken, ForbiddenException};
 use Centrifugal\Phpcent\Token\{ConnectionClaims, Key, Token};
 
 $key = Key::hmac($secret);   // client.token.hmac_secret_key
 
 $connectionToken = new ConnectionToken(function (HttpRequest $http) use ($key): string {
-    $user = sessionUser($http) ?? throw new Unauthorized();   // 403: the client stops asking
+    $user = sessionUser($http) ?? throw new ForbiddenException();   // 403: the client stops asking
     return Token::connection($key, new ConnectionClaims(
         expiresAt: new DateTimeImmutable('+1 hour'),
         user: $user,
     ));
 }, onError: $logError);
 ```
+
+`ForbiddenException` answers 403, which client SDKs report as their
+`UnauthorizedError`: they stop asking, and disconnect or unsubscribe. It is not
+the API client's `UnauthorizedException`, which means Centrifugo refused
+phpcent's own credentials.
 
 An expiry is required: a `DateTimeInterface`, or `Expiry::Never` for a token
 accepted forever. `SubscriptionToken` serves subscription tokens the same way,

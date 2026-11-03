@@ -10,10 +10,10 @@ use Centrifugal\Phpcent\Http\HttpResponse;
 /**
  * The endpoint a client's getToken callback calls: $issue returns the
  * connection token of the request's user - from Token::connection, say - or
- * throws Unauthorized. It takes GET and POST, the body ignored.
+ * throws ForbiddenException. It takes GET and POST, the body ignored.
  *
  *     $endpoint = new ConnectionToken(function (HttpRequest $http) use ($key): string {
- *         $user = sessionUser($http->header('cookie')) ?? throw new Unauthorized();
+ *         $user = sessionUser($http->header('cookie')) ?? throw new ForbiddenException();
  *         return Token::connection($key, new ConnectionClaims(
  *             user: $user,
  *             expiresAt: new DateTimeImmutable('+15 minutes'),

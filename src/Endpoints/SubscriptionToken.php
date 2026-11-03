@@ -10,7 +10,7 @@ use Centrifugal\Phpcent\Http\HttpResponse;
 /**
  * The endpoint a subscription's getToken callback calls: $issue returns the
  * token of the request's user for the channel - from Token::subscription,
- * say - or throws Unauthorized when the user may not subscribe. The channel
+ * say - or throws ForbiddenException when the user may not subscribe. The channel
  * comes from a POST's JSON body, {"channel": ...}, or from a GET's channel
  * query parameter; it is required.
  */

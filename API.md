@@ -3339,11 +3339,11 @@ new ConnectionToken(callable $issue, ?callable $onError = null)
 
 The endpoint a client's getToken callback calls: $issue returns the
 connection token of the request's user - from Token::connection, say - or
-throws Unauthorized. It takes GET and POST, the body ignored.
+throws ForbiddenException. It takes GET and POST, the body ignored.
 
 ```php
 $endpoint = new ConnectionToken(function (HttpRequest $http) use ($key): string {
-    $user = sessionUser($http->header('cookie')) ?? throw new Unauthorized();
+    $user = sessionUser($http->header('cookie')) ?? throw new ForbiddenException();
     return Token::connection($key, new ConnectionClaims(
         user: $user,
         expiresAt: new DateTimeImmutable('+15 minutes'),
@@ -3353,6 +3353,21 @@ $endpoint = new ConnectionToken(function (HttpRequest $http) use ($key): string 
 
 - `$issue` `callable(HttpRequest): string`
 - `$onError` `?callable(HttpRequest, \Throwable): void`
+
+### `ForbiddenException`
+
+```php
+new ForbiddenException(string $message = '', int $code = 0, ?Throwable $previous = null)
+```
+
+Thrown by the function of an endpoint when the user may not have a token or
+signature: answered with 403, on which client SDKs stop asking, and
+disconnect or unsubscribe. Client SDKs report it as their
+UnauthorizedError.
+
+It is named apart from the API client's UnauthorizedException, which means
+Centrifugo refused phpcent's own credentials, so that catching one where
+the other is meant cannot happen silently.
 
 ### `Jwks`
 
@@ -3380,7 +3395,7 @@ $sign decides which of the keys the user may track in the channel, signs
 them - with SharedPoll::sign, say - and returns them, in the order signed,
 with the signature: [$allowed, $signature]. The keys it leaves out are
 revoked: the client stops tracking them. To end the subscription instead,
-it throws Unauthorized. It may return only keys it was asked for: a
+it throws ForbiddenException. It may return only keys it was asked for: a
 signature covering another would be refused, and such a key fails the
 request with 500.
 
@@ -3395,24 +3410,12 @@ new SubscriptionToken(callable $issue, ?callable $onError = null)
 
 The endpoint a subscription's getToken callback calls: $issue returns the
 token of the request's user for the channel - from Token::subscription,
-say - or throws Unauthorized when the user may not subscribe. The channel
+say - or throws ForbiddenException when the user may not subscribe. The channel
 comes from a POST's JSON body, {"channel": ...}, or from a GET's channel
 query parameter; it is required.
 
 - `$issue` `callable(HttpRequest, string): string`
 - `$onError` `?callable(HttpRequest, \Throwable): void`
-
-### `Unauthorized`
-
-```php
-new Unauthorized(string $message = '', int $code = 0, ?Throwable $previous = null)
-```
-
-Thrown by the function of an endpoint when the user may not have a token or
-signature: answered with 403, on which client SDKs stop asking. It is the
-endpoints' own, named after client SDKs' UnauthorizedError - not the API
-client's UnauthorizedException, which means Centrifugo refused the SDK's
-credentials.
 
 ## Centrifugal\Phpcent\Proxy
 

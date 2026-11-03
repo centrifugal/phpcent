@@ -10,8 +10,10 @@ use Centrifugal\Phpcent\Exception\BroadcastFailedChannelsException;
 use Centrifugal\Phpcent\Exception\HttpException;
 use Centrifugal\Phpcent\Exception\NotFoundException;
 use Centrifugal\Phpcent\Exception\UnknownChannelException;
+use Centrifugal\Phpcent\Exception\UnrecoverablePositionException;
 use Centrifugal\Phpcent\RawJson;
 use Centrifugal\Phpcent\Retry;
+use Centrifugal\Phpcent\StreamPosition;
 use Centrifugal\Phpcent\Token\ConnectionClaims;
 use Centrifugal\Phpcent\Token\Key;
 use Centrifugal\Phpcent\Token\Token;
@@ -151,6 +153,45 @@ final class ApiTest extends IntegrationTestCase
         $c->mapRemove(channel: $ch, key: 'k1');
         self::assertSame(1, $c->mapStats(channel: $ch)->numKeys);
         $c->mapClear(channel: $ch);
+    }
+
+    public function testHistoryAllFromAPosition(): void
+    {
+        $c = $this->client();
+        $ch = $this->unique();
+        $first = $c->publish(channel: $ch, data: ['n' => 0]);
+        for ($i = 1; $i <= 7; $i++) {
+            $c->publish(channel: $ch, data: ['n' => $i]);
+        }
+        // What came after the first publication, three to a page.
+        $ns = [];
+        foreach ($c->historyAll(channel: $ch, limit: 3, since: $first->position()) as $pub) {
+            $ns[] = $pub->data->n;
+        }
+        self::assertSame(range(1, 7), $ns);
+        // A position whose epoch is no longer the stream's.
+        $this->expectException(UnrecoverablePositionException::class);
+        iterator_to_array($c->historyAll(channel: $ch, limit: 3, since: new StreamPosition(offset: 1, epoch: 'gone')));
+    }
+
+    public function testMapReadStateAll(): void
+    {
+        $c = $this->client();
+        $ch = 'map:' . $this->unique();
+        $want = [];
+        for ($i = 0; $i < 5; $i++) {
+            $pos = $c->mapPublish(channel: $ch, key: "k{$i}", data: new \stdClass())->position();
+            self::assertNotSame('', $pos->epoch);
+            $want[] = "k{$i}";
+        }
+        // Every page after the first carries the first one's revision, which
+        // Centrifugo accepts with a cursor.
+        $keys = array_map(static fn($e): string => $e->key, iterator_to_array($c->mapReadStateAll(channel: $ch, limit: 2)));
+        sort($keys);
+        self::assertSame($want, $keys);
+        // A revision from another epoch fails: the state was reset since.
+        $this->expectException(UnrecoverablePositionException::class);
+        iterator_to_array($c->mapReadStateAll(channel: $ch, limit: 2, revisionOffset: 1, revisionEpoch: 'gone'));
     }
 
     public function testSharedPollPublish(): void

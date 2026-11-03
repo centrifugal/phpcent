@@ -8,11 +8,21 @@ use Centrifugal\Phpcent\Client;
 use Centrifugal\Phpcent\Command;
 use Centrifugal\Phpcent\DeviceFilter;
 use Centrifugal\Phpcent\DeviceMetaUpdate;
+use Centrifugal\Phpcent\DeviceTimezoneUpdate;
 use Centrifugal\Phpcent\DeviceTopicFilter;
+use Centrifugal\Phpcent\DeviceUserUpdate;
 use Centrifugal\Phpcent\Exception\NotAvailableException;
 use Centrifugal\Phpcent\Exception\UnauthorizedException;
+use Centrifugal\Phpcent\Op;
+use Centrifugal\Phpcent\Platform;
+use Centrifugal\Phpcent\Provider;
+use Centrifugal\Phpcent\PushLimitStrategy;
 use Centrifugal\Phpcent\PushNotification;
+use Centrifugal\Phpcent\PushRateLimitStrategy;
 use Centrifugal\Phpcent\PushRecipient;
+use Centrifugal\Phpcent\PushTimeLimitStrategy;
+use Centrifugal\Phpcent\RateLimitPolicy;
+use Centrifugal\Phpcent\Status;
 use Centrifugal\Phpcent\Tests\Support\TestServer;
 use Centrifugal\Phpcent\Token\ApiClaims;
 use Centrifugal\Phpcent\Token\ApiTokens;
@@ -79,7 +89,7 @@ final class ProTest extends IntegrationTestCase
     {
         $pro = $this->pro();
         $user = $this->unique();
-        $reg = $pro->deviceRegister(provider: 'webpush', token: self::webpushToken(), platform: 'web', user: $user, meta: ['app' => 'phpcent'], topics: ['news']);
+        $reg = $pro->deviceRegister(provider: Provider::WEBPUSH, token: self::webpushToken(), platform: Platform::WEB, user: $user, meta: ['app' => 'phpcent'], topics: ['news']);
         self::assertNotSame('', $reg->id);
         $byUser = new DeviceFilter(users: [$user]);
         $list = $pro->deviceList(filter: $byUser, includeTotalCount: true, includeMeta: true, includeTopics: true);
@@ -87,12 +97,17 @@ final class ProTest extends IntegrationTestCase
         self::assertSame($reg->id, $list->items[0]->id);
         self::assertSame(['app' => 'phpcent'], $list->items[0]->meta);
         self::assertContains('news', $list->items[0]->topics);
-        $pro->deviceTopicUpdate(deviceId: $reg->id, op: 'add', topics: ['sport']);
+        $pro->deviceTopicUpdate(deviceId: $reg->id, op: Op::ADD, topics: ['sport']);
         $topics = $pro->deviceTopicList(filter: new DeviceTopicFilter(deviceIds: [$reg->id]), includeTotalCount: true);
         self::assertSame(2, $topics->totalCount);
-        $pro->deviceUpdate(ids: [$reg->id], metaUpdate: new DeviceMetaUpdate(meta: ['app' => 'updated']));
-        self::assertSame(['app' => 'updated'], $pro->deviceList(filter: $byUser, includeMeta: true)->items[0]->meta);
-        $pro->userTopicUpdate(user: $user, op: 'add', topics: ['alerts']);
+        $pro->deviceUpdate(ids: [$reg->id], metaUpdate: new DeviceMetaUpdate(meta: ['app' => 'updated']), timezoneUpdate: new DeviceTimezoneUpdate(timezone: 'Europe/Berlin'));
+        $dev = $pro->deviceList(filter: $byUser, includeMeta: true)->items[0];
+        self::assertSame([['app' => 'updated'], 'Europe/Berlin'], [$dev->meta, $dev->timezone]);
+        // An empty update is sent, and clears it: before, an empty update was
+        // left out, and the timezone stayed.
+        $pro->deviceUpdate(ids: [$reg->id], timezoneUpdate: new DeviceTimezoneUpdate(timezone: ''));
+        self::assertSame('', $pro->deviceList(filter: $byUser)->items[0]->timezone);
+        $pro->userTopicUpdate(user: $user, op: Op::ADD, topics: ['alerts']);
         $ut = $pro->userTopicList(filter: new UserTopicFilter(users: [$user]));
         self::assertSame(['alerts'], array_map(static fn($i) => $i->topic, $ut->items));
         $push = $pro->sendPushNotification(
@@ -105,11 +120,58 @@ final class ProTest extends IntegrationTestCase
         // Push status needs push analytics in ClickHouse; without it, the
         // method is not available.
         try {
-            $pro->updatePushStatus(analyticsUid: $push->uid, status: 'delivered', deviceId: $reg->id);
+            $pro->updatePushStatus(analyticsUid: $push->uid, status: Status::DELIVERED, deviceId: $reg->id);
         } catch (NotAvailableException) {
         }
         $pro->deviceRemove(ids: [$reg->id]);
         self::assertSame([], $pro->deviceList(filter: $byUser)->items);
+    }
+
+    /**
+     * Push notifications with every part the checks before sending look
+     * into: rate and time limits, a device detached by an empty user update,
+     * devices read page by page. Each request sets exactly what the API
+     * requires, so that a check stricter than Centrifugo's fails here.
+     */
+    public function testPushParts(): void
+    {
+        $pro = $this->pro();
+        $user = $this->unique();
+        $ids = [];
+        for ($i = 0; $i < 3; $i++) {
+            $ids[] = $pro->deviceRegister(provider: Provider::WEBPUSH, token: self::webpushToken(), platform: Platform::WEB, user: $user)->id;
+        }
+        try {
+            $byUser = new DeviceFilter(users: [$user]);
+            // Every device, two to a page.
+            $seen = array_map(static fn($d): string => $d->id, iterator_to_array($pro->deviceListAll(filter: $byUser, limit: 2)));
+            sort($seen);
+            $want = $ids;
+            sort($want);
+            self::assertSame($want, $seen);
+
+            foreach ([
+                'rate limit' => new PushLimitStrategy(rateLimit: new PushRateLimitStrategy(key: 'device.id', policies: [new RateLimitPolicy(rate: 1, intervalMs: 60000)])),
+                'time limit' => new PushLimitStrategy(timeLimit: new PushTimeLimitStrategy(sendAfterTime: '09:00:00', sendBeforeTime: '21:00:00', noTzSendNow: true)),
+            ] as $name => $strategy) {
+                $push = $pro->sendPushNotification(
+                    recipient: new PushRecipient(filter: $byUser),
+                    // Centrifugo needs expireAt with a limit strategy: a push
+                    // the limit holds back must not wait forever.
+                    notification: new PushNotification(webpush: new WebPushPushNotification(payload: ['title' => 'hi']), expireAt: time() + 7200),
+                    limitStrategy: $strategy,
+                    sendAt: time() + 3600,
+                );
+                self::assertNotSame('', $push->uid, $name);
+                $pro->cancelPush(uid: $push->uid);
+            }
+
+            // An empty user update detaches the device.
+            $pro->deviceUpdate(ids: [$ids[0]], userUpdate: new DeviceUserUpdate(user: ''));
+            self::assertSame('', $pro->deviceList(filter: new DeviceFilter(ids: [$ids[0]]))->items[0]->user);
+        } finally {
+            $pro->deviceRemove(ids: $ids);
+        }
     }
 
     public function testProBatch(): void
@@ -119,7 +181,7 @@ final class ProTest extends IntegrationTestCase
         $b = $pro->newBatch();
         $b->updateUserStatus(users: [$user], state: 'busy');
         $status = $b->getUserStatus(users: [$user]);
-        $reg = $b->deviceRegister(provider: 'webpush', token: self::webpushToken(), platform: 'web', user: $user);
+        $reg = $b->deviceRegister(provider: Provider::WEBPUSH, token: self::webpushToken(), platform: Platform::WEB, user: $user);
         $conns = $b->connections(user: $user);
         $b->send();
         self::assertSame('busy', $status->result()->statuses[0]->state);

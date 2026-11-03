@@ -70,6 +70,50 @@ final class CurlTest extends TestCase
         self::assertLessThan(1.8, microtime(true) - $start);
     }
 
+    /**
+     * requestTimeout bounds every call; a call's own timeout replaces it,
+     * longer or shorter (spec 0.3, 3.2). The server answers after 0.6 s - or
+     * later, when it is still busy with the requests of tests before which
+     * timed out: the longer timeouts leave room for that.
+     */
+    public function testTimeoutReplacesRequestTimeout(): void
+    {
+        $timesOut = static function (callable $call): bool {
+            try {
+                $call();
+
+                return false;
+            } catch (TimeoutException) {
+                return true;
+            }
+        };
+        $short = self::client('sleep', 0.2);
+        self::assertTrue($timesOut(static fn(): mixed => $short->publish(channel: 'c', data: 1)), 'requestTimeout');
+        self::assertFalse($timesOut(static fn(): mixed => $short->publish(channel: 'c', data: 1, timeout: 15.0)), 'a longer timeout');
+        $long = self::client('sleep', 10.0);
+        $start = microtime(true);
+        self::assertTrue($timesOut(static fn(): mixed => $long->publish(channel: 'c', data: 1, timeout: 0.2)), 'a shorter timeout');
+        self::assertLessThan(0.55, microtime(true) - $start);
+    }
+
+    /**
+     * attemptTimeout is each attempt's own timeout, replacing requestTimeout;
+     * the call's timeout still ends an attempt sooner (spec 0.3, 7.3).
+     */
+    public function testAttemptTimeout(): void
+    {
+        $short = self::client('sleep', 0.2);
+        $res = $short->broadcastWithRetry(channels: ['c'], data: 1, maxAttempts: 1, attemptTimeout: 15.0);
+        self::assertSame(1, $res->channels[0]->result?->offset);
+        $start = microtime(true);
+        try {
+            self::client('sleep', 10.0)->broadcastWithRetry(channels: ['c'], data: 1, maxAttempts: 1, attemptTimeout: 3.0, timeout: 0.2);
+            self::fail('no timeout');
+        } catch (TimeoutException) {
+        }
+        self::assertLessThan(0.55, microtime(true) - $start);
+    }
+
     public function testRedirectNotFollowed(): void
     {
         try {

@@ -45,6 +45,14 @@ switch ($behaviour) {
         }
         echo '"}}';
         break;
+    case 'sleep':
+        // Answers after 0.6 s: a publish, or a broadcast into one channel.
+        usleep(600_000);
+        header('Content-Type: application/json');
+        echo ($parts[2] ?? '') === 'broadcast'
+            ? '{"result":{"responses":[{"result":{"offset":1,"epoch":"e"}}]}}'
+            : '{"result":{"offset":1,"epoch":"e"}}';
+        break;
     case 'redirect':
         header('Location: https://elsewhere.test/api/publish', true, 302);
         break;

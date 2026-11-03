@@ -142,12 +142,17 @@ larger integers silently. PHP's own `int` stops at 2^63.
 
 ## Timeouts
 
-Each call takes a `timeout`, in seconds; without one, `requestTimeout` - ten
-seconds by default - bounds it:
+`requestTimeout` - ten seconds by default - bounds every call. A call's own
+`timeout`, in seconds, replaces it for that call, longer or shorter:
 
 ```php
 $client->info(timeout: 0.5);
+$client->broadcast(channels: $many, data: $data, timeout: 30.0);
 ```
+
+PHP has no deadline a call runs under - no context or cancellation of the
+caller's - so these two are the whole story: a call inside a web request ends
+at its timeout whatever the request's own limits.
 
 The timeout bounds the whole call - connecting, sending, the reply's headers
 and body - and however a call times out, it throws `TimeoutException`. With an
@@ -156,7 +161,9 @@ PSR-18 has no way to give a request a deadline - so set them on it:
 `new \GuzzleHttp\Client(['timeout' => 5])`. Its timeouts throw
 `TimeoutException` too.
 `broadcastWithRetry` makes several requests in one call: its `timeout` bounds
-them all, waits between them included, and `attemptTimeout` each one.
+them all, waits between them included. `attemptTimeout` is each attempt's own
+timeout, replacing `requestTimeout` for it, longer or shorter; the call's
+`timeout` still ends an attempt sooner.
 
 ## Errors
 

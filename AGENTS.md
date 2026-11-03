@@ -108,6 +108,11 @@ release. `composer.json` has no `version`: the tag is the version.
 - **curl by default, PSR-18 optional.** curl enforces the one deadline and
   keeps connections alive; PSR-18 is how applications bring their own client,
   and how they test code using phpcent (issue #55). `Client` stays `final`.
+- **A call's `timeout` replaces `requestTimeout`, longer or shorter**, and
+  `broadcastWithRetry`'s `attemptTimeout` does for each attempt, its call's
+  `timeout` still ending it sooner (spec 0.3, 3.2 and 7.3). PHP has no
+  deadline a call runs under - no context, no cancellation - so nothing else
+  shortens it.
 - **No automatic batching and no async client**: a PHP request makes its calls
   one after another (spec 8 allows leaving it out).
 - **`ext-curl` is suggested, not required**: an application passing its own

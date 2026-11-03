@@ -818,8 +818,9 @@ const BROADCAST_RETRY_DOC = <<<'DOC'
     - The result holds every channel's last outcome, and the key: retrying
       later with it publishes only into the channels which did not get it.
 
-    $timeout, when set, bounds the whole call, waits included; $attemptTimeout
-    - requestTimeout by default - bounds each attempt. Waits block the calling
+    $timeout, when set, bounds the whole call, waits included. $attemptTimeout
+    is each attempt's own timeout, replacing requestTimeout for it, longer or
+    shorter; $timeout still ends an attempt sooner. Waits block the calling
     request: in a web request, set a short $timeout, and retry for longer from
     a job queue, with an $idempotencyKey of its own.
 
@@ -925,8 +926,9 @@ function emitClientMethods(array $cmds): string
     $out .= "    abstract private function sendBroadcast(BroadcastRequest \$request, ?float \$timeout): BroadcastResult;\n\n";
     $out .= "    /** @param ?callable(BroadcastAttempt): ?float \$onAttemptError */\n";
     $out .= "    abstract private function retryBroadcast(BroadcastRequest \$request, int \$maxAttempts, ?float \$attemptTimeout, ?callable \$onAttemptError, ?float \$timeout): BroadcastResult;\n";
-    $timeoutDoc = ['@param ?float $timeout Seconds bounding the call: requestTimeout when null. With an',
-        '    httpClient of your own, its timeouts bound the request instead.'];
+    $timeoutDoc = ['@param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,',
+        '    longer or shorter: requestTimeout when null. With an httpClient of',
+        '    your own, its timeouts bound the request instead.'];
     foreach ($cmds as $c) {
         [$fieldDocs, $params, $request] = fieldParams($c);
         $name = camel($c->method);
@@ -956,7 +958,8 @@ function emitClientMethods(array $cmds): string
                 throw new \RuntimeException("api.proto: {$c->result} has no repeated {$itemsField}");
             }
             $doc = [...lines($pagedDoc), '', ...lines(PAGED_DOC), '', ...$fieldDocs,
-                '@param ?float $timeout Seconds bounding each page\'s call: requestTimeout when null.',
+                '@param ?float $timeout Seconds bounding each page\'s call, replacing',
+                '    requestTimeout for it: requestTimeout when null.',
                 '', "@return \\Generator<int, {$item}>", '', '@throws CentException'];
             $page = "fn({$c->request->name} \$r): {$c->result} => \$this->invoke(\$r, \$timeout)";
             $out .= method($doc, "public function {$name}All", [...$params, '?float $timeout = null'], '\Generator', "return {$pages}({$request}, {$page});");
@@ -964,7 +967,9 @@ function emitClientMethods(array $cmds): string
         if ($c->method === 'broadcast') {
             $doc = [...lines(BROADCAST_RETRY_DOC), '', ...$fieldDocs,
                 '@param int $maxAttempts Attempts at most, the first included.',
-                '@param ?float $attemptTimeout Seconds bounding each attempt: requestTimeout when null.',
+                '@param ?float $attemptTimeout Seconds bounding each attempt, replacing',
+                '    requestTimeout for it: requestTimeout when null. $timeout still ends',
+                '    an attempt sooner.',
                 '@param ?callable(BroadcastAttempt): ?float $onAttemptError Called after an attempt',
                 '    which failed in a way a retry may fix, except the last; returns the',
                 '    seconds to wait before the next attempt, or null for the default wait.',

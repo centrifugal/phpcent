@@ -56,7 +56,7 @@ connect again until unblocked or the block expires. Centrifugo PRO only.
 
 - `$expireAt` - The Unix time in seconds when the block expires. Optional, but a reasonably small value is recommended to keep the set of blocked users small.
 - `$user` - The ID of the user to block. Required.
-- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+- `$timeout` - Seconds bounding the call, replacing requestTimeout for it, longer or shorter: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `broadcast(
     array $channels,
@@ -103,7 +103,7 @@ may still succeed, with one $idempotencyKey.
 - `$delta` - Tells Centrifugo to construct a delta update, if possible, when broadcasting the publications to subscribers.
 - `$version` - When > 0, the version of the document being sent: publications with a version less than or equal to one already seen are ignored. Only works in channels with history enabled.
 - `$versionEpoch` - The epoch of version. When it changes, Centrifugo accepts the publication even if its version is lower than before.
-- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+- `$timeout` - Seconds bounding the call, replacing requestTimeout for it, longer or shorter: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `broadcastWithRetry(
     array $channels,
@@ -135,8 +135,9 @@ one retry).
 - The result holds every channel's last outcome, and the key: retrying
   later with it publishes only into the channels which did not get it.
 
-$timeout, when set, bounds the whole call, waits included; $attemptTimeout
-- requestTimeout by default - bounds each attempt. Waits block the calling
+$timeout, when set, bounds the whole call, waits included. $attemptTimeout
+is each attempt's own timeout, replacing requestTimeout for it, longer or
+shorter; $timeout still ends an attempt sooner. Waits block the calling
 request: in a web request, set a short $timeout, and retry for longer from
 a job queue, with an $idempotencyKey of its own.
 
@@ -160,7 +161,7 @@ It throws as broadcast does.
 - `$version` - When > 0, the version of the document being sent: publications with a version less than or equal to one already seen are ignored. Only works in channels with history enabled.
 - `$versionEpoch` - The epoch of version. When it changes, Centrifugo accepts the publication even if its version is lower than before.
 - `$maxAttempts` - Attempts at most, the first included.
-- `$attemptTimeout` - Seconds bounding each attempt: requestTimeout when null.
+- `$attemptTimeout` - Seconds bounding each attempt, replacing requestTimeout for it: requestTimeout when null. $timeout still ends an attempt sooner.
 - `$onAttemptError` - Called after an attempt which failed in a way a retry may fix, except the last; returns the seconds to wait before the next attempt, or null for the default wait.
 - `$timeout` - Seconds bounding the whole call, waits included: no bound but each attempt's when null.
 
@@ -170,7 +171,7 @@ Cancels a delayed push notification (sent with
 $sendAt). Centrifugo PRO only.
 
 - `$uid` - The uid of the push notification to cancel. Required.
-- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+- `$timeout` - Seconds bounding the call, replacing requestTimeout for it, longer or shorter: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `channels(string $pattern = '', ?float $timeout = null): ChannelsResult`
 
@@ -178,7 +179,7 @@ Returns active channels (with one or more subscribers).
 It can be heavy on large deployments: there is no pagination.
 
 - `$pattern` - Filters channels by name, using gobwas/glob syntax.
-- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+- `$timeout` - Seconds bounding the call, replacing requestTimeout for it, longer or shorter: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `close(): void`
 
@@ -200,14 +201,14 @@ $labelFilter must be set. Centrifugo PRO only.
 - `$user` - Returns only the connections of this user ID.
 - `$expression` - A CEL expression to filter connections.
 - `$labelFilter` - Restricts the listing to clients whose labels match this filter. Centrifugo PRO only.
-- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+- `$timeout` - Seconds bounding the call, replacing requestTimeout for it, longer or shorter: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `deleteUserStatus(array $users, ?float $timeout = null): DeleteUserStatusResult`
 
 Deletes the status of users. Centrifugo PRO only.
 
 - `$users` - The list of user IDs to delete the status for. Required.
-- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+- `$timeout` - Seconds bounding the call, replacing requestTimeout for it, longer or shorter: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `deviceList(
     ?DeviceFilter $filter = null,
@@ -230,7 +231,7 @@ Centrifugo PRO only.
 - `$includeWebpushKeys` - Includes $webpushKeys of each device (webpush only).
 - `$cursor` - The pagination cursor: $nextCursor of the previous page, empty for the first page.
 - `$limit` - The maximum number of devices to return.
-- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+- `$timeout` - Seconds bounding the call, replacing requestTimeout for it, longer or shorter: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `deviceListAll(
     ?DeviceFilter $filter = null,
@@ -260,7 +261,7 @@ invalid one throws InvalidRequestException before anything is sent.
 - `$includeWebpushKeys` - Includes $webpushKeys of each device (webpush only).
 - `$cursor` - The pagination cursor: $nextCursor of the previous page, empty for the first page.
 - `$limit` - The maximum number of devices to return.
-- `$timeout` - Seconds bounding each page's call: requestTimeout when null.
+- `$timeout` - Seconds bounding each page's call, replacing requestTimeout for it: requestTimeout when null.
 
 #### `deviceRegister(
     string $provider,
@@ -287,7 +288,7 @@ updates a registered one. Centrifugo PRO only.
 - `$topics` - The full list of the device's topic subscriptions, replacing the previous one. The user's topics are attached automatically.
 - `$timezone` - The IANA time zone of the device user, for example Europe/Nicosia.
 - `$locale` - The locale of the device user as an IETF BCP 47 language tag, for example en-US.
-- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+- `$timeout` - Seconds bounding the call, replacing requestTimeout for it, longer or shorter: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `deviceRemove(array $ids = [], array $users = [], ?float $timeout = null): DeviceRemoveResult`
 
@@ -296,7 +297,7 @@ Centrifugo PRO only.
 
 - `$ids` - Selects devices to remove by ID.
 - `$users` - Selects devices to remove by user.
-- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+- `$timeout` - Seconds bounding the call, replacing requestTimeout for it, longer or shorter: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `deviceTopicList(
     ?DeviceTopicFilter $filter = null,
@@ -315,7 +316,7 @@ subscriptions. Centrifugo PRO only.
 - `$includeDevice` - Includes the Device of each item.
 - `$cursor` - The pagination cursor: $nextCursor of the previous page, empty for the first page.
 - `$limit` - The maximum number of items to return.
-- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+- `$timeout` - Seconds bounding the call, replacing requestTimeout for it, longer or shorter: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `deviceTopicListAll(
     ?DeviceTopicFilter $filter = null,
@@ -341,7 +342,7 @@ invalid one throws InvalidRequestException before anything is sent.
 - `$includeDevice` - Includes the Device of each item.
 - `$cursor` - The pagination cursor: $nextCursor of the previous page, empty for the first page.
 - `$limit` - The maximum number of items to return.
-- `$timeout` - Seconds bounding each page's call: requestTimeout when null.
+- `$timeout` - Seconds bounding each page's call, replacing requestTimeout for it: requestTimeout when null.
 
 #### `deviceTopicUpdate(
     string $deviceId,
@@ -359,7 +360,7 @@ Centrifugo PRO only.
 - `$op` - The operation. Required. One of: add, remove, set. Constants: Op::ADD, Op::REMOVE, Op::SET.
 - `$topics` - The topics for the operation.
 - `$user` - An optional ownership guard: the update is applied only if the device currently belongs to this user. Otherwise the call fails with a conflict error (or not found if there is no such device).
-- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+- `$timeout` - Seconds bounding the call, replacing requestTimeout for it, longer or shorter: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `deviceUpdate(
     array $ids = [],
@@ -382,7 +383,7 @@ users. Centrifugo PRO only.
 - `$topicsUpdate` - Updates the device topics.
 - `$timezoneUpdate` - Updates the device timezone.
 - `$localeUpdate` - Updates the device locale.
-- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+- `$timeout` - Seconds bounding the call, replacing requestTimeout for it, longer or shorter: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `disconnect(
     string $user = '',
@@ -404,14 +405,14 @@ Disconnects a user's connections.
 - `$session` - Limits the call to the connection with this session ID. user is still required.
 - `$labelFilter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
 - `$allUsers` - Works as SubscribeRequest::$allUsers. Centrifugo PRO only.
-- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+- `$timeout` - Seconds bounding the call, replacing requestTimeout for it, longer or shorter: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `getUserStatus(array $users, ?float $timeout = null): GetUserStatusResult`
 
 Returns the status of users. Centrifugo PRO only.
 
 - `$users` - The list of user IDs to get the status for. Required.
-- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+- `$timeout` - Seconds bounding the call, replacing requestTimeout for it, longer or shorter: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `history(
     string $channel,
@@ -428,7 +429,7 @@ History must be enabled for the channel.
 - `$limit` - The maximum number of publications to return; -1 returns all the channel keeps. If not set, only the current stream position is returned, without publications.
 - `$since` - Returns publications after this stream position.
 - `$reverse` - Iterates in reverse order, from latest to earliest.
-- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+- `$timeout` - Seconds bounding the call, replacing requestTimeout for it, longer or shorter: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `historyAll(
     string $channel,
@@ -468,7 +469,7 @@ invalid one throws InvalidRequestException before anything is sent.
 - `$limit` - The maximum number of publications to return; -1 returns all the channel keeps. If not set, only the current stream position is returned, without publications.
 - `$since` - Returns publications after this stream position.
 - `$reverse` - Iterates in reverse order, from latest to earliest.
-- `$timeout` - Seconds bounding each page's call: requestTimeout when null.
+- `$timeout` - Seconds bounding each page's call, replacing requestTimeout for it: requestTimeout when null.
 
 #### `historyRemove(string $channel, ?float $timeout = null): HistoryRemoveResult`
 
@@ -477,13 +478,13 @@ The current top stream position is kept, so clients do not get
 disconnected because of insufficient state.
 
 - `$channel` - The name of the channel. Required.
-- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+- `$timeout` - Seconds bounding the call, replacing requestTimeout for it, longer or shorter: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `info(?float $timeout = null): InfoResult`
 
 Returns information about the running Centrifugo nodes.
 
-- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+- `$timeout` - Seconds bounding the call, replacing requestTimeout for it, longer or shorter: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `invalidateUserTokens(
     string $user,
@@ -500,14 +501,14 @@ certain time (based on the iat claim of a JWT). Centrifugo PRO only.
 - `$user` - The ID of the user whose tokens to invalidate. Required. "" invalidates the tokens of anonymous users.
 - `$issuedBefore` - The Unix time in seconds: tokens issued before it are considered revoked. If not set, the current time is used.
 - `$channel` - Limits the invalidation to subscription tokens for this channel.
-- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+- `$timeout` - Seconds bounding the call, replacing requestTimeout for it, longer or shorter: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `mapClear(string $channel, ?float $timeout = null): MapClearResult`
 
 Removes all state and stream data of a map channel.
 
 - `$channel` - The name of the map channel. Required.
-- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+- `$timeout` - Seconds bounding the call, replacing requestTimeout for it, longer or shorter: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `mapPublish(
     string $channel,
@@ -541,7 +542,7 @@ Publishes or updates a key in a map channel.
 - `$versionEpoch` - Scopes version. A different epoch resets version comparison.
 - `$score` - Currently not used by the server API.
 - `$keyMode` - Makes the publish conditional: if_new writes only if the key does not exist, if_exists only if it exists. Empty always writes. One of: if_new, if_exists. Constants: KeyMode::IF_NEW, KeyMode::IF_EXISTS.
-- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+- `$timeout` - Seconds bounding the call, replacing requestTimeout for it, longer or shorter: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `mapReadState(
     string $channel,
@@ -564,7 +565,7 @@ optional pagination.
 - `$asc` - Sorts ordered state by score ascending instead of descending. Ignored for unordered channels.
 - `$revisionOffset` - The offset of the position from a previous state read, used with $revisionEpoch.
 - `$revisionEpoch` - The epoch of the position from a previous state read. If the epoch changed, the call fails with an unrecoverable position error.
-- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+- `$timeout` - Seconds bounding the call, replacing requestTimeout for it, longer or shorter: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `mapReadStateAll(
     string $channel,
@@ -600,7 +601,7 @@ invalid one throws InvalidRequestException before anything is sent.
 - `$asc` - Sorts ordered state by score ascending instead of descending. Ignored for unordered channels.
 - `$revisionOffset` - The offset of the position from a previous state read, used with $revisionEpoch.
 - `$revisionEpoch` - The epoch of the position from a previous state read. If the epoch changed, the call fails with an unrecoverable position error.
-- `$timeout` - Seconds bounding each page's call: requestTimeout when null.
+- `$timeout` - Seconds bounding each page's call, replacing requestTimeout for it: requestTimeout when null.
 
 #### `mapReadStream(
     string $channel,
@@ -618,7 +619,7 @@ Reads the change stream of a map channel.
 - `$sinceEpoch` - The epoch of the since position. It must match the current stream epoch.
 - `$limit` - The maximum number of entries: -1 means no limit, 0 returns only the stream position.
 - `$reverse` - Returns entries newest first.
-- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+- `$timeout` - Seconds bounding the call, replacing requestTimeout for it, longer or shorter: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `mapRemove(
     string $channel,
@@ -632,14 +633,14 @@ Removes a key from a map channel.
 - `$channel` - The name of the map channel. Required.
 - `$key` - The key to remove. Required.
 - `$idempotencyKey` - Drops duplicate removals upon retries, as it does for MapPublishRequest: a removal with a key already used in the channel is not applied again, and its result is suppressed with $suppressReason "idempotency". Keys are kept for 5 minutes by default.
-- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+- `$timeout` - Seconds bounding the call, replacing requestTimeout for it, longer or shorter: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `mapStats(string $channel, ?float $timeout = null): MapStatsResult`
 
 Returns statistics about a map channel.
 
 - `$channel` - The name of the map channel. Required.
-- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+- `$timeout` - Seconds bounding the call, replacing requestTimeout for it, longer or shorter: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `newBatch(bool $parallel = false): Batch`
 
@@ -656,7 +657,7 @@ Returns the online presence of a channel: all clients
 currently subscribed to it. Presence must be enabled for the channel.
 
 - `$channel` - The name of the channel. Required.
-- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+- `$timeout` - Seconds bounding the call, replacing requestTimeout for it, longer or shorter: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `presenceStats(string $channel, ?float $timeout = null): PresenceStatsResult`
 
@@ -665,7 +666,7 @@ number of clients and of unique users. Presence must be enabled for the
 channel.
 
 - `$channel` - The name of the channel. Required.
-- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+- `$timeout` - Seconds bounding the call, replacing requestTimeout for it, longer or shorter: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `publish(
     string $channel,
@@ -691,7 +692,7 @@ Publishes data into a channel.
 - `$delta` - Tells Centrifugo to construct a delta update, if possible, when broadcasting the publication to subscribers.
 - `$version` - When > 0, the version of the document being sent: publications with a version less than or equal to one already seen are ignored. Only works in channels with history enabled.
 - `$versionEpoch` - The epoch of version. When it changes, Centrifugo accepts the publication even if its version is lower than before.
-- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+- `$timeout` - Seconds bounding the call, replacing requestTimeout for it, longer or shorter: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `refresh(
     string $user = '',
@@ -717,7 +718,7 @@ non-expiring.
 - `$session` - Limits the call to the connection with this session ID. user is still required.
 - `$labelFilter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
 - `$allUsers` - Works as SubscribeRequest::$allUsers. Centrifugo PRO only.
-- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+- `$timeout` - Seconds bounding the call, replacing requestTimeout for it, longer or shorter: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `revokeToken(string $uid, int $expireAt = 0, ?float $timeout = null): RevokeTokenResult`
 
@@ -727,7 +728,7 @@ with it again. Centrifugo PRO only.
 
 - `$expireAt` - The Unix time in seconds when the revocation expires. Optional, but a value matching the token expiration is recommended.
 - `$uid` - The unique ID of the token to revoke (jti claim). Required.
-- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+- `$timeout` - Seconds bounding the call, replacing requestTimeout for it, longer or shorter: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `sendPushNotification(
     PushRecipient $recipient,
@@ -757,7 +758,7 @@ Centrifugo PRO only.
 - `$localizations` - Optional per language/locale localizations. Setting them enables templating.
 - `$useTemplating` - Enables templating of the notification. Only works with a filter recipient.
 - `$useMeta` - Additionally loads device meta while sending, making it available in templating.
-- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+- `$timeout` - Seconds bounding the call, replacing requestTimeout for it, longer or shorter: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `sharedPollPublish(
     string $channel,
@@ -779,7 +780,7 @@ versioned mode and publish_enabled on the namespace.
 - `$b64data` - Data as base64, for binary payloads. Centrifugo decodes it.
 - `$version` - The item version, must be >= 1. Required. A version not higher than the current one within the same epoch is silently dropped.
 - `$epoch` - The channel-level publisher epoch. A change resets per-key versions and unsubscribes current subscribers with insufficient state.
-- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+- `$timeout` - Seconds bounding the call, replacing requestTimeout for it, longer or shorter: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `subscribe(
     string $channel,
@@ -815,14 +816,14 @@ for the caller.
 - `$session` - Limits the call to the connection with this session ID. user is still required.
 - `$labelFilter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
 - `$allUsers` - When user is empty, targets every connection on every node instead of the anonymous-only bucket. No effect when user is non-empty. Without $labelFilter it acts on every connection. Centrifugo PRO only.
-- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+- `$timeout` - Seconds bounding the call, replacing requestTimeout for it, longer or shorter: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `unblockUser(string $user, ?float $timeout = null): UnblockUserResult`
 
 Unblocks a user. Centrifugo PRO only.
 
 - `$user` - The ID of the user to unblock. Required.
-- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+- `$timeout` - Seconds bounding the call, replacing requestTimeout for it, longer or shorter: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `unsubscribe(
     string $channel,
@@ -842,7 +843,7 @@ Unsubscribes a user from a channel.
 - `$session` - Limits the call to the connection with this session ID. user is still required.
 - `$labelFilter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
 - `$allUsers` - Works as SubscribeRequest::$allUsers. Centrifugo PRO only.
-- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+- `$timeout` - Seconds bounding the call, replacing requestTimeout for it, longer or shorter: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `updatePushStatus(
     string $analyticsUid,
@@ -859,7 +860,7 @@ push notification to analytics. Experimental. Centrifugo PRO only.
 - `$status` - The status of the push notification. Required. One of: delivered, interacted. Constants: Status::DELIVERED, Status::INTERACTED.
 - `$deviceId` - The Centrifugo device ID. Required.
 - `$msgId` - The message ID issued by the provider.
-- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+- `$timeout` - Seconds bounding the call, replacing requestTimeout for it, longer or shorter: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `updateUserStatus(array $users, string $state = '', ?float $timeout = null): UpdateUserStatusResult`
 
@@ -868,7 +869,7 @@ their state when one is given. Centrifugo PRO only.
 
 - `$users` - The list of user IDs to update the status for. Required.
 - `$state` - An optional custom state to store in the user status. It can be restricted by the user_status.state_regex option.
-- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+- `$timeout` - Seconds bounding the call, replacing requestTimeout for it, longer or shorter: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `userTopicList(
     ?UserTopicFilter $filter = null,
@@ -885,7 +886,7 @@ subscriptions. Centrifugo PRO only.
 - `$includeTotalCount` - Includes the total count for the filter in the result.
 - `$cursor` - The pagination cursor: $nextCursor of the previous page, empty for the first page.
 - `$limit` - The maximum number of items to return.
-- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+- `$timeout` - Seconds bounding the call, replacing requestTimeout for it, longer or shorter: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 #### `userTopicListAll(
     ?UserTopicFilter $filter = null,
@@ -909,7 +910,7 @@ invalid one throws InvalidRequestException before anything is sent.
 - `$includeTotalCount` - Includes the total count for the filter in the result.
 - `$cursor` - The pagination cursor: $nextCursor of the previous page, empty for the first page.
 - `$limit` - The maximum number of items to return.
-- `$timeout` - Seconds bounding each page's call: requestTimeout when null.
+- `$timeout` - Seconds bounding each page's call, replacing requestTimeout for it: requestTimeout when null.
 
 #### `userTopicUpdate(
     string $user,
@@ -924,7 +925,7 @@ applied to the user's registered devices. Centrifugo PRO only.
 - `$user` - The user ID. Required. "" updates the global binding, which every device - anonymous ones included - gets on its next $deviceRegister.
 - `$op` - The operation. Required. One of: add, remove, set. Constants: Op::ADD, Op::REMOVE, Op::SET.
 - `$topics` - The topics for the operation.
-- `$timeout` - Seconds bounding the call: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
+- `$timeout` - Seconds bounding the call, replacing requestTimeout for it, longer or shorter: requestTimeout when null. With an httpClient of your own, its timeouts bound the request instead.
 
 ### `Batch`
 

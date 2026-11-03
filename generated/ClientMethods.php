@@ -93,8 +93,9 @@ trait ClientMethods
      *     ignored. Only works in channels with history enabled.
      * @param string $versionEpoch The epoch of version. When it changes, Centrifugo
      *     accepts the publication even if its version is lower than before.
-     * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
-     *     httpClient of your own, its timeouts bound the request instead.
+     * @param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,
+     *     longer or shorter: requestTimeout when null. With an httpClient of
+     *     your own, its timeouts bound the request instead.
      *
      * @throws CentException
      */
@@ -166,8 +167,9 @@ trait ClientMethods
      *     ignored. Only works in channels with history enabled.
      * @param string $versionEpoch The epoch of version. When it changes, Centrifugo
      *     accepts the publication even if its version is lower than before.
-     * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
-     *     httpClient of your own, its timeouts bound the request instead.
+     * @param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,
+     *     longer or shorter: requestTimeout when null. With an httpClient of
+     *     your own, its timeouts bound the request instead.
      *
      * @throws CentException
      */
@@ -211,8 +213,9 @@ trait ClientMethods
      * - The result holds every channel's last outcome, and the key: retrying
      *   later with it publishes only into the channels which did not get it.
      *
-     * $timeout, when set, bounds the whole call, waits included; $attemptTimeout
-     * - requestTimeout by default - bounds each attempt. Waits block the calling
+     * $timeout, when set, bounds the whole call, waits included. $attemptTimeout
+     * is each attempt's own timeout, replacing requestTimeout for it, longer or
+     * shorter; $timeout still ends an attempt sooner. Waits block the calling
      * request: in a web request, set a short $timeout, and retry for longer from
      * a job queue, with an $idempotencyKey of its own.
      *
@@ -248,7 +251,9 @@ trait ClientMethods
      * @param string $versionEpoch The epoch of version. When it changes, Centrifugo
      *     accepts the publication even if its version is lower than before.
      * @param int $maxAttempts Attempts at most, the first included.
-     * @param ?float $attemptTimeout Seconds bounding each attempt: requestTimeout when null.
+     * @param ?float $attemptTimeout Seconds bounding each attempt, replacing
+     *     requestTimeout for it: requestTimeout when null. $timeout still ends
+     *     an attempt sooner.
      * @param ?callable(BroadcastAttempt): ?float $onAttemptError Called after an attempt
      *     which failed in a way a retry may fix, except the last; returns the
      *     seconds to wait before the next attempt, or null for the default wait.
@@ -312,8 +317,9 @@ trait ClientMethods
      * @param bool $allUsers When user is empty, targets every connection on every node
      *     instead of the anonymous-only bucket. No effect when user is non-empty.
      *     Without $labelFilter it acts on every connection. Centrifugo PRO only.
-     * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
-     *     httpClient of your own, its timeouts bound the request instead.
+     * @param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,
+     *     longer or shorter: requestTimeout when null. With an httpClient of
+     *     your own, its timeouts bound the request instead.
      *
      * @throws CentException
      */
@@ -363,8 +369,9 @@ trait ClientMethods
      * @param FilterNode|null $labelFilter Restricts the call to clients whose labels match this
      *     filter. Centrifugo PRO only.
      * @param bool $allUsers Works as SubscribeRequest::$allUsers. Centrifugo PRO only.
-     * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
-     *     httpClient of your own, its timeouts bound the request instead.
+     * @param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,
+     *     longer or shorter: requestTimeout when null. With an httpClient of
+     *     your own, its timeouts bound the request instead.
      *
      * @throws CentException
      */
@@ -402,8 +409,9 @@ trait ClientMethods
      * @param FilterNode|null $labelFilter Restricts the call to clients whose labels match this
      *     filter. Centrifugo PRO only.
      * @param bool $allUsers Works as SubscribeRequest::$allUsers. Centrifugo PRO only.
-     * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
-     *     httpClient of your own, its timeouts bound the request instead.
+     * @param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,
+     *     longer or shorter: requestTimeout when null. With an httpClient of
+     *     your own, its timeouts bound the request instead.
      *
      * @throws CentException
      */
@@ -433,8 +441,9 @@ trait ClientMethods
      * currently subscribed to it. Presence must be enabled for the channel.
      *
      * @param string $channel The name of the channel. Required.
-     * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
-     *     httpClient of your own, its timeouts bound the request instead.
+     * @param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,
+     *     longer or shorter: requestTimeout when null. With an httpClient of
+     *     your own, its timeouts bound the request instead.
      *
      * @throws CentException
      */
@@ -451,8 +460,9 @@ trait ClientMethods
      * channel.
      *
      * @param string $channel The name of the channel. Required.
-     * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
-     *     httpClient of your own, its timeouts bound the request instead.
+     * @param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,
+     *     longer or shorter: requestTimeout when null. With an httpClient of
+     *     your own, its timeouts bound the request instead.
      *
      * @throws CentException
      */
@@ -473,8 +483,9 @@ trait ClientMethods
      *     returned, without publications.
      * @param StreamPosition|null $since Returns publications after this stream position.
      * @param bool $reverse Iterates in reverse order, from latest to earliest.
-     * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
-     *     httpClient of your own, its timeouts bound the request instead.
+     * @param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,
+     *     longer or shorter: requestTimeout when null. With an httpClient of
+     *     your own, its timeouts bound the request instead.
      *
      * @throws CentException
      */
@@ -524,7 +535,8 @@ trait ClientMethods
      *     returned, without publications.
      * @param StreamPosition|null $since Returns publications after this stream position.
      * @param bool $reverse Iterates in reverse order, from latest to earliest.
-     * @param ?float $timeout Seconds bounding each page's call: requestTimeout when null.
+     * @param ?float $timeout Seconds bounding each page's call, replacing
+     *     requestTimeout for it: requestTimeout when null.
      *
      * @return \Generator<int, HistoryItem>
      *
@@ -551,8 +563,9 @@ trait ClientMethods
      * disconnected because of insufficient state.
      *
      * @param string $channel The name of the channel. Required.
-     * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
-     *     httpClient of your own, its timeouts bound the request instead.
+     * @param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,
+     *     longer or shorter: requestTimeout when null. With an httpClient of
+     *     your own, its timeouts bound the request instead.
      *
      * @throws CentException
      */
@@ -566,8 +579,9 @@ trait ClientMethods
     /**
      * Returns information about the running Centrifugo nodes.
      *
-     * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
-     *     httpClient of your own, its timeouts bound the request instead.
+     * @param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,
+     *     longer or shorter: requestTimeout when null. With an httpClient of
+     *     your own, its timeouts bound the request instead.
      *
      * @throws CentException
      */
@@ -595,8 +609,9 @@ trait ClientMethods
      * @param FilterNode|null $labelFilter Restricts the call to clients whose labels match this
      *     filter. Centrifugo PRO only.
      * @param bool $allUsers Works as SubscribeRequest::$allUsers. Centrifugo PRO only.
-     * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
-     *     httpClient of your own, its timeouts bound the request instead.
+     * @param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,
+     *     longer or shorter: requestTimeout when null. With an httpClient of
+     *     your own, its timeouts bound the request instead.
      *
      * @throws CentException
      */
@@ -628,8 +643,9 @@ trait ClientMethods
      * It can be heavy on large deployments: there is no pagination.
      *
      * @param string $pattern Filters channels by name, using gobwas/glob syntax.
-     * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
-     *     httpClient of your own, its timeouts bound the request instead.
+     * @param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,
+     *     longer or shorter: requestTimeout when null. With an httpClient of
+     *     your own, its timeouts bound the request instead.
      *
      * @throws CentException
      */
@@ -649,8 +665,9 @@ trait ClientMethods
      * @param string $expression A CEL expression to filter connections.
      * @param FilterNode|null $labelFilter Restricts the listing to clients whose labels match this
      *     filter. Centrifugo PRO only.
-     * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
-     *     httpClient of your own, its timeouts bound the request instead.
+     * @param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,
+     *     longer or shorter: requestTimeout when null. With an httpClient of
+     *     your own, its timeouts bound the request instead.
      *
      * @throws CentException
      */
@@ -674,8 +691,9 @@ trait ClientMethods
      * @param list<string> $users The list of user IDs to update the status for. Required.
      * @param string $state An optional custom state to store in the user status. It can
      *     be restricted by the user_status.state_regex option.
-     * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
-     *     httpClient of your own, its timeouts bound the request instead.
+     * @param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,
+     *     longer or shorter: requestTimeout when null. With an httpClient of
+     *     your own, its timeouts bound the request instead.
      *
      * @throws CentException
      */
@@ -691,8 +709,9 @@ trait ClientMethods
      * Returns the status of users. Centrifugo PRO only.
      *
      * @param list<string> $users The list of user IDs to get the status for. Required.
-     * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
-     *     httpClient of your own, its timeouts bound the request instead.
+     * @param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,
+     *     longer or shorter: requestTimeout when null. With an httpClient of
+     *     your own, its timeouts bound the request instead.
      *
      * @throws CentException
      */
@@ -707,8 +726,9 @@ trait ClientMethods
      * Deletes the status of users. Centrifugo PRO only.
      *
      * @param list<string> $users The list of user IDs to delete the status for. Required.
-     * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
-     *     httpClient of your own, its timeouts bound the request instead.
+     * @param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,
+     *     longer or shorter: requestTimeout when null. With an httpClient of
+     *     your own, its timeouts bound the request instead.
      *
      * @throws CentException
      */
@@ -727,8 +747,9 @@ trait ClientMethods
      *     but a reasonably small value is recommended to keep the set of blocked
      *     users small.
      * @param string $user The ID of the user to block. Required.
-     * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
-     *     httpClient of your own, its timeouts bound the request instead.
+     * @param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,
+     *     longer or shorter: requestTimeout when null. With an httpClient of
+     *     your own, its timeouts bound the request instead.
      *
      * @throws CentException
      */
@@ -744,8 +765,9 @@ trait ClientMethods
      * Unblocks a user. Centrifugo PRO only.
      *
      * @param string $user The ID of the user to unblock. Required.
-     * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
-     *     httpClient of your own, its timeouts bound the request instead.
+     * @param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,
+     *     longer or shorter: requestTimeout when null. With an httpClient of
+     *     your own, its timeouts bound the request instead.
      *
      * @throws CentException
      */
@@ -764,8 +786,9 @@ trait ClientMethods
      * @param int $expireAt The Unix time in seconds when the revocation expires.
      *     Optional, but a value matching the token expiration is recommended.
      * @param string $uid The unique ID of the token to revoke (jti claim). Required.
-     * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
-     *     httpClient of your own, its timeouts bound the request instead.
+     * @param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,
+     *     longer or shorter: requestTimeout when null. With an httpClient of
+     *     your own, its timeouts bound the request instead.
      *
      * @throws CentException
      */
@@ -789,8 +812,9 @@ trait ClientMethods
      *     considered revoked. If not set, the current time is used.
      * @param string $channel Limits the invalidation to subscription tokens for this
      *     channel.
-     * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
-     *     httpClient of your own, its timeouts bound the request instead.
+     * @param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,
+     *     longer or shorter: requestTimeout when null. With an httpClient of
+     *     your own, its timeouts bound the request instead.
      *
      * @throws CentException
      */
@@ -831,8 +855,9 @@ trait ClientMethods
      *     Europe/Nicosia.
      * @param string $locale The locale of the device user as an IETF BCP 47 language
      *     tag, for example en-US.
-     * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
-     *     httpClient of your own, its timeouts bound the request instead.
+     * @param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,
+     *     longer or shorter: requestTimeout when null. With an httpClient of
+     *     your own, its timeouts bound the request instead.
      *
      * @throws CentException
      */
@@ -874,8 +899,9 @@ trait ClientMethods
      * @param DeviceTopicsUpdate|null $topicsUpdate Updates the device topics.
      * @param DeviceTimezoneUpdate|null $timezoneUpdate Updates the device timezone.
      * @param DeviceLocaleUpdate|null $localeUpdate Updates the device locale.
-     * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
-     *     httpClient of your own, its timeouts bound the request instead.
+     * @param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,
+     *     longer or shorter: requestTimeout when null. With an httpClient of
+     *     your own, its timeouts bound the request instead.
      *
      * @throws CentException
      */
@@ -906,8 +932,9 @@ trait ClientMethods
      *
      * @param list<string> $ids Selects devices to remove by ID.
      * @param list<string> $users Selects devices to remove by user.
-     * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
-     *     httpClient of your own, its timeouts bound the request instead.
+     * @param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,
+     *     longer or shorter: requestTimeout when null. With an httpClient of
+     *     your own, its timeouts bound the request instead.
      *
      * @throws CentException
      */
@@ -933,8 +960,9 @@ trait ClientMethods
      * @param string $cursor The pagination cursor: $nextCursor of the previous page,
      *     empty for the first page.
      * @param int $limit The maximum number of devices to return.
-     * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
-     *     httpClient of your own, its timeouts bound the request instead.
+     * @param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,
+     *     longer or shorter: requestTimeout when null. With an httpClient of
+     *     your own, its timeouts bound the request instead.
      *
      * @throws CentException
      */
@@ -980,7 +1008,8 @@ trait ClientMethods
      * @param string $cursor The pagination cursor: $nextCursor of the previous page,
      *     empty for the first page.
      * @param int $limit The maximum number of devices to return.
-     * @param ?float $timeout Seconds bounding each page's call: requestTimeout when null.
+     * @param ?float $timeout Seconds bounding each page's call, replacing
+     *     requestTimeout for it: requestTimeout when null.
      *
      * @return \Generator<int, Device>
      *
@@ -1018,8 +1047,9 @@ trait ClientMethods
      * @param string $cursor The pagination cursor: $nextCursor of the previous page,
      *     empty for the first page.
      * @param int $limit The maximum number of items to return.
-     * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
-     *     httpClient of your own, its timeouts bound the request instead.
+     * @param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,
+     *     longer or shorter: requestTimeout when null. With an httpClient of
+     *     your own, its timeouts bound the request instead.
      *
      * @throws CentException
      */
@@ -1058,7 +1088,8 @@ trait ClientMethods
      * @param string $cursor The pagination cursor: $nextCursor of the previous page,
      *     empty for the first page.
      * @param int $limit The maximum number of items to return.
-     * @param ?float $timeout Seconds bounding each page's call: requestTimeout when null.
+     * @param ?float $timeout Seconds bounding each page's call, replacing
+     *     requestTimeout for it: requestTimeout when null.
      *
      * @return \Generator<int, DeviceTopic>
      *
@@ -1093,8 +1124,9 @@ trait ClientMethods
      * @param string $user An optional ownership guard: the update is applied only if the
      *     device currently belongs to this user. Otherwise the call fails with a
      *     conflict error (or not found if there is no such device).
-     * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
-     *     httpClient of your own, its timeouts bound the request instead.
+     * @param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,
+     *     longer or shorter: requestTimeout when null. With an httpClient of
+     *     your own, its timeouts bound the request instead.
      *
      * @throws CentException
      */
@@ -1123,8 +1155,9 @@ trait ClientMethods
      * @param string $cursor The pagination cursor: $nextCursor of the previous page,
      *     empty for the first page.
      * @param int $limit The maximum number of items to return.
-     * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
-     *     httpClient of your own, its timeouts bound the request instead.
+     * @param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,
+     *     longer or shorter: requestTimeout when null. With an httpClient of
+     *     your own, its timeouts bound the request instead.
      *
      * @throws CentException
      */
@@ -1160,7 +1193,8 @@ trait ClientMethods
      * @param string $cursor The pagination cursor: $nextCursor of the previous page,
      *     empty for the first page.
      * @param int $limit The maximum number of items to return.
-     * @param ?float $timeout Seconds bounding each page's call: requestTimeout when null.
+     * @param ?float $timeout Seconds bounding each page's call, replacing
+     *     requestTimeout for it: requestTimeout when null.
      *
      * @return \Generator<int, UserTopic>
      *
@@ -1190,8 +1224,9 @@ trait ClientMethods
      * @param string $op The operation. Required. One of: add, remove, set.
      *     Constants: Op::ADD, Op::REMOVE, Op::SET.
      * @param list<string> $topics The topics for the operation.
-     * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
-     *     httpClient of your own, its timeouts bound the request instead.
+     * @param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,
+     *     longer or shorter: requestTimeout when null. With an httpClient of
+     *     your own, its timeouts bound the request instead.
      *
      * @throws CentException
      */
@@ -1235,8 +1270,9 @@ trait ClientMethods
      *     with a filter recipient.
      * @param bool $useMeta Additionally loads device meta while sending, making it
      *     available in templating.
-     * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
-     *     httpClient of your own, its timeouts bound the request instead.
+     * @param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,
+     *     longer or shorter: requestTimeout when null. With an httpClient of
+     *     your own, its timeouts bound the request instead.
      *
      * @throws CentException
      */
@@ -1278,8 +1314,9 @@ trait ClientMethods
      *     Constants: Status::DELIVERED, Status::INTERACTED.
      * @param string $deviceId The Centrifugo device ID. Required.
      * @param string $msgId The message ID issued by the provider.
-     * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
-     *     httpClient of your own, its timeouts bound the request instead.
+     * @param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,
+     *     longer or shorter: requestTimeout when null. With an httpClient of
+     *     your own, its timeouts bound the request instead.
      *
      * @throws CentException
      */
@@ -1303,8 +1340,9 @@ trait ClientMethods
      * $sendAt). Centrifugo PRO only.
      *
      * @param string $uid The uid of the push notification to cancel. Required.
-     * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
-     *     httpClient of your own, its timeouts bound the request instead.
+     * @param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,
+     *     longer or shorter: requestTimeout when null. With an httpClient of
+     *     your own, its timeouts bound the request instead.
      *
      * @throws CentException
      */
@@ -1343,8 +1381,9 @@ trait ClientMethods
      *     does not exist, if_exists only if it exists. Empty always writes.
      *     One of: if_new, if_exists.
      *     Constants: KeyMode::IF_NEW, KeyMode::IF_EXISTS.
-     * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
-     *     httpClient of your own, its timeouts bound the request instead.
+     * @param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,
+     *     longer or shorter: requestTimeout when null. With an httpClient of
+     *     your own, its timeouts bound the request instead.
      *
      * @throws CentException
      */
@@ -1390,8 +1429,9 @@ trait ClientMethods
      *     MapPublishRequest: a removal with a key already used in the channel is
      *     not applied again, and its result is suppressed with $suppressReason
      *     "idempotency". Keys are kept for 5 minutes by default.
-     * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
-     *     httpClient of your own, its timeouts bound the request instead.
+     * @param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,
+     *     longer or shorter: requestTimeout when null. With an httpClient of
+     *     your own, its timeouts bound the request instead.
      *
      * @throws CentException
      */
@@ -1427,8 +1467,9 @@ trait ClientMethods
      * @param string $revisionEpoch The epoch of the position from a previous state
      *     read. If the epoch changed, the call fails with an unrecoverable
      *     position error.
-     * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
-     *     httpClient of your own, its timeouts bound the request instead.
+     * @param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,
+     *     longer or shorter: requestTimeout when null. With an httpClient of
+     *     your own, its timeouts bound the request instead.
      *
      * @throws CentException
      */
@@ -1485,7 +1526,8 @@ trait ClientMethods
      * @param string $revisionEpoch The epoch of the position from a previous state
      *     read. If the epoch changed, the call fails with an unrecoverable
      *     position error.
-     * @param ?float $timeout Seconds bounding each page's call: requestTimeout when null.
+     * @param ?float $timeout Seconds bounding each page's call, replacing
+     *     requestTimeout for it: requestTimeout when null.
      *
      * @return \Generator<int, MapStateItem>
      *
@@ -1523,8 +1565,9 @@ trait ClientMethods
      * @param int $limit The maximum number of entries: -1 means no limit, 0 returns
      *     only the stream position.
      * @param bool $reverse Returns entries newest first.
-     * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
-     *     httpClient of your own, its timeouts bound the request instead.
+     * @param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,
+     *     longer or shorter: requestTimeout when null. With an httpClient of
+     *     your own, its timeouts bound the request instead.
      *
      * @throws CentException
      */
@@ -1549,8 +1592,9 @@ trait ClientMethods
      * Returns statistics about a map channel.
      *
      * @param string $channel The name of the map channel. Required.
-     * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
-     *     httpClient of your own, its timeouts bound the request instead.
+     * @param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,
+     *     longer or shorter: requestTimeout when null. With an httpClient of
+     *     your own, its timeouts bound the request instead.
      *
      * @throws CentException
      */
@@ -1565,8 +1609,9 @@ trait ClientMethods
      * Removes all state and stream data of a map channel.
      *
      * @param string $channel The name of the map channel. Required.
-     * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
-     *     httpClient of your own, its timeouts bound the request instead.
+     * @param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,
+     *     longer or shorter: requestTimeout when null. With an httpClient of
+     *     your own, its timeouts bound the request instead.
      *
      * @throws CentException
      */
@@ -1590,8 +1635,9 @@ trait ClientMethods
      *     higher than the current one within the same epoch is silently dropped.
      * @param string $epoch The channel-level publisher epoch. A change resets per-key
      *     versions and unsubscribes current subscribers with insufficient state.
-     * @param ?float $timeout Seconds bounding the call: requestTimeout when null. With an
-     *     httpClient of your own, its timeouts bound the request instead.
+     * @param ?float $timeout Seconds bounding the call, replacing requestTimeout for it,
+     *     longer or shorter: requestTimeout when null. With an httpClient of
+     *     your own, its timeouts bound the request instead.
      *
      * @throws CentException
      */

@@ -38,6 +38,7 @@ use Centrifugal\Phpcent\PushRateLimitStrategy;
 use Centrifugal\Phpcent\PushRecipient;
 use Centrifugal\Phpcent\PushTimeLimitStrategy;
 use Centrifugal\Phpcent\RateLimitPolicy;
+use Centrifugal\Phpcent\RawJson;
 use Centrifugal\Phpcent\RequestInfo;
 use Centrifugal\Phpcent\Retry;
 use Centrifugal\Phpcent\Tests\Support\FakeCentrifugo;
@@ -166,6 +167,9 @@ final class ClientTest extends TestCase
             if ($name === 'broadcast' || $name === 'broadcastWithRetry') {
                 continue; // a result per channel: tested on their own
             }
+            if (str_ends_with($name, 'All')) {
+                continue; // the iterators of the paged methods: PagesTest
+            }
             /** @var class-string<Request<mixed>> $class */
             $class = 'Centrifugal\\Phpcent\\Internal\\' . ucfirst($name) . 'Request';
             // Every field set, nested ones too: the required-field checks let
@@ -248,6 +252,11 @@ final class ClientTest extends TestCase
         $n = 0;
         foreach ((new \ReflectionClass(\Centrifugal\Phpcent\ClientMethods::class))->getMethods(\ReflectionMethod::IS_PUBLIC) as $m) {
             if ($m->getName() === 'broadcastWithRetry') {
+                continue;
+            }
+            if (str_ends_with($m->getName(), 'All')) {
+                // A paged method's iterator takes the method's arguments.
+                self::assertSame($params($client->getMethod(substr($m->getName(), 0, -3))), $params($m), $m->getName());
                 continue;
             }
             $fields = $params($m);
@@ -565,6 +574,9 @@ final class ClientTest extends TestCase
         $c->sendPushNotification(recipient: new PushRecipient(fcmTokens: ['t']), notification: new PushNotification(fcm: new FcmPushNotification(message: ['k' => 'v'])), limitStrategy: new PushLimitStrategy(timeLimit: new PushTimeLimitStrategy(sendAfterTime: '', sendBeforeTime: '')));
         self::assertSame('{"recipient":{"fcm_tokens":["t"]},"notification":{"fcm":{"message":{"k":"v"}}}}', $fake->last()['body']);
         self::assertCount(3, $fake->requests);
+        // A payload's JSON null is a value: only PHP null is unset.
+        $c->sendPushNotification(recipient: new PushRecipient(fcmTokens: ['t']), notification: new PushNotification(fcm: new FcmPushNotification(message: new RawJson('null'))));
+        self::assertSame('{"recipient":{"fcm_tokens":["t"]},"notification":{"fcm":{"message":null}}}', $fake->last()['body']);
     }
 
     // Broadcast.

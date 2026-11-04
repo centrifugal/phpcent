@@ -1,8 +1,8 @@
 # Migrating from phpcent 6 to phpcent 7
 
 phpcent 7 is a rewrite, to the
-[Centrifugo server SDK specification](https://github.com/centrifugal/gocent/blob/master/spec.md).
-It needs PHP 8.3 or newer, and lives in the `Centrifugal\Phpcent` namespace
+[Centrifugo server SDK specification](https://github.com/centrifugal/gocent/blob/master/spec.md),
+version 0.3, for Centrifugo v6. It needs PHP 8.3 or newer, and lives in the `Centrifugal\Phpcent` namespace
 instead of `phpcent`. Both are the `centrifugal/phpcent` package, so an
 application moves over at once; one which needs time can stay on
 `"centrifugal/phpcent": "^6.0"`, which keeps working.
@@ -21,6 +21,20 @@ What changes:
   Network errors and HTTP statuses throw their own exceptions, not
   `\Exception`. **Check every broadcast and batch you send**: see
   [Broadcasts and batches now throw](#broadcasts-and-batches-now-throw).
+- **Nested messages are objects**, not arrays: `since` and `recoverSince` take
+  a `StreamPosition`, `override` a `SubscribeOptionOverride`, `disconnect` a
+  `Disconnect` - see [Arguments which were arrays](#arguments-which-were-arrays).
+- **Every call has a timeout.** phpcent 6 set none unless you called
+  `setTimeoutOption`, so a stuck Centrifugo held the request for as long as
+  PHP let it; phpcent 7's `requestTimeout` is 10 seconds by default and bounds
+  the whole call, a `timeout:` argument replacing it for one call. Zero is
+  refused: `setTimeoutOption(0)`'s "no timeout" has no equivalent - set a
+  large value. A timeout throws `TimeoutException`.
+- **Requests are checked before sending.** A field Centrifugo requires given
+  empty - `publish(channel: '', ...)`, `history(channel: '')` - a publication
+  without `data`, or a payload which is not JSON - NaN, a binary string -
+  throws `InvalidRequestException`, and nothing is sent. phpcent 6 sent them,
+  and Centrifugo's code 107 came back in the response.
 - **Payloads** go back exactly: replies give them as `stdClass`, which you can
   publish again unchanged. `setUseAssoc` is gone - `Payload::toArray($v)`
   gives arrays where you want them.
@@ -77,6 +91,30 @@ any call does, and no part of it was published.
 To retry the channels which failed for a temporary reason, use
 `broadcastWithRetry` instead of `broadcast`: it sends again only those, under
 one `idempotencyKey`.
+
+## Arguments which were arrays
+
+phpcent 6 took nested messages as arrays and sent them as they were. phpcent 7
+takes the generated classes, which name their fields and check them; an empty
+one is not sent:
+
+```php
+// phpcent 6
+$client->history('news', 10, ['offset' => 5, 'epoch' => $epoch]);
+$client->subscribe('news', '42', '', 0, [], [], ['offset' => 5, 'epoch' => $epoch], ['presence' => ['value' => true]]);
+$client->disconnect('42', '', ['code' => 4000, 'reason' => 'bye']);
+
+// phpcent 7
+use Centrifugal\Phpcent\{Disconnect, StreamPosition, SubscribeOptionOverride};
+
+$client->history(channel: 'news', limit: 10, since: new StreamPosition(offset: 5, epoch: $epoch));
+$client->subscribe(channel: 'news', user: '42', recoverSince: new StreamPosition(offset: 5, epoch: $epoch), override: new SubscribeOptionOverride(presence: true));
+$client->disconnect(user: '42', disconnect: new Disconnect(code: 4000, reason: 'bye'));
+```
+
+A result's `position()` gives the `StreamPosition` to read on from:
+`history(channel: 'news', limit: 10, since: $published->position())`, or
+`historyAll(...)`, which reads every page.
 
 ## Programs
 
@@ -300,7 +338,8 @@ foreach ([$conn, $sub] as $token) {
 | `new \phpcent\Client($url, $apiKey, $secret)` | `new Client($url, apiKey: $apiKey)`; the secret goes to `Key::hmac($secret)` |
 | `setApiKey($key)` | `apiKey:` |
 | `setSecret($secret)` | `Key::hmac($secret)`, for `Token::connection` and `Token::subscription` |
-| `setTimeoutOption($seconds)` | `requestTimeout:`, or `timeout:` on a call. It bounds the whole request |
+| `setTimeoutOption($seconds)` | `requestTimeout:`, or `timeout:` on a call. It bounds the whole request; 10 seconds by default, where phpcent 6 had none |
+| `setTimeoutOption(0)`, no timeout | refused: set a large `requestTimeout` |
 | `setConnectTimeoutOption($seconds)` | `curlOptions: [CURLOPT_CONNECTTIMEOUT_MS => ...]`; `requestTimeout` already bounds connecting |
 | `setSafety(false)` | `curlOptions: [CURLOPT_SSL_VERIFYPEER => false, CURLOPT_SSL_VERIFYHOST => 0]` - for development only |
 | `setCert($path)`, `setCAPath($dir)` | `curlOptions: [CURLOPT_CAINFO => $path, CURLOPT_CAPATH => $dir]` |
@@ -308,14 +347,21 @@ foreach ([$conn, $sub] as $token) {
 | `setUseAssoc(true)` | gone: results are typed objects, payloads `stdClass`; `Payload::toArray($payload)` for arrays |
 | `publish($channel, $data, $skipHistory, $tags, $idempotencyKey, $delta, $version, $versionEpoch)` | `publish(channel: ..., data: ..., skipHistory: ..., tags: ..., idempotencyKey: ..., delta: ..., version: ..., versionEpoch: ...)` |
 | `broadcast($channels, $data, ...)` | `broadcast(channels: ..., data: ...)`, or `broadcastWithRetry` |
-| `subscribe($channel, $user, $client, ...)` | `subscribe(channel: ..., user: ..., client: ...)` |
-| `unsubscribe`, `disconnect`, `presence`, `presenceStats`, `history`, `historyRemove`, `channels`, `info` | the same names, each taking its request's fields by name: `history(channel: ..., limit: ...)`; `info()` takes none |
+| `subscribe($channel, $user, $client, $expireAt, $info, $data, $recoverSince, $override, $session)` | `subscribe(channel: ..., user: ..., client: ..., recoverSince: new StreamPosition(...), override: new SubscribeOptionOverride(...))` |
+| `history($channel, $limit, $since, $reverse)` | `history(channel: ..., limit: ..., since: new StreamPosition(offset: ..., epoch: ...), reverse: ...)`; `historyAll(...)` for every page |
+| `disconnect($user, $client, $disconnect, $whitelist, $session)` | `disconnect(user: ..., client: ..., disconnect: new Disconnect(code: ..., reason: ...), whitelist: ...)` |
+| `channels($pattern)` | `channels(pattern: ...)` |
+| `unsubscribe`, `presence`, `presenceStats`, `historyRemove`, `info` | the same names, each taking its request's fields by name: `presence(channel: ...)`; `info()` takes none |
 | `batch(['commands' => [...]])` | `$batch = $client->newBatch(); $p = $batch->publish(channel: ..., data: ...); $batch->send(); $p->result()` |
 | `generateConnectionToken($user, $exp, $info, $channels, $meta)` | `Token::connection($key, new ConnectionClaims(expiresAt: ..., user: ..., info: ..., channels: ..., meta: ...))` |
 | `generateSubscriptionToken($user, $channel, $exp, $info)` | `Token::subscription($key, new SubscriptionClaims(channel: ..., expiresAt: ..., user: ..., info: ...))` |
 | a token without `$exp`, which never expired | `expiresAt: Expiry::Never`, chosen explicitly |
 | `\Exception` with "Response code: ..." | `HttpException` (`UnauthorizedException` for a 401), `NetworkException`, `TimeoutException`, `DecodeException`, all `CentException` |
 | `$res->error` in a response | `ApiException`, thrown |
+| code 107 in a response for an empty required field | `InvalidRequestException`, before sending |
+| a payload `json_encode` cannot encode - NaN, a binary string - sent as no body at all | `InvalidRequestException`, before sending |
+| `\Exception` with "json_decode error" for a reply which is not JSON | `DecodeException` |
+| `User-Agent: curl/7.39.0` | `User-Agent: phpcent/7`; `headers: ['User-Agent' => ...]` replaces it |
 
 For tests, give the client a fake PSR-18 client instead of mocking it: see
 [Testing your code](README.md#testing-your-code).

@@ -44,9 +44,29 @@ final class Psr18ClientsTest extends TestCase
     }
 
     /** @param \Closure(): ClientInterface $http */
-    private static function client(\Closure $http, string $behaviour): Client
+    private static function client(\Closure $http, string $behaviour, ?TestServer $server = null): Client
     {
-        return new Client(self::$server->base . "/{$behaviour}/api", apiKey: 'secret', httpClient: $http(), httpFactory: new Psr17Factory());
+        $base = ($server ?? self::$server)->base;
+
+        return new Client("{$base}/{$behaviour}/api", apiKey: 'secret', httpClient: $http(), httpFactory: new Psr17Factory());
+    }
+
+    /**
+     * Runs $test against a server of its own. php -S serves one request at a
+     * time and goes on with a request whose client timed out, so a slow
+     * route would hold up every later test of the shared server - past their
+     * timeouts on a slow CI runner. Stopping this one ends its slow request.
+     *
+     * @param \Closure(TestServer): void $test
+     */
+    private static function onOwnServer(\Closure $test): void
+    {
+        $server = new TestServer();
+        try {
+            $test($server);
+        } finally {
+            $server->stop();
+        }
     }
 
     /** @param \Closure(): ClientInterface $http */
@@ -60,26 +80,30 @@ final class Psr18ClientsTest extends TestCase
     #[DataProvider('clients')]
     public function testSilentServerTimesOut(\Closure $http): void
     {
-        $start = microtime(true);
-        try {
-            self::client($http, 'slowheaders')->info(timeout: 0.5);
-            self::fail('no timeout');
-        } catch (TimeoutException) {
-        }
-        self::assertLessThan(1.2, microtime(true) - $start);
+        self::onOwnServer(static function (TestServer $server) use ($http): void {
+            $start = microtime(true);
+            try {
+                self::client($http, 'slowheaders', $server)->info(timeout: 0.5);
+                self::fail('no timeout');
+            } catch (TimeoutException) {
+            }
+            self::assertLessThan(1.2, microtime(true) - $start);
+        });
     }
 
     /** @param \Closure(): ClientInterface $http */
     #[DataProvider('clients')]
     public function testTricklingBodyTimesOut(\Closure $http): void
     {
-        $start = microtime(true);
-        try {
-            self::client($http, 'trickle')->info(timeout: 0.8);
-            self::fail('no timeout');
-        } catch (TimeoutException) {
-        }
-        self::assertLessThan(1.8, microtime(true) - $start);
+        self::onOwnServer(static function (TestServer $server) use ($http): void {
+            $start = microtime(true);
+            try {
+                self::client($http, 'trickle', $server)->info(timeout: 0.8);
+                self::fail('no timeout');
+            } catch (TimeoutException) {
+            }
+            self::assertLessThan(1.8, microtime(true) - $start);
+        });
     }
 
     /** @param \Closure(): ClientInterface $http */

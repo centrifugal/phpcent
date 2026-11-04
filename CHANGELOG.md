@@ -3,6 +3,8 @@ v7.0.0
 
 phpcent 7 is a rewrite to the [Centrifugo server SDK specification](https://github.com/centrifugal/gocent/blob/master/spec.md), version 0.3, whose reference implementation is gocent. It needs PHP 8.3 or newer and lives in the `Centrifugal\Phpcent` namespace; it works with Centrifugo v6 and Centrifugo PRO v6 - the map and shared poll methods need v6.8.0 or newer, `ApiException::$temporary` and `TooManyRequestsException` v6.10.0 or newer. Migrating from phpcent 6: see [MIGRATING.md](https://github.com/centrifugal/phpcent/blob/master/MIGRATING.md).
 
+Generated from Centrifugo's protos at [e21aeb50](https://github.com/centrifugal/centrifugo/commit/e21aeb50ab6fc4d525fc817473574f728da6c3ad) on its master, after v6.10.2: the same messages as v6.10.2, with the comments the constants are generated from, and `ConnectResult.profile` for the connect proxy, which Centrifugo PRO newer than v6.10.2 reads.
+
 **Client and calls**
 
 * A method for every API method, the map, shared poll and Centrifugo PRO ones included, generated from Centrifugo's `api.proto` with its documentation. Each takes its request's fields as named arguments - `$client->publish(channel: 'news', data: $data)` - and returns a typed result. `rpc` is not offered: it calls server API extensions, which Centrifugo does not provide.

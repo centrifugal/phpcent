@@ -10,7 +10,7 @@ misuse. Read this before changing code.
 
 | Path | What |
 |---|---|
-| `proto/api.proto`, `proto/proxy.proto` | Copies of Centrifugo's protos, from a released tag (`CENTRIFUGO_REF=v6.10.2 composer sync-proto`) |
+| `proto/api.proto`, `proto/proxy.proto` | Copies of Centrifugo's protos (`CENTRIFUGO_REF=vX.Y.Z composer sync-proto`): a released tag, or a commit of master named in the changelog |
 | `gen/required_fields.txt` | The fields the protos mark "Required.", made required named arguments and constructor arguments, and checked for a value before sending (but those whose empty value has a meaning). Generation fails when the protos' list differs: a newly required field breaks every call without it, so review the change - fix the proto upstream if Centrifugo accepts the field absent - then `php gen/generate.php --accept-required` |
 | `gen/` | The generator: `Proto.php` parses the protos, `Rules.php` reads their comments ("Required.", presence wrappers, "One of:"), `constants_*.txt` pin the constants' names, `generate.php` writes `generated/`, `api_docs.php` writes `API.md` |
 | `generated/` | Generated - never edited: the result and nested message types; `ClientMethods`, `BatchMethods`, `CommandMethods`, the methods taking each request's fields as named arguments; `Internal/` the request classes they build; `Proxy/` types |
@@ -83,7 +83,7 @@ with `php -S`, which Centrifugo reaches as `host.docker.internal`.
 
 ## Updating to a new Centrifugo API
 
-1. `CENTRIFUGO_REF=vX.Y.Z composer sync-proto` - always a released tag.
+1. `CENTRIFUGO_REF=vX.Y.Z composer sync-proto` - a released tag, or, when a release needs changes no tag has yet, a commit of Centrifugo's master, which the release's changelog entry names (spec section 2).
 2. Read the diff of `proto/`: a removed field is a breaking change.
 3. `composer check`, then the integration tests against the new release.
 4. Bump the Centrifugo image in `.github/workflows/ci.yml` and

@@ -89,6 +89,13 @@ final class Psr18Transport implements Transport
         } finally {
             $stream->close();
         }
+        // A body which ended once the call's time ran out may have been cut
+        // short there: some clients end it at their deadline without an
+        // error - Symfony's 7.3.0 does at max_duration - and the reply
+        // would read as one which is not JSON. It is a timeout.
+        if ((hrtime(true) - $start) / 1e9 >= $timeout) {
+            throw new TimeoutException("{$method}: timed out reading the reply");
+        }
 
         return new TransportResponse($status, $respHeaders, $out);
     }

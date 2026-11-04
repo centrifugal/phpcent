@@ -96,12 +96,6 @@ Push a tag, `v7.0.0` say: Packagist picks it up through its GitHub hook, and
 `release.yml` checks the tag against the code, then creates the GitHub
 release. `composer.json` has no `version`: the tag is the version.
 
-Before releasing v7.0.0: `proto/` holds Centrifugo's master (e21aeb50, with
-the "One of:" sentences of centrifugal/centrifugo#1308-#1310 and
-`ConnectResult.profile`), not a tag. Sync it from the first Centrifugo
-release holding them - `CENTRIFUGO_REF=vX.Y.Z composer sync-proto` - and
-bump the image in `ci.yml` and `testdata/centrifugo-pro.compose.yml`.
-
 The release notes are the version's `CHANGELOG.md` entry, pasted into the
 GitHub release as they are: its links are absolute.
 

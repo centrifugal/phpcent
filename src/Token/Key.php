@@ -22,6 +22,8 @@ final class Key
         'secp521r1' => ['ES512', 'P-521', 66, \OPENSSL_ALGO_SHA512],
     ];
 
+    private const int RSA_MIN_BITS = 2048;
+
     // The DER prefix of an Ed25519 private key in PKCS #8, before its 32-byte seed.
     private const string ED25519_PKCS8_PREFIX = "\x30\x2e\x02\x01\x00\x30\x05\x06\x03\x2b\x65\x70\x04\x22\x04\x20";
 
@@ -66,7 +68,9 @@ final class Key
 
     /**
      * A key signing with RS256, whose public key is Centrifugo's
-     * client.token.rsa_public_key: an OpenSSL key, or its PEM.
+     * client.token.rsa_public_key: an OpenSSL key, or its PEM, of 2048 bits or
+     * more. A shorter key is refused, as an ECDSA key on another curve is:
+     * 2048 bits is the floor of NIST SP 800-131A.
      */
     public static function rsa(#[\SensitiveParameter] \OpenSSLAsymmetricKey|string $privateKey, ?string $passphrase = null): self
     {
@@ -74,6 +78,12 @@ final class Key
         $d = self::details($key);
         if (($d['type'] ?? null) !== \OPENSSL_KEYTYPE_RSA) {
             throw new InvalidRequestException('token: Key::rsa takes an RSA private key');
+        }
+        $bits = $d['bits'] ?? null;
+        if (!\is_int($bits) || $bits < self::RSA_MIN_BITS) {
+            $got = \is_int($bits) ? (string) $bits : 'unknown';
+
+            throw new InvalidRequestException("token: RSA key of {$got} bits, want 2048 or more");
         }
         $jwk = ['kty' => 'RSA', 'n' => self::b64(ltrim(self::part($d, 'rsa', 'n'), "\0")), 'e' => self::b64(ltrim(self::part($d, 'rsa', 'e'), "\0"))];
 

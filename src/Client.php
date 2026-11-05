@@ -292,7 +292,9 @@ final class Client
             if ($sleep > 0) {
                 usleep((int) ($sleep * 1e6));
             }
-            $this->checkOpen();
+            // A client closed meanwhile fails the next attempt with
+            // ClosedException, which no retry fixes: the result keeps every
+            // channel's outcome.
         }
         $out = self::outcome(new BroadcastResult(array_values($final), $key, $attempts, $replied), $replied, $last);
         if ($out instanceof \Throwable) {
@@ -321,8 +323,11 @@ final class Client
 
     /**
      * Stops the client: calls made from now on throw ClosedException, and its
-     * connections are closed. A broadcast being retried stops at its next
-     * attempt.
+     * connections are closed. A call in progress - one whose HTTP client or
+     * callback calls close() - goes on. A broadcast being retried stops at its
+     * next attempt, which fails with ClosedException. Calls are made one after
+     * another, so nothing is left to wait for: close() returns at once, and
+     * may be called again.
      */
     public function close(): void
     {

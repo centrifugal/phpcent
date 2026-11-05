@@ -21,7 +21,7 @@ composer require centrifugal/phpcent
 phpcent 7 replaces phpcent 6: see [MIGRATING.md](MIGRATING.md). phpcent
 implements the
 [Centrifugo server SDK specification](https://github.com/centrifugal/gocent/blob/master/spec.md),
-version 0.3.
+version 0.4.
 
 ## Example
 
@@ -465,7 +465,11 @@ of `new FailedCommand($index, $method, $error)`.
 ## Shutdown
 
 `$client->close()` refuses new calls with `ClosedException` and closes its
-connections. A broadcast being retried stops at its next attempt.
+connections. A call in progress - one whose HTTP client or callback calls
+`close()` - goes on. A broadcast being retried stops at its next attempt,
+which fails with `ClosedException`: the exception holds every channel's
+outcome as usual. PHP makes calls one after another, so nothing is left to
+wait for: `close()` returns at once, and may be called again.
 
 ## HTTP handlers
 
@@ -530,12 +534,16 @@ allowed, and as a refresh or sub refresh which expired. Error codes are in
 most 32 bytes. Payloads
 arrive as `stdClass`, and go back exactly. Keep proxy endpoints
 reachable by Centrifugo only: whoever can call them can claim to be any user.
+Put them on a network only Centrifugo reaches, or check a secret header
+Centrifugo adds with the proxy's `static_headers` option before the handler,
+and use TLS where the traffic leaves a trusted network.
 
 ## Tokens
 
 The `Centrifugal\Phpcent\Token` namespace issues the JWTs Centrifugo
 authenticates clients with - connection and subscription tokens, with
-Centrifugo's claims, signed with HMAC, RSA, ECDSA or Ed25519 - and the
+Centrifugo's claims, signed with HMAC, RSA (2048 bits or more), ECDSA or
+Ed25519 - and the
 `Endpoints` namespace serves the endpoints the `getToken` callbacks of client
 SDKs call:
 

@@ -184,8 +184,11 @@ It can be heavy on large deployments: there is no pagination.
 #### `close(): void`
 
 Stops the client: calls made from now on throw ClosedException, and its
-connections are closed. A broadcast being retried stops at its next
-attempt.
+connections are closed. A call in progress - one whose HTTP client or
+callback calls close() - goes on. A broadcast being retried stops at its
+next attempt, which fails with ClosedException. Calls are made one after
+another, so nothing is left to wait for: close() returns at once, and
+may be called again.
 
 #### `connections(
     string $user = '',
@@ -3196,7 +3199,9 @@ A key signing with HS256 and $secret: Centrifugo's client.token.hmac_secret_key.
 #### `static rsa(OpenSSLAsymmetricKey|string $privateKey, ?string $passphrase = null): Key`
 
 A key signing with RS256, whose public key is Centrifugo's
-client.token.rsa_public_key: an OpenSSL key, or its PEM.
+client.token.rsa_public_key: an OpenSSL key, or its PEM, of 2048 bits or
+more. A shorter key is refused, as an ECDSA key on another curve is:
+2048 bits is the floor of NIST SP 800-131A.
 
 #### `withKeyId(string $kid): Key`
 
@@ -3663,8 +3668,10 @@ with encoding "binary"; a result may answer with either field.
 Security: Centrifugo trusts what a proxy endpoint answers, and the endpoint
 trusts what Centrifugo sends - a SubscribeRequest's user is the user
 Centrifugo authenticated. Anyone else able to reach the endpoint could claim
-any user. Keep proxy endpoints reachable by Centrifugo only: on an internal
-network, or behind a check of a secret Centrifugo sends as a static header.
+any user. Keep proxy endpoints reachable by Centrifugo only: on a network
+only Centrifugo reaches, or behind a check of a secret header Centrifugo
+adds to every proxy request - the proxy's static_headers option - made
+before the handler; with TLS where the traffic leaves a trusted network.
 
 - `$func` `callable(TRequest, HttpRequest): TResult` - answers the proxy request: it takes the decoded request and the HTTP request - with the headers Centrifugo passed on
 - `$onError` `?callable(HttpRequest, \Throwable): void` - told of every 500 and 400, with the exception; it must not throw

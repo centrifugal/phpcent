@@ -184,6 +184,25 @@ final class TokenTest extends TestCase
         Key::ecdsa($pk);
     }
 
+    public function testShortRsaKeysRefused(): void
+    {
+        // Refused as a wrong ECDSA curve is: when the key is made, with
+        // InvalidRequestException - so for connection, subscription and API
+        // tokens, and JWKS, alike.
+        $pk = openssl_pkey_new(['private_key_type' => \OPENSSL_KEYTYPE_RSA, 'private_key_bits' => 1024]);
+        self::assertNotFalse($pk);
+        self::assertTrue(openssl_pkey_export($pk, $pem));
+        \assert(\is_string($pem));
+        foreach ([static fn(): Key => Key::rsa($pk), static fn(): Key => Key::rsa($pem), static fn(): Key => Key::fromPem($pem)] as $make) {
+            try {
+                $make();
+                self::fail('a 1024-bit RSA key was accepted');
+            } catch (InvalidRequestException $e) {
+                self::assertStringContainsString('RSA key of 1024 bits, want 2048 or more', $e->getMessage());
+            }
+        }
+    }
+
     public function testEd25519(): void
     {
         $seed = str_repeat("\1", 32);

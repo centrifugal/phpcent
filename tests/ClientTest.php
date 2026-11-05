@@ -942,6 +942,87 @@ final class ClientTest extends TestCase
         self::assertSame([], $fake->requests);
     }
 
+    /**
+     * Shutdown (spec 3.6 and 15). PHP has no concurrent calls: close() can only
+     * be called while a call is in progress from inside it - the HTTP client,
+     * a callback - and then the call goes on, while calls made after it throw
+     * ClosedException. Nothing is left to wait for when close() returns, so it
+     * takes no deadline, and calling it again does the same.
+     */
+    public function testCloseDuringACall(): void
+    {
+        $c = null;
+        $fake = new FakeCentrifugo(static function () use (&$c): \stdClass {
+            \assert($c instanceof Client);
+            $c->close();
+
+            return (object) ['offset' => 7];
+        });
+        $c = FakeCentrifugo::client($fake);
+        // The call in progress gets its reply.
+        self::assertSame(7, $c->publish(channel: 'news', data: 1)->offset);
+        try {
+            $c->publish(channel: 'news', data: 1);
+            self::fail('no error');
+        } catch (ClosedException $e) {
+            self::assertFalse(Retry::retryable($e));
+        }
+        $b = $c->newBatch();
+        $p = $b->publish(channel: 'news', data: 1);
+        try {
+            $b->send();
+            self::fail('no error');
+        } catch (ClosedException) {
+        }
+        try {
+            $p->result();
+            self::fail('no error');
+        } catch (ClosedException) {
+        }
+        self::assertCount(1, $fake->requests);
+        // Again: nothing left to wait for.
+        $c->close();
+        self::assertCount(1, $fake->requests);
+    }
+
+    /** A broadcast being retried when the client closes stops at its next attempt, which fails with ClosedException. */
+    public function testCloseStopsRetries(): void
+    {
+        // Attempts which got a reply: the result holds ClosedException for the channel.
+        $fake = new FakeCentrifugo(static fn(): array => ['responses' => [['error' => ['code' => 111, 'message' => 'limit', 'temporary' => true]]]]);
+        $c = FakeCentrifugo::client($fake);
+        $close = static function () use ($c): float {
+            $c->close();
+
+            return 0.0;
+        };
+        try {
+            $c->broadcastWithRetry(channels: ['a'], data: 1, maxAttempts: 10, onAttemptError: $close);
+            self::fail('no error');
+        } catch (BroadcastFailedChannelsException $e) {
+            self::assertInstanceOf(ClosedException::class, $e->result->channels[0]->error);
+            self::assertFalse(Retry::retryable($e));
+            self::assertTrue($e->result->replied);
+            self::assertSame(2, $e->result->attempts);
+        }
+        self::assertCount(1, $fake->requests);
+        // Attempts which failed as a whole: ClosedException, with the key the attempts carried.
+        $fake = new FakeCentrifugo(static fn(): Response => FakeCentrifugo::json(503, 'down'));
+        $c = FakeCentrifugo::client($fake);
+        $close = static function () use ($c): float {
+            $c->close();
+
+            return 0.0;
+        };
+        try {
+            $c->broadcastWithRetry(channels: ['a'], data: 1, maxAttempts: 10, onAttemptError: $close);
+            self::fail('no error');
+        } catch (ClosedException $e) {
+            self::assertSame($fake->last()['json']->idempotency_key, $e->idempotencyKey);
+        }
+        self::assertCount(1, $fake->requests);
+    }
+
     public function testOnRequest(): void
     {
         /** @var list<RequestInfo> $infos */

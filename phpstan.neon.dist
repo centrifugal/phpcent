@@ -1,0 +1,11 @@
+includes:
+    - vendor/phpstan/phpstan-strict-rules/rules.neon
+
+parameters:
+    level: max
+    paths:
+        - src
+        - generated
+    phpVersion: 80300
+    # A library checks what callers pass at run time, whatever the PHPDoc says.
+    treatPhpDocTypesAsCertain: false

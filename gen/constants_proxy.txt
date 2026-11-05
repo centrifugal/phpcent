@@ -1,0 +1,13 @@
+# The names of the constants of proxy.proto's fields with a "One of:"
+# sentence, as the spec's section 3.3 pins them for every SDK: a selector and the
+# name. *.field names the field in every message which has it. A name never
+# changes once given; a field with a new sentence fails the generation until
+# it is named here and in the spec's table.
+FilterNode.op FilterNodeOp
+FilterNode.cmp Cmp
+*.protocol Protocol
+*.encoding Encoding
+*.allow Allow
+ChannelsCapability.match CapabilityMatch
+MapPublishResult.key_mode KeyMode
+ChannelEvent.type ChannelEventType

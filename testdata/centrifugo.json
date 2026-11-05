@@ -1,0 +1,39 @@
+{
+  "http_server": {"port": 8100},
+  "http_api": {"key": "api_key"},
+  "log": {"level": "error"},
+  "client": {
+    "token": {
+      "hmac_secret_key": "client_secret",
+      "ed25519_public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAgTl3Dqh9F19Wo1Rmw0x+zMuNipG07jeiXfYPW4/Js5Q=\n-----END PUBLIC KEY-----\n"
+    },
+    "proxy": {
+      "connect": {"enabled": true, "endpoint": "http://host.docker.internal:3100/connect", "timeout": "3s"},
+      "refresh": {"enabled": true, "endpoint": "http://host.docker.internal:3100/refresh", "timeout": "3s"}
+    }
+  },
+  "uni_http_stream": {"enabled": true},
+  "shared_poll": {"hmac_secret_key": "shared_poll_secret"},
+  "channel": {
+    "without_namespace": {
+      "history_size": 1000,
+      "history_ttl": "300s",
+      "presence": true
+    },
+    "proxy": {
+      "shared_poll_refresh": {"endpoint": "http://localhost:3000/shared_poll_refresh"}
+    },
+    "namespaces": [
+      {
+        "name": "map",
+        "subscription_type": "map",
+        "map": {"mode": "recoverable", "key_ttl": "60s", "stream_size": 100, "stream_ttl": "300s", "meta_ttl": "600s"}
+      },
+      {
+        "name": "poll",
+        "subscription_type": "shared_poll",
+        "shared_poll": {"mode": "versioned", "publish_enabled": true}
+      }
+    ]
+  }
+}

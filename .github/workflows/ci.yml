@@ -1,40 +1,127 @@
-
-name: "test"
+name: CI
 
 on: [push, pull_request]
 
+permissions:
+  contents: read
+
+# Every job runs composer scripts, so what passes locally passes here. Each job
+# skips a pull request from this repository's own branches, which the push
+# already ran.
+
 jobs:
   test:
-    name: Test with PHP ${{ matrix.php-version }}
-    runs-on: ubuntu-latest
-    # Prevent duplicate builds on internal PRs.
+    name: test (${{ matrix.os }}, PHP ${{ matrix.php }}${{ matrix.lowest && ', lowest deps' || '' }})
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        php-version: ["7.4", "8.0"]
+        os: [ubuntu-latest]
+        php: ["8.3", "8.4", "8.5"]
+        lowest: [false]
+        include:
+          - os: ubuntu-latest
+            php: "8.3"
+            lowest: true
+          - os: macos-latest
+            php: "8.5"
+            lowest: false
+          - os: windows-latest
+            php: "8.5"
+            lowest: false
     steps:
-      - uses: "actions/checkout@v2"
-
-      - uses: "shivammathur/setup-php@v2"
+      - uses: actions/checkout@v5
+      - uses: shivammathur/setup-php@v2
         with:
-          php-version: "${{ matrix.php-version }}"
+          php-version: ${{ matrix.php }}
+          extensions: curl, openssl, sodium
+          coverage: none
+      - uses: ramsey/composer-install@v3
+        with:
+          dependency-versions: ${{ matrix.lowest && 'lowest' || 'highest' }}
+      - run: composer test
 
-      - name: Composer install
-        uses: "ramsey/composer-install@v1"
+  check:
+    name: check (style, types, generated code)
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          coverage: none
+      - uses: ramsey/composer-install@v3
+      - run: composer validate --strict --no-check-lock
+      - run: composer check
 
-      - name: Start Centrifugo
-        run: docker run -d -p 8000:8000 centrifugo/centrifugo:latest centrifugo --http_api.insecure
+  integration:
+    name: integration (Centrifugo)
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    # The same setup as testdata/centrifugo.json, through Centrifugo's
+    # environment variables.
+    services:
+      centrifugo:
+        image: centrifugo/centrifugo:v6.10.2
+        ports:
+          - 8100:8000
+        # The proxy tests' backend runs on the runner, which Centrifugo
+        # reaches as host.docker.internal.
+        options: --add-host=host.docker.internal:host-gateway
+        env:
+          CENTRIFUGO_HTTP_API_KEY: api_key
+          CENTRIFUGO_CHANNEL_WITHOUT_NAMESPACE_HISTORY_SIZE: "1000"
+          CENTRIFUGO_CHANNEL_WITHOUT_NAMESPACE_HISTORY_TTL: 300s
+          CENTRIFUGO_CHANNEL_WITHOUT_NAMESPACE_PRESENCE: "true"
+          CENTRIFUGO_CLIENT_TOKEN_HMAC_SECRET_KEY: client_secret
+          CENTRIFUGO_CLIENT_TOKEN_ED25519_PUBLIC_KEY: |
+            -----BEGIN PUBLIC KEY-----
+            MCowBQYDK2VwAyEAgTl3Dqh9F19Wo1Rmw0x+zMuNipG07jeiXfYPW4/Js5Q=
+            -----END PUBLIC KEY-----
+          CENTRIFUGO_UNI_HTTP_STREAM_ENABLED: "true"
+          CENTRIFUGO_CLIENT_PROXY_CONNECT_ENABLED: "true"
+          CENTRIFUGO_CLIENT_PROXY_CONNECT_ENDPOINT: http://host.docker.internal:3100/connect
+          CENTRIFUGO_CLIENT_PROXY_CONNECT_TIMEOUT: 3s
+          CENTRIFUGO_CLIENT_PROXY_REFRESH_ENABLED: "true"
+          CENTRIFUGO_CLIENT_PROXY_REFRESH_ENDPOINT: http://host.docker.internal:3100/refresh
+          CENTRIFUGO_CLIENT_PROXY_REFRESH_TIMEOUT: 3s
+          CENTRIFUGO_SHARED_POLL_HMAC_SECRET_KEY: shared_poll_secret
+          CENTRIFUGO_CHANNEL_PROXY_SHARED_POLL_REFRESH_ENDPOINT: http://localhost:3000/shared_poll_refresh
+          CENTRIFUGO_CHANNEL_NAMESPACES: >-
+            [{"name":"map","subscription_type":"map","map":{"mode":"recoverable","key_ttl":"60s","stream_size":100,"stream_ttl":"300s","meta_ttl":"600s"}},
+            {"name":"poll","subscription_type":"shared_poll","shared_poll":{"mode":"versioned","publish_enabled":true}}]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.5"
+          coverage: none
+      - uses: ramsey/composer-install@v3
+      - run: composer test-integration
 
-      - name: Check container status
-        run: docker ps
-
-      - name: Wait for server to be ready
-        run: |
-          while ! curl -s http://localhost:8000 > /dev/null; do
-            echo "Waiting for server..."
-            sleep 1
-          done
-        shell: bash
-
-      - name: Run tests
-        run: vendor/bin/phpunit
+  integration-pro:
+    name: integration (Centrifugo PRO)
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    # testdata/centrifugo-pro.compose.yml, which also runs it locally: Centrifugo
+    # PRO with Redis and PostgreSQL. PHPCENT_TEST_PRO fails the PRO tests, rather
+    # than skipping them, if the server turns out not to be PRO. The tests use
+    # Centrifugo PRO in sandbox mode, without a license key. Centrifugo PRO is
+    # commercial software, under the Centrifugal Labs License Agreement
+    # (https://centrifugal.dev/license), not phpcent's MIT license.
+    env:
+      PHPCENT_TEST_PRO: "1"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.5"
+          coverage: none
+      - uses: ramsey/composer-install@v3
+      - run: docker compose -f testdata/centrifugo-pro.compose.yml up -d --wait
+      - run: composer test-integration
+      - name: Centrifugo logs
+        if: failure()
+        run: docker compose -f testdata/centrifugo-pro.compose.yml logs centrifugo

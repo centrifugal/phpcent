@@ -1,7 +1,7 @@
 v7.0.0
 ======
 
-phpcent 7 is a rewrite to the [Centrifugo server SDK specification](https://github.com/centrifugal/gocent/blob/master/spec.md), version 0.3, whose reference implementation is gocent. It needs PHP 8.3 or newer and lives in the `Centrifugal\Phpcent` namespace; it works with Centrifugo v6 and Centrifugo PRO v6 - the map and shared poll methods need v6.8.0 or newer, `ApiException::$temporary` and `TooManyRequestsException` v6.10.0 or newer. Migrating from phpcent 6: see [MIGRATING.md](https://github.com/centrifugal/phpcent/blob/master/MIGRATING.md).
+phpcent 7 is a rewrite to the [Centrifugo server SDK specification](https://github.com/centrifugal/gocent/blob/master/spec.md), version 0.4, whose reference implementation is gocent. It needs PHP 8.3 or newer and lives in the `Centrifugal\Phpcent` namespace; it works with Centrifugo v6 and Centrifugo PRO v6 - the map and shared poll methods need v6.8.0 or newer, `ApiException::$temporary` and `TooManyRequestsException` v6.10.0 or newer. Migrating from phpcent 6: see [MIGRATING.md](https://github.com/centrifugal/phpcent/blob/master/MIGRATING.md).
 
 Generated from Centrifugo's protos at [e21aeb50](https://github.com/centrifugal/centrifugo/commit/e21aeb50ab6fc4d525fc817473574f728da6c3ad) on its master, after v6.10.2: the same messages as v6.10.2, with the comments the constants are generated from, and `ConnectResult.profile` for the connect proxy, which Centrifugo PRO newer than v6.10.2 reads.
 
@@ -13,7 +13,7 @@ Generated from Centrifugo's protos at [e21aeb50](https://github.com/centrifugal/
 * `apiEndpointFunc` and `bearerTokenFunc` are called for each request. An endpoint failing `apiEndpoint`'s rules, or an empty or malformed token, fails the call with `InvalidConfigException` before sending.
 * A field the protos mark "Required." is a named argument without a default - in the nested messages' constructors too: `new RateLimitPolicy(rate: 1, intervalMs: 1000)` - and is checked for a value before sending, in a call, a batch and a command: `channel: ''`, `version: 0` or an empty `notification` throws `InvalidRequestException` naming the field's path, `limit_strategy.rate_limit.policies[0].rate is required`. A field whose empty value has a meaning - `invalidateUserTokens(user: '')`, the device updates' values - is not checked; a payload's JSON null, `new RawJson('null')`, is a value.
 * A nested message set but empty is not sent - an empty `limitStrategy` is no limit strategy. The presence wrappers are sent whenever set, even empty: `deviceUpdate(userUpdate: new DeviceUserUpdate(user: ''))` detaches the devices from their user, an empty timezone, locale or meta update clears it. `BoolValue` fields are `?bool`: `null` leaves the server's setting alone.
-* Redirects are not followed; the error says Centrifugo's API never redirects a call, and to check the endpoint's scheme and path. `close()` refuses further calls with `ClosedException`.
+* Redirects are not followed; the error says Centrifugo's API never redirects a call, and to check the endpoint's scheme and path. `close()` refuses further calls with `ClosedException`; a broadcast being retried stops at its next attempt, which fails with `ClosedException`.
 * Results render with Centrifugo's field names under `json_encode` - `num_clients` - and errors in them as `{code, message}`.
 
 **Timeouts**
@@ -56,7 +56,7 @@ Generated from Centrifugo's protos at [e21aeb50](https://github.com/centrifugal/
 
 **Tokens and JWKS**
 
-* `Token::connection` and `Token::subscription` with every claim, `profile` included; HS256, RS256, ES256/384/512 and EdDSA keys (`Key::hmac`, `rsa`, `ecdsa`, `ed25519`, `fromPem`). An expiry is required: a time, or `Expiry::Never`.
+* `Token::connection` and `Token::subscription` with every claim, `profile` included; HS256, RS256 (RSA keys of 2048 bits or more), ES256/384/512 (other curves refused) and EdDSA keys (`Key::hmac`, `rsa`, `ecdsa`, `ed25519`, `fromPem`). An expiry is required: a time, or `Expiry::Never`.
 * `Token::jwks` and the `Jwks` endpoint publish the public keys, for key rotation without restarting Centrifugo.
 * Centrifugo PRO server API tokens: `Token::api`, and `ApiTokenSource`, whose `token` method is a client's `bearerTokenFunc`, reusing a token for half its lifetime.
 
@@ -64,7 +64,7 @@ Generated from Centrifugo's protos at [e21aeb50](https://github.com/centrifugal/
 
 * Endpoints client SDKs call: `ConnectionToken`, `SubscriptionToken`, `SharedPollSignature`, `Jwks`. Their function throws `ForbiddenException` to answer 403, which client SDKs report as their `UnauthorizedError`.
 * `SharedPoll::sign` for shared poll signatures, its expiry required.
-* A handler for every proxy type, generated from `proxy.proto`: connect, refresh, subscribe, sub refresh, publish, RPC, map publish and remove, shared poll refresh, and Centrifugo PRO's channel state and cache empty notifications. The function returns a result, or throws `ProxyError` or `Disconnect`; anything else is a 500 reported to `onError`.
+* A handler for every proxy type, generated from `proxy.proto`: connect, refresh, subscribe, sub refresh, publish, RPC, map publish and remove, shared poll refresh, and Centrifugo PRO's channel state and cache empty notifications. The function returns a result, or throws `ProxyError` or `Disconnect`; anything else is a 500 reported to `onError`. The docs say how to keep proxy endpoints reachable by Centrifugo only: a network only Centrifugo reaches, a secret header from the proxy's `static_headers` checked before the handler, TLS where the traffic leaves a trusted network.
 * Every handler and endpoint is a framework-free core with PSR-15 (`psr15()`, `handlePsr()`) and plain PHP (`serve()`) adapters, with a body limit.
 * `Command::publish(...)` and the other methods, for Centrifugo's async consumers: checked as a call is, `method` and `payload` for an outbox table, `toJson()` or `json_encode` for a whole message.
 

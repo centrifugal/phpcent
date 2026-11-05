@@ -2,7 +2,7 @@
 
 phpcent 7 is a rewrite, to the
 [Centrifugo server SDK specification](https://github.com/centrifugal/gocent/blob/master/spec.md),
-version 0.3, for Centrifugo v6. It needs PHP 8.3 or newer, and lives in the `Centrifugal\Phpcent` namespace
+version 0.4, for Centrifugo v6. It needs PHP 8.3 or newer, and lives in the `Centrifugal\Phpcent` namespace
 instead of `phpcent`. Both are the `centrifugal/phpcent` package, so an
 application moves over at once; one which needs time can stay on
 `"centrifugal/phpcent": "^6.0"`, which keeps working.
